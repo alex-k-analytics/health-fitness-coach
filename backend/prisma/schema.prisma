@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String            @id @default(cuid())
+  name              String
+  timezone          String
+  dailyCalorieGoal  Int
+  phoneNumber       String?
+  equipment         UserEquipment[]
+  workouts          WorkoutLog[]
+  meals             MealSubmission[]
+  reminders         Reminder[]
+  conversations     Conversation[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model UserEquipment {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model WorkoutLog {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  durationMinutes Int
+  completedAt     DateTime
+  notes           String?
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MealSubmission {
+  id                String   @id @default(cuid())
+  userId            String
+  imageBlobKey      String?
+  estimatedCalories Int?
+  portionAdvice     String?
+  macroAdvice       String?
+  submittedAt       DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  channel   String
+  message   String
+  sendAt    DateTime
+  status    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
