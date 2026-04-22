@@ -1,69 +1,129 @@
-# Health & Fitness Coach (Agentic Web App)
+# Health & Fitness Coach
 
-This repository contains a starter full-stack implementation for a **mobile-first health and fitness coaching app** with an agent workflow.
+Household nutrition tracking app with:
 
-## What is included
+- authenticated owner/member access
+- per-member goals and health metrics
+- meal logging with multiple food and label photos
+- OpenAI-powered nutrition analysis with fallback heuristics
+- reusable saved foods
+- PostgreSQL persistence and GCS-backed image storage in production
+- Terraform-managed GCP infrastructure and GitHub Actions deployment
 
-- **Frontend (React + Vite + TypeScript)** optimized for mobile workflows.
-- **Backend (Node.js + Express + TypeScript)** with API routes for:
-  - profile + equipment
-  - workout planning and workout logs
-  - nutrition photo submissions + portion guidance
-  - conversation history and reminders
-- **Integrations scaffold** for:
-  - OpenAI API for agent responses
-  - Google Calendar OAuth + scheduling hooks
-  - SMS reminders (Twilio-style adapter)
-- **Data layer plan**
-  - PostgreSQL (relational app data)
-  - Blob storage (MinIO/S3-compatible) for food pictures and generated artifacts
-  - Prisma schema to support future conversation recall and analytics
-- **Local infra** via `docker-compose` (Postgres + MinIO)
+## Stack
 
-## Monorepo structure
+- `frontend/`: React + Vite + TypeScript
+- `backend/`: Express + TypeScript + Prisma
+- `infra/terraform/`: Cloud Run, Cloud SQL, Artifact Registry, Secret Manager, and GCS
+- `Dockerfile`: production image that serves both the API and built frontend from one Cloud Run service
 
-- `frontend/` mobile-first React app
-- `backend/` API + service integrations + data schema
-- `docker-compose.yml` local data services
-- `.env.example` shared config template
+## Product model
 
-## Quick start
+- One `Household` contains multiple authorized profiles.
+- Each signed-in person has a private `HouseholdMember` page.
+- Owners can invite additional users with invite links/tokens.
+- Members can set goals, log health metrics, upload meal photos, and reuse saved food entries.
+- Meal analysis stores calories, macros, assumptions, micronutrients, vitamins, and image references.
+
+## Local development
 
 1. Copy environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-2. Start local infrastructure:
-   ```bash
-   docker compose up -d
-   ```
-3. Install dependencies and run apps:
-   ```bash
-   cd backend && npm install && npm run dev
-   cd frontend && npm install && npm run dev
-   ```
 
-## Product roadmap alignment
+```bash
+cp .env.example .env
+```
 
-### Phase 1 (implemented in scaffold)
-- Core API contracts and domain models
-- Mobile-first UI for profile, workouts, food photo flow, and reminders
-- Integration service interfaces + stubs
+2. Start PostgreSQL:
 
-### Phase 2 (next)
-- Real Google OAuth flow + calendar event writebacks
-- Production OpenAI tool-calling loop for autonomous scheduling and guidance
-- Blob upload from mobile camera + vision nutrition extraction
-- Conversation memory retrieval and proactive coaching
+```bash
+docker compose up -d
+```
 
-### Phase 3 (later)
-- Adaptive plans based on compliance and fatigue
-- Macro/micro nutrient deficiency trend detection
-- Rich notifications (SMS + push) and wearable data sync
+3. Install backend dependencies, generate Prisma client, and run the API:
 
-## Security and privacy notes
+```bash
+cd backend
+npm install
+npm run prisma:generate
+npm run dev
+```
 
-- Health data is sensitive; use encryption in transit and at rest.
-- Store OAuth tokens securely and rotate refresh tokens.
-- Gate reminders and AI recommendations behind explicit user consent.
-- Add explainability in nutrition and workout suggestions.
+4. In another terminal, install frontend dependencies and run Vite:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+5. Optional: apply the schema to a local Postgres instance:
+
+```bash
+cd backend
+npx prisma db push
+```
+
+The frontend expects the API at `http://localhost:4000/api` by default.
+
+## Auth and data flow
+
+- `POST /api/auth/register-owner`: create the first household owner.
+- `POST /api/auth/login`: sign in.
+- `POST /api/auth/accept-invite`: join a household with an invite token.
+- `GET /api/household`: view members and pending invites.
+- `PATCH /api/profile/me`: update goals/profile.
+- `POST /api/profile/me/health-metrics`: append a health snapshot.
+- `POST /api/nutrition/meals`: multipart meal submission with `plateImages`, `labelImages`, and `otherImages`.
+- `POST /api/nutrition/saved-foods`: create reusable food entries.
+
+If `OPENAI_API_KEY` is configured, the backend sends meal photos and serving context to the OpenAI Responses API. If it is not configured, the app still stores the meal and produces a conservative fallback estimate.
+
+## Production deployment
+
+The production deployment uses one Cloud Run service that serves:
+
+- the Express API
+- the built React frontend
+
+Terraform provisions:
+
+- Artifact Registry repository
+- Cloud Run service
+- Cloud SQL PostgreSQL instance
+- GCS bucket for meal images
+- Secret Manager secrets for `DATABASE_URL`, `JWT_SECRET`, and optionally `OPENAI_API_KEY`
+- runtime service account and IAM bindings
+
+The main Terraform entrypoint is:
+
+- [infra/terraform/main.tf](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/infra/terraform/main.tf)
+
+Example variables live in:
+
+- [infra/terraform/terraform.tfvars.example](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/infra/terraform/terraform.tfvars.example)
+
+## GitHub Actions
+
+Two workflows are included:
+
+- [CI](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/ci.yml): installs dependencies, builds frontend/backend, and validates Terraform
+- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): creates Artifact Registry if needed, builds and pushes the container image, then applies Terraform
+
+Required GitHub secrets for deployment:
+
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `GCP_SERVICE_NAME`
+- `GCP_ARTIFACT_REPOSITORY_ID`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_DEPLOYER_SERVICE_ACCOUNT`
+- `APP_BASE_URL`
+- `JWT_SECRET`
+- `OPENAI_API_KEY`
+
+`APP_BASE_URL` should be the public URL you want the app to use for invite links and browser-origin checks.
+
+## Notes
+
+- The repo includes a generated Prisma migration at [backend/prisma/migrations/20260418223000_household_nutrition/migration.sql](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/backend/prisma/migrations/20260418223000_household_nutrition/migration.sql).
+- Health data is sensitive. The production stack assumes HTTPS, Secret Manager, private object storage, and authenticated access at the application layer.

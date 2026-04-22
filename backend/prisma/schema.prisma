@@ -7,65 +7,190 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                String            @id @default(cuid())
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum MealAnalysisStatus {
+  PENDING
+  COMPLETED
+  FALLBACK
+  FAILED
+}
+
+enum MealImageKind {
+  PLATE
+  LABEL
+  OTHER
+}
+
+model Account {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  passwordHash    String
+  member          HouseholdMember?
+  acceptedInvites HouseholdInvite[] @relation("InviteAcceptedBy")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Household {
+  id        String           @id @default(cuid())
+  name      String
+  members   HouseholdMember[]
+  invites   HouseholdInvite[]
+  savedFoods SavedFood[]
+  meals     MealEntry[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model HouseholdMember {
+  id               String            @id @default(cuid())
+  householdId      String
+  accountId        String            @unique
+  displayName      String
+  role             HouseholdRole     @default(MEMBER)
+  goalSummary      String?
+  calorieGoal      Int?
+  proteinGoalGrams Float?
+  carbGoalGrams    Float?
+  fatGoalGrams     Float?
+  heightCm         Float?
+  activityLevel    String?
+  notes            String?
+  household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  healthMetrics    HealthMetric[]
+  meals            MealEntry[]
+  createdInvites   HouseholdInvite[] @relation("InviteCreatedBy")
+  createdFoods     SavedFood[]       @relation("FoodCreatedBy")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([householdId])
+}
+
+model HouseholdInvite {
+  id                 String           @id @default(cuid())
+  householdId        String
+  email              String
+  suggestedName      String?
+  role               HouseholdRole    @default(MEMBER)
+  tokenHash          String           @unique
+  invitedByMemberId  String
+  expiresAt          DateTime
+  status             InvitationStatus @default(PENDING)
+  acceptedAt         DateTime?
+  acceptedByAccountId String?
+  household          Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  invitedBy          HouseholdMember  @relation("InviteCreatedBy", fields: [invitedByMemberId], references: [id], onDelete: Cascade)
+  acceptedByAccount  Account?         @relation("InviteAcceptedBy", fields: [acceptedByAccountId], references: [id], onDelete: SetNull)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([householdId, status])
+}
+
+model HealthMetric {
+  id                      String          @id @default(cuid())
+  memberId                String
+  recordedAt              DateTime        @default(now())
+  weightKg                Float?
+  systolicBloodPressure   Int?
+  diastolicBloodPressure  Int?
+  restingHeartRate        Int?
+  bodyFatPercent          Float?
+  waistCm                 Float?
+  note                    String?
+  member                  HouseholdMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt               DateTime        @default(now())
+
+  @@index([memberId, recordedAt(sort: Desc)])
+}
+
+model SavedFood {
+  id                String          @id @default(cuid())
+  householdId       String
+  createdByMemberId String
   name              String
-  timezone          String
-  dailyCalorieGoal  Int
-  phoneNumber       String?
-  equipment         UserEquipment[]
-  workouts          WorkoutLog[]
-  meals             MealSubmission[]
-  reminders         Reminder[]
-  conversations     Conversation[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  brand             String?
+  servingDescription String?
+  servingWeightGrams Float?
+  calories          Float?
+  proteinGrams      Float?
+  carbsGrams        Float?
+  fatGrams          Float?
+  fiberGrams        Float?
+  sugarGrams        Float?
+  sodiumMg          Float?
+  micronutrients    Json?
+  notes             String?
+  household         Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy         HouseholdMember @relation("FoodCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Cascade)
+  meals             MealEntry[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([householdId, name])
 }
 
-model UserEquipment {
-  id        String   @id @default(cuid())
-  userId    String
-  label     String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+model MealEntry {
+  id                String             @id @default(cuid())
+  householdId       String
+  memberId          String
+  savedFoodId       String?
+  title             String
+  notes             String?
+  eatenAt           DateTime
+  servingDescription String?
+  quantity          Float?
+  weightGrams       Float?
+  analysisStatus    MealAnalysisStatus @default(PENDING)
+  analysisSummary   String?
+  confidenceScore   Float?
+  estimatedCalories Float?
+  proteinGrams      Float?
+  carbsGrams        Float?
+  fatGrams          Float?
+  fiberGrams        Float?
+  sugarGrams        Float?
+  sodiumMg          Float?
+  micronutrients    Json?
+  vitamins          Json?
+  assumptions       Json?
+  foodBreakdown     Json?
+  rawAnalysis       Json?
+  aiModel           String?
+  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  member            HouseholdMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  savedFood         SavedFood?         @relation(fields: [savedFoodId], references: [id], onDelete: SetNull)
+  images            MealImage[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([memberId, eatenAt(sort: Desc)])
+  @@index([householdId, eatenAt(sort: Desc)])
 }
 
-model WorkoutLog {
-  id              String   @id @default(cuid())
-  userId          String
-  title           String
-  durationMinutes Int
-  completedAt     DateTime
-  notes           String?
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+model MealImage {
+  id               String        @id @default(cuid())
+  mealEntryId      String
+  storageKey       String
+  originalFileName String
+  contentType      String
+  sizeBytes        Int
+  kind             MealImageKind @default(OTHER)
+  mealEntry        MealEntry     @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+  createdAt        DateTime      @default(now())
 
-model MealSubmission {
-  id                String   @id @default(cuid())
-  userId            String
-  imageBlobKey      String?
-  estimatedCalories Int?
-  portionAdvice     String?
-  macroAdvice       String?
-  submittedAt       DateTime @default(now())
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Reminder {
-  id        String   @id @default(cuid())
-  userId    String
-  channel   String
-  message   String
-  sendAt    DateTime
-  status    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Conversation {
-  id        String   @id @default(cuid())
-  userId    String
-  role      String
-  content   String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([mealEntryId])
 }

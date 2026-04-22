@@ -1,27 +1,164 @@
 import { Router } from "express";
 import { z } from "zod";
-import { mockStore } from "../db/mockStore.js";
+import { getRequiredAuth, type AuthenticatedRequest } from "../middleware/auth.js";
+import { prisma } from "../lib/prisma.js";
 
 export const profileRoutes = Router();
 
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  timezone: z.string().min(1).optional(),
-  dailyCalorieGoal: z.number().int().positive().optional(),
-  devices: z.array(z.enum(["dumbbells","barbell","kettlebell","pullup_bar","treadmill","bike","rower","none"])).optional(),
-  phoneNumber: z.string().optional()
+const updateProfileSchema = z.object({
+  displayName: z.string().min(1).max(120).optional(),
+  goalSummary: z.string().max(500).nullable().optional(),
+  calorieGoal: z.number().int().positive().max(10000).nullable().optional(),
+  proteinGoalGrams: z.number().nonnegative().max(1000).nullable().optional(),
+  carbGoalGrams: z.number().nonnegative().max(2000).nullable().optional(),
+  fatGoalGrams: z.number().nonnegative().max(1000).nullable().optional(),
+  heightCm: z.number().positive().max(300).nullable().optional(),
+  activityLevel: z.string().max(120).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional()
 });
 
-profileRoutes.get("/", (_req, res) => {
-  res.json(mockStore.getProfile());
+const createHealthMetricSchema = z
+  .object({
+    recordedAt: z.string().datetime().optional(),
+    weightKg: z.number().positive().max(600).nullable().optional(),
+    systolicBloodPressure: z.number().int().positive().max(300).nullable().optional(),
+    diastolicBloodPressure: z.number().int().positive().max(250).nullable().optional(),
+    restingHeartRate: z.number().int().positive().max(250).nullable().optional(),
+    bodyFatPercent: z.number().nonnegative().max(100).nullable().optional(),
+    waistCm: z.number().positive().max(500).nullable().optional(),
+    note: z.string().max(500).nullable().optional()
+  })
+  .refine(
+    (value) =>
+      value.weightKg !== undefined ||
+      value.systolicBloodPressure !== undefined ||
+      value.diastolicBloodPressure !== undefined ||
+      value.restingHeartRate !== undefined ||
+      value.bodyFatPercent !== undefined ||
+      value.waistCm !== undefined,
+    { message: "At least one health metric is required" }
+  );
+
+const metricQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(52).default(12)
 });
 
-profileRoutes.patch("/", (req, res) => {
-  const parsed = updateSchema.safeParse(req.body);
+profileRoutes.get("/me", async (req: AuthenticatedRequest, res) => {
+  const auth = getRequiredAuth(req);
+  const member = await prisma.householdMember.findUnique({
+    where: { id: auth.memberId },
+    include: {
+      healthMetrics: {
+        take: 1,
+        orderBy: {
+          recordedAt: "desc"
+        }
+      }
+    }
+  });
+
+  if (!member) {
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
+  return res.json({
+    profile: {
+      id: member.id,
+      displayName: member.displayName,
+      role: member.role,
+      goalSummary: member.goalSummary,
+      calorieGoal: member.calorieGoal,
+      proteinGoalGrams: member.proteinGoalGrams,
+      carbGoalGrams: member.carbGoalGrams,
+      fatGoalGrams: member.fatGoalGrams,
+      heightCm: member.heightCm,
+      activityLevel: member.activityLevel,
+      notes: member.notes
+    },
+    latestMetric: member.healthMetrics[0] ?? null
+  });
+});
+
+profileRoutes.patch("/me", async (req: AuthenticatedRequest, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const updated = mockStore.updateProfile(parsed.data);
-  return res.json(updated);
+  const auth = getRequiredAuth(req);
+  const updated = await prisma.householdMember.update({
+    where: { id: auth.memberId },
+    data: {
+      displayName: parsed.data.displayName?.trim(),
+      goalSummary: parsed.data.goalSummary === undefined ? undefined : parsed.data.goalSummary?.trim() || null,
+      calorieGoal: parsed.data.calorieGoal,
+      proteinGoalGrams: parsed.data.proteinGoalGrams,
+      carbGoalGrams: parsed.data.carbGoalGrams,
+      fatGoalGrams: parsed.data.fatGoalGrams,
+      heightCm: parsed.data.heightCm,
+      activityLevel:
+        parsed.data.activityLevel === undefined ? undefined : parsed.data.activityLevel?.trim() || null,
+      notes: parsed.data.notes === undefined ? undefined : parsed.data.notes?.trim() || null
+    }
+  });
+
+  return res.json({
+    profile: {
+      id: updated.id,
+      displayName: updated.displayName,
+      role: updated.role,
+      goalSummary: updated.goalSummary,
+      calorieGoal: updated.calorieGoal,
+      proteinGoalGrams: updated.proteinGoalGrams,
+      carbGoalGrams: updated.carbGoalGrams,
+      fatGoalGrams: updated.fatGoalGrams,
+      heightCm: updated.heightCm,
+      activityLevel: updated.activityLevel,
+      notes: updated.notes
+    }
+  });
+});
+
+profileRoutes.get("/me/health-metrics", async (req: AuthenticatedRequest, res) => {
+  const parsed = metricQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const auth = getRequiredAuth(req);
+  const metrics = await prisma.healthMetric.findMany({
+    where: {
+      memberId: auth.memberId
+    },
+    orderBy: {
+      recordedAt: "desc"
+    },
+    take: parsed.data.limit
+  });
+
+  return res.json({ metrics });
+});
+
+profileRoutes.post("/me/health-metrics", async (req: AuthenticatedRequest, res) => {
+  const parsed = createHealthMetricSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const auth = getRequiredAuth(req);
+  const metric = await prisma.healthMetric.create({
+    data: {
+      memberId: auth.memberId,
+      recordedAt: parsed.data.recordedAt ? new Date(parsed.data.recordedAt) : new Date(),
+      weightKg: parsed.data.weightKg,
+      systolicBloodPressure: parsed.data.systolicBloodPressure,
+      diastolicBloodPressure: parsed.data.diastolicBloodPressure,
+      restingHeartRate: parsed.data.restingHeartRate,
+      bodyFatPercent: parsed.data.bodyFatPercent,
+      waistCm: parsed.data.waistCm,
+      note: parsed.data.note?.trim() || null
+    }
+  });
+
+  return res.status(201).json({ metric });
 });
