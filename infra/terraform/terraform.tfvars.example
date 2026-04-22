@@ -1,0 +1,8 @@
+project_id             = "your-gcp-project-id"
+region                 = "us-central1"
+service_name           = "health-fitness-coach"
+artifact_repository_id = "health-fitness-coach"
+app_image              = "us-docker.pkg.dev/cloudrun/container/hello"
+app_base_url           = "https://your-service-url-or-domain"
+db_name                = "coach"
+db_user                = "coach"
