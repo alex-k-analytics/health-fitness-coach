@@ -26,12 +26,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_project_id: ${{ env.PROJECT_ID }}
-      TF_VAR_region: ${{ env.REGION }}
-      TF_VAR_service_name: ${{ env.SERVICE_NAME }}
-      TF_VAR_artifact_repository_id: ${{ env.ARTIFACT_REPOSITORY_ID }}
-      TF_VAR_deployer_service_account_email: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
-      TF_VAR_app_image: ${{ env.BOOTSTRAP_IMAGE }}
+      TF_VAR_project_id: akalish-software
+      TF_VAR_region: us-central1
+      TF_VAR_service_name: health-fitness-coach
+      TF_VAR_artifact_repository_id: health-fitness-coach
+      TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
+      TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
       TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
@@ -64,12 +64,12 @@ jobs:
       - name: Persist app base URL
         working-directory: infra/terraform
         env:
-          TF_VAR_project_id: ${{ env.PROJECT_ID }}
-          TF_VAR_region: ${{ env.REGION }}
-          TF_VAR_service_name: ${{ env.SERVICE_NAME }}
-          TF_VAR_artifact_repository_id: ${{ env.ARTIFACT_REPOSITORY_ID }}
-          TF_VAR_deployer_service_account_email: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
-          TF_VAR_app_image: ${{ env.BOOTSTRAP_IMAGE }}
+          TF_VAR_project_id: akalish-software
+          TF_VAR_region: us-central1
+          TF_VAR_service_name: health-fitness-coach
+          TF_VAR_artifact_repository_id: health-fitness-coach
+          TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
+          TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           TF_VAR_app_base_url: ${{ env.SERVICE_URL }}
         run: terraform apply -auto-approve -input=false -lock-timeout=10m
