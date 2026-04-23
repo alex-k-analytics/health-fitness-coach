@@ -9,6 +9,7 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit"
   },
