@@ -43,13 +43,6 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Confirm Cloud Run service exists
-        run: |
-          gcloud run services describe "${SERVICE_NAME}" \
-            --region="${REGION}" \
-            --project="${PROJECT_ID}" \
-            >/dev/null
-
       - name: Configure Docker authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
