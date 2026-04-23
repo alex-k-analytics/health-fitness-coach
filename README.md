@@ -102,26 +102,41 @@ Example variables live in:
 
 - [infra/terraform/terraform.tfvars.example](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/infra/terraform/terraform.tfvars.example)
 
+Bootstrap the platform once with Terraform using a placeholder image, for example:
+
+```bash
+cd infra/terraform
+terraform init
+terraform apply \
+  -var="project_id=akalish-software" \
+  -var="app_image=us-docker.pkg.dev/cloudrun/container/hello"
+```
+
+That initial apply creates Artifact Registry, Cloud Run, Cloud SQL, Secret Manager entries, the runtime service account, and the IAM bindings for the existing GitHub deployer service account.
+
+After the first apply, get the generated Cloud Run URL:
+
+```bash
+terraform output -raw service_url
+```
+
+Then rerun `terraform apply` with `-var="app_base_url=https://..."` once you decide whether to use the default Cloud Run URL or a custom domain.
+
 ## GitHub Actions
 
 Two workflows are included:
 
 - [CI](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/ci.yml): installs dependencies, builds frontend/backend, and validates Terraform
-- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): creates Artifact Registry if needed, builds and pushes the container image, then applies Terraform
+- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, builds and pushes the container image, then rolls a new Cloud Run revision
 
-Required GitHub secrets for deployment:
+This repo is wired to the same GitHub deployer identity already used in `MyGreenHouse`:
 
-- `GCP_PROJECT_ID`
-- `GCP_REGION`
-- `GCP_SERVICE_NAME`
-- `GCP_ARTIFACT_REPOSITORY_ID`
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `GCP_DEPLOYER_SERVICE_ACCOUNT`
-- `APP_BASE_URL`
-- `JWT_SECRET`
-- `OPENAI_API_KEY`
+- workload identity provider: `projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github`
+- deployer service account: `github-actions-service-account@akalish-software.iam.gserviceaccount.com`
 
-`APP_BASE_URL` should be the public URL you want the app to use for invite links and browser-origin checks.
+The deploy workflow assumes the Terraform bootstrap has already run once so the Cloud Run service and Artifact Registry repository already exist.
+
+`APP_BASE_URL` is still important for production invite links and strict CORS. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
 
 ## Notes
 
