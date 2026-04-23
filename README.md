@@ -127,8 +127,8 @@ Then rerun `terraform apply` with `-var="app_base_url=https://..."` once you dec
 Three workflows are included:
 
 - [CI](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/ci.yml): installs dependencies, builds frontend/backend, and validates Terraform
-- [Bootstrap Infra](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/bootstrap-infra.yml): manual first-run Terraform bootstrap that creates Artifact Registry, Cloud Run, Cloud SQL, Secret Manager, and IAM using a placeholder image, then reruns Terraform with the generated Cloud Run URL as `APP_BASE_URL`
-- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, builds and pushes the container image, then rolls a new Cloud Run revision
+- [Bootstrap Infra](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/bootstrap-infra.yml): manual first-run Terraform bootstrap that creates Artifact Registry, Cloud Run, Cloud SQL, Secret Manager, and IAM using a placeholder image, applies Prisma migrations, then reruns Terraform with the generated Cloud Run URL as `APP_BASE_URL`
+- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, applies Prisma migrations, builds and pushes the container image, then rolls a new Cloud Run revision
 
 This repo is wired to two GitHub Actions identities:
 

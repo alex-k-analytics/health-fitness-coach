@@ -65,6 +65,41 @@ jobs:
       - name: Configure Docker authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Apply database migrations
+        env:
+          CLOUD_SQL_CONNECTION_NAME: akalish-software:us-central1:health-fitness-coach-db
+          DATABASE_URL_SECRET: health-fitness-coach-database-url
+        run: |
+          set -euo pipefail
+
+          curl -L https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.3/cloud-sql-proxy.linux.amd64 -o cloud-sql-proxy
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --credentials-file="${GOOGLE_APPLICATION_CREDENTIALS}" --port 6543 "${CLOUD_SQL_CONNECTION_NAME}" &
+          PROXY_PID=$!
+          trap 'kill ${PROXY_PID}' EXIT
+
+          for _ in $(seq 1 20); do
+            if nc -z 127.0.0.1 6543; then
+              break
+            fi
+            sleep 1
+          done
+
+          DB_SECRET="$(gcloud secrets versions access latest --secret="${DATABASE_URL_SECRET}" --project="${PROJECT_ID}")"
+          export DATABASE_URL="$(node -e 'const url = new URL(process.argv[1]); url.hostname = "127.0.0.1"; url.port = "6543"; url.search = ""; console.log(url.toString())' "${DB_SECRET}")"
+
+          cd backend
+          npm run prisma:migrate:deploy
+
       - name: Build and push image
         env:
           IMAGE_URI: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
