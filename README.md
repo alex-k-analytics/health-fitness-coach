@@ -139,9 +139,12 @@ This repo is wired to two GitHub Actions identities:
 The intended order is:
 
 1. Run `Bootstrap Infra` once.
-2. Run `Deploy` for normal image rollouts.
+2. Run `CI` when you want validation.
+3. Run `Deploy` for normal image rollouts.
 
-The deploy workflow now checks for the Artifact Registry repository and Cloud Run service up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
+All three workflows are manual-only via `workflow_dispatch`.
+
+The deploy workflow checks for the Artifact Registry repository and Cloud Run service up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
 
 `APP_BASE_URL` is still important for production invite links and strict CORS. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
 
