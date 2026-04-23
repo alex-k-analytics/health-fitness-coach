@@ -15,10 +15,12 @@ permissions:
   id-token: write
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.GCP_REGION }}
-  SERVICE_NAME: ${{ secrets.GCP_SERVICE_NAME }}
-  ARTIFACT_REPOSITORY_ID: ${{ secrets.GCP_ARTIFACT_REPOSITORY_ID }}
+  PROJECT_ID: akalish-software
+  REGION: us-central1
+  SERVICE_NAME: health-fitness-coach
+  ARTIFACT_REPOSITORY_ID: health-fitness-coach
+  WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
+  DEPLOYER_SERVICE_ACCOUNT: github-actions-service-account@akalish-software.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -31,50 +33,45 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform init
-        working-directory: infra/terraform
-        run: terraform init
-
-      - name: Ensure Artifact Registry exists
-        working-directory: infra/terraform
+      - name: Confirm Cloud Run service exists
         run: |
-          terraform apply -auto-approve \
-            -target=google_artifact_registry_repository.app \
-            -var="project_id=${PROJECT_ID}" \
-            -var="region=${REGION}" \
-            -var="service_name=${SERVICE_NAME}" \
-            -var="artifact_repository_id=${ARTIFACT_REPOSITORY_ID}" \
-            -var="app_image=us-docker.pkg.dev/cloudrun/container/hello"
+          gcloud run services describe "${SERVICE_NAME}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            >/dev/null
 
       - name: Configure Docker authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
       - name: Build and push image
         env:
-          IMAGE_URI: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPOSITORY_ID }}/${{ secrets.GCP_SERVICE_NAME }}:${{ github.sha }}
+          IMAGE_URI: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         run: |
           docker build -t "${IMAGE_URI}" .
           docker push "${IMAGE_URI}"
           echo "IMAGE_URI=${IMAGE_URI}" >> "${GITHUB_ENV}"
 
-      - name: Terraform apply
-        working-directory: infra/terraform
+      - name: Deploy revision
         run: |
-          terraform apply -auto-approve \
-            -var="project_id=${PROJECT_ID}" \
-            -var="region=${REGION}" \
-            -var="service_name=${SERVICE_NAME}" \
-            -var="artifact_repository_id=${ARTIFACT_REPOSITORY_ID}" \
-            -var="app_image=${IMAGE_URI}" \
-            -var="app_base_url=${{ secrets.APP_BASE_URL }}" \
-            -var="openai_api_key=${{ secrets.OPENAI_API_KEY }}" \
-            -var="jwt_secret=${{ secrets.JWT_SECRET }}"
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image="${IMAGE_URI}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet
+
+      - name: Show service URL
+        run: |
+          gcloud run services describe "${SERVICE_NAME}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            --format='value(status.url)'

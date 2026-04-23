@@ -21,6 +21,12 @@ variable "artifact_repository_id" {
   default     = "health-fitness-coach"
 }
 
+variable "deployer_service_account_email" {
+  description = "Existing GitHub Actions deployer service account email."
+  type        = string
+  default     = "github-actions-service-account@akalish-software.iam.gserviceaccount.com"
+}
+
 variable "app_image" {
   description = "Container image reference deployed to Cloud Run."
   type        = string
