@@ -16,6 +16,18 @@ resource "google_project_iam_member" "deployer_run_admin" {
   member  = local.deployer_member
 }
 
+resource "google_project_iam_member" "deployer_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = local.deployer_member
+}
+
+resource "google_project_iam_member" "deployer_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = local.deployer_member
+}
+
 resource "google_service_account_iam_member" "deployer_runtime_user" {
   service_account_id = google_service_account.app_runtime.name
   role               = "roles/iam.serviceAccountUser"

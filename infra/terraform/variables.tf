@@ -47,7 +47,7 @@ variable "db_user" {
 variable "db_tier" {
   description = "Cloud SQL machine tier."
   type        = string
-  default     = "db-custom-1-3840"
+  default     = "db-f1-micro"
 }
 
 variable "sql_disk_size_gb" {
@@ -91,7 +91,7 @@ variable "min_instances" {
 variable "max_instances" {
   description = "Maximum Cloud Run instances."
   type        = number
-  default     = 3
+  default     = 1
 }
 
 variable "deletion_protection" {
