@@ -124,17 +124,24 @@ Then rerun `terraform apply` with `-var="app_base_url=https://..."` once you dec
 
 ## GitHub Actions
 
-Two workflows are included:
+Three workflows are included:
 
 - [CI](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/ci.yml): installs dependencies, builds frontend/backend, and validates Terraform
+- [Bootstrap Infra](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/bootstrap-infra.yml): manual first-run Terraform bootstrap that creates Artifact Registry, Cloud Run, Cloud SQL, Secret Manager, and IAM using a placeholder image, then reruns Terraform with the generated Cloud Run URL as `APP_BASE_URL`
 - [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, builds and pushes the container image, then rolls a new Cloud Run revision
 
-This repo is wired to the same GitHub deployer identity already used in `MyGreenHouse`:
+This repo is wired to two GitHub Actions identities:
 
 - workload identity provider: `projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github`
 - deployer service account: `github-actions-service-account@akalish-software.iam.gserviceaccount.com`
+- bootstrap service account: `github-actions-bootstrap@akalish-software.iam.gserviceaccount.com`
 
-The deploy workflow assumes the Terraform bootstrap has already run once so the Cloud Run service and Artifact Registry repository already exist.
+The intended order is:
+
+1. Run `Bootstrap Infra` once.
+2. Run `Deploy` for normal image rollouts.
+
+The deploy workflow now checks for the Artifact Registry repository and Cloud Run service up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
 
 `APP_BASE_URL` is still important for production invite links and strict CORS. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
 
