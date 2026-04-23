@@ -43,6 +43,28 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Confirm bootstrap infrastructure exists
+        run: |
+          set -euo pipefail
+
+          if ! gcloud artifacts repositories describe "${ARTIFACT_REPOSITORY_ID}" \
+            --location="${REGION}" \
+            --project="${PROJECT_ID}" \
+            >/dev/null 2>&1; then
+            echo "Artifact Registry repository ${ARTIFACT_REPOSITORY_ID} was not found in ${PROJECT_ID}/${REGION}."
+            echo "Run the Bootstrap Infra workflow once before using Deploy."
+            exit 1
+          fi
+
+          if ! gcloud run services describe "${SERVICE_NAME}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            >/dev/null 2>&1; then
+            echo "Cloud Run service ${SERVICE_NAME} was not found in ${PROJECT_ID}/${REGION}."
+            echo "Run the Bootstrap Infra workflow once before using Deploy."
+            exit 1
+          fi
+
       - name: Configure Docker authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 

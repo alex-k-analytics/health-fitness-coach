@@ -1,0 +1,79 @@
+name: Bootstrap Infra
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: bootstrap-infra
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: akalish-software
+  REGION: us-central1
+  SERVICE_NAME: health-fitness-coach
+  ARTIFACT_REPOSITORY_ID: health-fitness-coach
+  WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
+  BOOTSTRAP_SERVICE_ACCOUNT: github-actions-bootstrap@akalish-software.iam.gserviceaccount.com
+  DEPLOYER_SERVICE_ACCOUNT: github-actions-service-account@akalish-software.iam.gserviceaccount.com
+  BOOTSTRAP_IMAGE: us-docker.pkg.dev/cloudrun/container/hello
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_project_id: ${{ env.PROJECT_ID }}
+      TF_VAR_region: ${{ env.REGION }}
+      TF_VAR_service_name: ${{ env.SERVICE_NAME }}
+      TF_VAR_artifact_repository_id: ${{ env.ARTIFACT_REPOSITORY_ID }}
+      TF_VAR_deployer_service_account_email: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+      TF_VAR_app_image: ${{ env.BOOTSTRAP_IMAGE }}
+      TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.BOOTSTRAP_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init -input=false
+
+      - name: Bootstrap infrastructure with placeholder image
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -input=false -lock-timeout=10m
+
+      - name: Capture service URL
+        working-directory: infra/terraform
+        run: echo "SERVICE_URL=$(terraform output -raw service_url)" >> "${GITHUB_ENV}"
+
+      - name: Persist app base URL
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ env.PROJECT_ID }}
+          TF_VAR_region: ${{ env.REGION }}
+          TF_VAR_service_name: ${{ env.SERVICE_NAME }}
+          TF_VAR_artifact_repository_id: ${{ env.ARTIFACT_REPOSITORY_ID }}
+          TF_VAR_deployer_service_account_email: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+          TF_VAR_app_image: ${{ env.BOOTSTRAP_IMAGE }}
+          TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          TF_VAR_app_base_url: ${{ env.SERVICE_URL }}
+        run: terraform apply -auto-approve -input=false -lock-timeout=10m
+
+      - name: Show Terraform outputs
+        working-directory: infra/terraform
+        run: terraform output
