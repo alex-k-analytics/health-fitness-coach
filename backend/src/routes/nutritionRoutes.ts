@@ -22,6 +22,10 @@ const listMealsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
 
+const summaryQuerySchema = z.object({
+  timezone: z.string().min(1).max(80).optional()
+});
+
 const createSavedFoodSchema = z.object({
   name: z.string().min(1).max(160),
   brand: z.string().max(160).nullable().optional(),
@@ -134,6 +138,39 @@ const parseOptionalBoolean = (value: unknown) => {
   }
 
   return ["true", "1", "yes", "on"].includes(String(value).toLowerCase());
+};
+
+const getDateKeyInTimeZone = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+};
+
+const getSafeTimeZone = (timeZone: string | undefined) => {
+  if (!timeZone) {
+    return "UTC";
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return "UTC";
+  }
+};
+
+const addDaysToDateKey = (dateKey: string, days: number) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+  return date.toISOString().slice(0, 10);
 };
 
 const createMealBodySchema = z.object({
@@ -400,11 +437,17 @@ nutritionRoutes.patch("/meals/:mealId", async (req: AuthenticatedRequest, res) =
 });
 
 nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
+  const parsed = summaryQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
   const auth = getRequiredAuth(req);
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const startOfTrendWindow = new Date(startOfDay);
-  startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 6);
+  const timeZone = getSafeTimeZone(parsed.data.timezone);
+  const todayKey = getDateKeyInTimeZone(new Date(), timeZone);
+  const trendDateKeys = Array.from({ length: 7 }, (_, index) => addDaysToDateKey(todayKey, index - 6));
+  const startOfTrendWindow = new Date();
+  startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
   const [recentMeals, member] = await Promise.all([
     prisma.mealEntry.findMany({
@@ -437,39 +480,29 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     })
   ]);
 
-  const dailyCalories = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(startOfTrendWindow);
-    date.setDate(startOfTrendWindow.getDate() + index);
-
-    return {
-      date: date.toISOString().slice(0, 10),
-      calories: 0,
-      mealCount: 0
-    };
-  });
+  const dailyCalories = trendDateKeys.map((date) => ({
+    date,
+    calories: 0,
+    mealCount: 0
+  }));
 
   const totals = recentMeals.reduce(
-    (accumulator, meal) => ({
-      calories:
-        accumulator.calories +
-        (meal.eatenAt >= startOfDay ? (meal.estimatedCalories ?? 0) : 0),
-      proteinGrams:
-        accumulator.proteinGrams +
-        (meal.eatenAt >= startOfDay ? (meal.proteinGrams ?? 0) : 0),
-      carbsGrams:
-        accumulator.carbsGrams +
-        (meal.eatenAt >= startOfDay ? (meal.carbsGrams ?? 0) : 0),
-      fatGrams:
-        accumulator.fatGrams +
-        (meal.eatenAt >= startOfDay ? (meal.fatGrams ?? 0) : 0)
-    }),
-    { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 }
+    (accumulator, meal) => {
+      const isToday = getDateKeyInTimeZone(meal.eatenAt, timeZone) === todayKey;
+
+      return {
+        calories: accumulator.calories + (isToday ? (meal.estimatedCalories ?? 0) : 0),
+        proteinGrams: accumulator.proteinGrams + (isToday ? (meal.proteinGrams ?? 0) : 0),
+        carbsGrams: accumulator.carbsGrams + (isToday ? (meal.carbsGrams ?? 0) : 0),
+        fatGrams: accumulator.fatGrams + (isToday ? (meal.fatGrams ?? 0) : 0),
+        mealCount: accumulator.mealCount + (isToday ? 1 : 0)
+      };
+    },
+    { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0, mealCount: 0 }
   );
 
   recentMeals.forEach((meal) => {
-    const mealDate = new Date(meal.eatenAt);
-    mealDate.setHours(0, 0, 0, 0);
-    const dateKey = mealDate.toISOString().slice(0, 10);
+    const dateKey = getDateKeyInTimeZone(meal.eatenAt, timeZone);
     const matchingDay = dailyCalories.find((day) => day.date === dateKey);
 
     if (matchingDay) {
@@ -480,7 +513,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
 
   return res.json({
     today: {
-      mealCount: recentMeals.filter((meal) => meal.eatenAt >= startOfDay).length,
+      mealCount: totals.mealCount,
       calories: Math.round(totals.calories),
       proteinGrams: Math.round(totals.proteinGrams * 10) / 10,
       carbsGrams: Math.round(totals.carbsGrams * 10) / 10,
