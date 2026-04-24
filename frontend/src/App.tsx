@@ -20,24 +20,14 @@ import type {
 } from "./types";
 
 type MealTemplateResult =
-  | {
-      key: string;
-      kind: "meal";
-      title: string;
-      subtitle: string;
-      detail: string;
-      searchText: string;
-      meal: Meal;
-    }
-  | {
-      key: string;
-      kind: "savedFood";
-      title: string;
-      subtitle: string;
-      detail: string;
-      searchText: string;
-      food: SavedFood;
-    };
+  {
+    key: string;
+    title: string;
+    subtitle: string;
+    detail: string;
+    searchText: string;
+    food: SavedFood;
+  };
 
 const defaultMealForm = () => ({
   title: "",
@@ -84,8 +74,12 @@ const formatDate = (value: string) =>
     year: "numeric"
   }).format(new Date(value));
 
-const formatShortDay = (value: string) =>
-  new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(value));
+const formatDateKeyShortDay = (value: string) => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(
+    new Date(year, month - 1, day)
+  );
+};
 
 const toDateTimeLocalInput = (value: string) => {
   const date = new Date(value);
@@ -311,7 +305,9 @@ export function App() {
       const [profileResponse, summaryResponse, foodsResponse, mealsResponse] =
         await Promise.all([
           apiFetch<ProfileData>("/profile/me"),
-          apiFetch<NutritionSummary>("/nutrition/summary"),
+          apiFetch<NutritionSummary>(
+            `/nutrition/summary?timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
+          ),
           apiFetch<{ foods: SavedFood[] }>("/nutrition/saved-foods"),
           apiFetch<{ meals: Meal[] }>("/nutrition/meals?limit=24")
         ]);
@@ -571,21 +567,6 @@ export function App() {
     setMealTemplateLabel(food.brand ? `${food.name} · ${food.brand}` : food.name);
   }
 
-  function applyMealTemplate(meal: Meal) {
-    resetMealComposer();
-
-    setMealForm({
-      ...defaultMealForm(),
-      title: meal.title,
-      notes: meal.notes ?? "",
-      servingDescription: meal.servingDescription ?? "",
-      quantity: valueToInput(meal.quantity ?? 1),
-      savedFoodId: meal.savedFood?.id ?? ""
-    });
-    setMealSearchQuery(meal.title);
-    setMealTemplateLabel(meal.title);
-  }
-
   const currentMemberName = session?.member?.displayName ?? "User";
   const currentMemberInitials = getInitials(currentMemberName);
   const hasMealEstimateInputs =
@@ -622,7 +603,6 @@ export function App() {
   const mealTemplates: MealTemplateResult[] = [
     ...savedFoods.map((food) => ({
       key: `saved-food-${food.id}`,
-      kind: "savedFood" as const,
       title: food.name,
       subtitle: food.brand ?? "Reusable food",
       detail: food.servingDescription ?? "Saved serving",
@@ -631,25 +611,7 @@ export function App() {
         .join(" ")
         .toLowerCase(),
       food
-    })),
-    ...meals
-      .filter((meal) => !meal.savedFood)
-      .map((meal) => ({
-        key: `meal-${meal.id}`,
-        kind: "meal" as const,
-        title: meal.title,
-        subtitle: meal.servingDescription ?? "Recent meal",
-        detail: `Last logged ${formatDateTime(meal.eatenAt)}${meal.estimatedCalories ? ` · ${meal.estimatedCalories} kcal` : ""}`,
-        searchText: [
-          meal.title,
-          meal.notes,
-          meal.servingDescription
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase(),
-        meal
-      }))
+    }))
   ];
   const mealSearchResults = mealTemplates
     .filter((template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch))
@@ -885,13 +847,13 @@ export function App() {
         <form className="form-stack" onSubmit={handleMealSave}>
           <SectionHeading
             title="Start with"
-            description="Reusable foods show first. Recent meals that were already saved as reusable are hidden to avoid duplicates."
+            description="Only reusable foods you save appear here."
           />
 
           <div className="template-toolbar">
             <Field label="Search saved foods">
               <input
-                placeholder="Search reusable foods or recent meals"
+                placeholder="Search reusable foods"
                 value={mealSearchQuery}
                 onChange={(event) => setMealSearchQuery(event.target.value)}
               />
@@ -910,20 +872,14 @@ export function App() {
                   <div className="template-card-copy">
                     <div className="template-card-heading">
                       <strong>{template.title}</strong>
-                      <span className="template-badge">
-                        {template.kind === "meal" ? "Recent" : "Reusable"}
-                      </span>
+                      <span className="template-badge">Reusable</span>
                     </div>
                     <span>{template.subtitle}</span>
                     <small>{template.detail}</small>
                   </div>
                   <button
                     className="ghost-button"
-                    onClick={() =>
-                      template.kind === "meal"
-                        ? applyMealTemplate(template.meal)
-                        : applySavedFoodTemplate(template.food)
-                    }
+                    onClick={() => applySavedFoodTemplate(template.food)}
                     type="button"
                   >
                     Use as base
@@ -1317,7 +1273,7 @@ function DailyTrendChart({
                 <div className="trend-fill" style={style} />
               </div>
               <strong>{point.calories}</strong>
-              <span>{formatShortDay(point.date)}</span>
+              <span>{formatDateKeyShortDay(point.date)}</span>
               <small>{point.mealCount} meal{point.mealCount === 1 ? "" : "s"}</small>
             </div>
           );
