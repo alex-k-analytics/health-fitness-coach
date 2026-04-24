@@ -720,9 +720,6 @@ export function App() {
   const weeklyAverageCalories = calorieTrend.length
     ? Math.round(calorieTrend.reduce((sum, point) => sum + point.calories, 0) / calorieTrend.length)
     : 0;
-  const weeklyAverageWorkoutCalories = calorieTrend.length
-    ? Math.round(calorieTrend.reduce((sum, point) => sum + point.caloriesBurned, 0) / calorieTrend.length)
-    : 0;
   const normalizedMealSearch = mealSearchQuery.trim().toLowerCase();
   const displayedMealEstimate = mealEstimate
     ? scaleNutritionEstimate(mealEstimate, getServingCount(mealForm.quantity) / mealEstimateBaseServings)
@@ -747,7 +744,6 @@ export function App() {
     (template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch)
   ).length;
   const displayedMeals = meals.slice(0, 3);
-  const displayedWorkouts = workouts.slice(0, 3);
   const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
   const weightTrendPoints = weightTrend.slice(-6);
   const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
@@ -983,35 +979,6 @@ export function App() {
         </div>
 
         <div className="dashboard-trend-row">
-          <Card className="compact-card workout-card">
-            <SectionHeading
-              title="Workouts"
-              description={`${todaySummary.caloriesBurned} kcal burned today`}
-            />
-            {dashboardLoading ? (
-              <p className="empty-state">Refreshing workouts…</p>
-            ) : workouts.length === 0 ? (
-              <div className="empty-panel">
-                <p className="empty-state">No workouts logged yet.</p>
-                <button className="secondary-button" onClick={() => setIsWorkoutModalOpen(true)} type="button">
-                  Log a workout
-                </button>
-              </div>
-            ) : (
-              <div className="workout-list">
-                {displayedWorkouts.map((workout) => (
-                  <article className="workout-item" key={workout.id}>
-                    <div>
-                      <strong>{workout.title}</strong>
-                      <p className="list-item-copy">{formatDateTime(workout.performedAt)}</p>
-                    </div>
-                    <strong className="workout-calories">+{workout.caloriesBurned} kcal</strong>
-                  </article>
-                ))}
-              </div>
-            )}
-          </Card>
-
           <Card className="trend-card compact-card">
             <SectionHeading
               title="7-day calorie trend"
@@ -1023,14 +990,6 @@ export function App() {
               points={calorieTrend}
               workoutCaloriesToday={todaySummary.caloriesBurned}
             />
-          </Card>
-
-          <Card className="trend-card compact-card">
-            <SectionHeading
-              title="7-day workout burn"
-              description={`${weeklyAverageWorkoutCalories} kcal burned per day average`}
-            />
-            <WorkoutTrendChart points={calorieTrend} />
           </Card>
 
           <Card className="trend-card compact-card">
@@ -1620,45 +1579,6 @@ function DailyTrendChart({
               <small>
                 {point.mealCount} meal{point.mealCount === 1 ? "" : "s"}
               </small>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function WorkoutTrendChart({ points }: { points: NutritionSummary["dailyCalories"] }) {
-  if (points.length === 0) {
-    return <p className="empty-state">No workout data yet.</p>;
-  }
-
-  const chartMax = Math.max(...points.map((point) => point.caloriesBurned), 1);
-
-  return (
-    <div className="trend-chart-shell">
-      <div className="chart-context">
-        <p className="trend-target-note">Daily workout calories burned</p>
-        <div className="chart-legend" aria-label="Workout chart legend">
-          <span><i className="legend-swatch burned" /> Burned</span>
-        </div>
-      </div>
-      <div className="trend-bars workout-bars">
-        {points.map((point) => {
-          const height =
-            point.caloriesBurned === 0
-              ? 0
-              : Math.max(16, Math.round((point.caloriesBurned / chartMax) * 100));
-          const style = { height: `${height}%` } as CSSProperties;
-
-          return (
-            <div className="trend-column" key={point.date}>
-              <div className="trend-track">
-                <div className="trend-fill workout-fill" style={style} />
-              </div>
-              <strong>{point.caloriesBurned}</strong>
-              <span>{formatDateKeyShortDay(point.date)}</span>
-              <small>kcal burned</small>
             </div>
           );
         })}

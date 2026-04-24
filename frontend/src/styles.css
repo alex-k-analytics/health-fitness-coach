@@ -731,10 +731,6 @@ img {
   background: rgba(194, 79, 85, 0.75);
 }
 
-.legend-swatch.burned {
-  background: var(--success);
-}
-
 .trend-bars {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -789,20 +785,6 @@ img {
   background: linear-gradient(180deg, #78a6ff, #2d6cdf);
 }
 
-.workout-bars {
-  background-image: repeating-linear-gradient(
-    to top,
-    transparent 0,
-    transparent calc(50% - 1px),
-    rgba(20, 45, 96, 0.08) calc(50% - 1px),
-    rgba(20, 45, 96, 0.08) 50%
-  );
-}
-
-.workout-fill {
-  background: linear-gradient(180deg, #52c7a8, var(--success));
-}
-
 .delta-chip {
   padding: 9px 12px;
   font-size: 0.77rem;
@@ -836,28 +818,6 @@ img {
 
 .meal-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.workout-list {
-  display: grid;
-  gap: 10px;
-}
-
-.workout-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #f9fbfe;
-}
-
-.workout-calories {
-  flex-shrink: 0;
-  color: var(--success);
-  font-size: 0.9rem;
 }
 
 .compact-meal-list {
@@ -1521,10 +1481,6 @@ img {
 
   .meal-item-header {
     gap: 10px;
-  }
-
-  .workout-item {
-    align-items: center;
   }
 
   .meal-row-side {
