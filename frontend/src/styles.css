@@ -400,7 +400,7 @@ img {
 }
 
 .dashboard-trend-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .dashboard-trend-row.single-trend-row {
@@ -684,11 +684,55 @@ img {
   gap: 10px;
 }
 
+.chart-context {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .trend-target-note {
   margin: 0;
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.legend-swatch.eaten {
+  background: #2d6cdf;
+}
+
+.legend-swatch.target {
+  height: 3px;
+  background: rgba(194, 79, 85, 0.75);
+}
+
+.legend-swatch.burned {
+  background: var(--success);
 }
 
 .trend-bars {
@@ -743,6 +787,20 @@ img {
   width: 100%;
   border-radius: 4px 4px 0 0;
   background: linear-gradient(180deg, #78a6ff, #2d6cdf);
+}
+
+.workout-bars {
+  background-image: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent calc(50% - 1px),
+    rgba(20, 45, 96, 0.08) calc(50% - 1px),
+    rgba(20, 45, 96, 0.08) 50%
+  );
+}
+
+.workout-fill {
+  background: linear-gradient(180deg, #52c7a8, var(--success));
 }
 
 .delta-chip {
@@ -1505,8 +1563,14 @@ img {
 
   .trend-column span,
   .trend-column small,
-  .trend-target-note {
+  .trend-target-note,
+  .chart-legend {
     font-size: 0.72rem;
+  }
+
+  .chart-context {
+    display: grid;
+    gap: 8px;
   }
 
   .trend-track {

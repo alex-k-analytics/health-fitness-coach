@@ -720,6 +720,9 @@ export function App() {
   const weeklyAverageCalories = calorieTrend.length
     ? Math.round(calorieTrend.reduce((sum, point) => sum + point.calories, 0) / calorieTrend.length)
     : 0;
+  const weeklyAverageWorkoutCalories = calorieTrend.length
+    ? Math.round(calorieTrend.reduce((sum, point) => sum + point.caloriesBurned, 0) / calorieTrend.length)
+    : 0;
   const normalizedMealSearch = mealSearchQuery.trim().toLowerCase();
   const displayedMealEstimate = mealEstimate
     ? scaleNutritionEstimate(mealEstimate, getServingCount(mealForm.quantity) / mealEstimateBaseServings)
@@ -1014,7 +1017,20 @@ export function App() {
               title="7-day calorie trend"
               description={`${weeklyAverageCalories} kcal eaten per day average`}
             />
-            <DailyTrendChart goalCalories={calorieGoal} points={calorieTrend} />
+            <DailyTrendChart
+              baseGoalCalories={baseCalorieGoal}
+              goalCalories={calorieGoal}
+              points={calorieTrend}
+              workoutCaloriesToday={todaySummary.caloriesBurned}
+            />
+          </Card>
+
+          <Card className="trend-card compact-card">
+            <SectionHeading
+              title="7-day workout burn"
+              description={`${weeklyAverageWorkoutCalories} kcal burned per day average`}
+            />
+            <WorkoutTrendChart points={calorieTrend} />
           </Card>
 
           <Card className="trend-card compact-card">
@@ -1553,10 +1569,14 @@ function SnapshotTile({
 
 function DailyTrendChart({
   points,
-  goalCalories
+  goalCalories,
+  baseGoalCalories,
+  workoutCaloriesToday
 }: {
   points: NutritionSummary["dailyCalories"];
   goalCalories?: number | null;
+  baseGoalCalories?: number | null;
+  workoutCaloriesToday: number;
 }) {
   if (points.length === 0) {
     return <p className="empty-state">No meal data yet.</p>;
@@ -1568,7 +1588,20 @@ function DailyTrendChart({
 
   return (
     <div className="trend-chart-shell">
-      {goalCalories ? <p className="trend-target-note">Target: {goalCalories} kcal</p> : null}
+      {goalCalories ? (
+        <div className="chart-context">
+          <p className="trend-target-note">
+            Adjusted target: {goalCalories} kcal
+            {baseGoalCalories
+              ? ` (${baseGoalCalories} base + ${workoutCaloriesToday} workout burn today)`
+              : ""}
+          </p>
+          <div className="chart-legend" aria-label="Calorie chart legend">
+            <span><i className="legend-swatch eaten" /> Eaten</span>
+            <span><i className="legend-swatch target" /> Adjusted target</span>
+          </div>
+        </div>
+      ) : null}
       <div className="trend-bars">
         {points.map((point) => {
           const height = point.calories === 0 ? 0 : Math.max(16, Math.round((point.calories / chartMax) * 100));
@@ -1586,8 +1619,46 @@ function DailyTrendChart({
               <span>{formatDateKeyShortDay(point.date)}</span>
               <small>
                 {point.mealCount} meal{point.mealCount === 1 ? "" : "s"}
-                {point.caloriesBurned ? ` · ${point.caloriesBurned} burned` : ""}
               </small>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutTrendChart({ points }: { points: NutritionSummary["dailyCalories"] }) {
+  if (points.length === 0) {
+    return <p className="empty-state">No workout data yet.</p>;
+  }
+
+  const chartMax = Math.max(...points.map((point) => point.caloriesBurned), 1);
+
+  return (
+    <div className="trend-chart-shell">
+      <div className="chart-context">
+        <p className="trend-target-note">Daily workout calories burned</p>
+        <div className="chart-legend" aria-label="Workout chart legend">
+          <span><i className="legend-swatch burned" /> Burned</span>
+        </div>
+      </div>
+      <div className="trend-bars workout-bars">
+        {points.map((point) => {
+          const height =
+            point.caloriesBurned === 0
+              ? 0
+              : Math.max(16, Math.round((point.caloriesBurned / chartMax) * 100));
+          const style = { height: `${height}%` } as CSSProperties;
+
+          return (
+            <div className="trend-column" key={point.date}>
+              <div className="trend-track">
+                <div className="trend-fill workout-fill" style={style} />
+              </div>
+              <strong>{point.caloriesBurned}</strong>
+              <span>{formatDateKeyShortDay(point.date)}</span>
+              <small>kcal burned</small>
             </div>
           );
         })}
