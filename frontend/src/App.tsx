@@ -11,6 +11,7 @@ import {
 import { ApiError, apiFetch } from "./api";
 import { Card } from "./components/Card";
 import type {
+  HealthMetric,
   Meal,
   NutritionEstimate,
   NutritionSummary,
@@ -28,6 +29,11 @@ type MealTemplateResult =
     searchText: string;
     food: SavedFood;
   };
+
+const defaultWeightForm = () => ({
+  recordedAt: "",
+  weightLbs: ""
+});
 
 const defaultMealForm = () => ({
   title: "",
@@ -81,6 +87,9 @@ const formatDateKeyShortDay = (value: string) => {
   );
 };
 
+const formatShortDay = (value: string) =>
+  new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(value));
+
 const toDateTimeLocalInput = (value: string) => {
   const date = new Date(value);
   const offsetMs = date.getTimezoneOffset() * 60 * 1000;
@@ -113,6 +122,31 @@ const getProgressPercent = (current: number, goal?: number | null) => {
   }
 
   return Math.min(100, Math.max(0, Math.round((current / goal) * 100)));
+};
+
+const KG_PER_LB = 0.45359237;
+
+const kgToLbs = (value: number) => value / KG_PER_LB;
+
+const lbsToKg = (value: number) => value * KG_PER_LB;
+
+const formatWeightValue = (value: number | null | undefined) =>
+  value === null || value === undefined ? null : kgToLbs(value).toFixed(1);
+
+const formatWeight = (value: number | null | undefined) => {
+  const formatted = formatWeightValue(value);
+  return formatted ? `${formatted} lb` : "No weight";
+};
+
+const getWeightDelta = (metrics: HealthMetric[]) => {
+  const weightPoints = metrics.filter((metric) => metric.weightKg !== null);
+  if (weightPoints.length < 2) {
+    return null;
+  }
+
+  const latest = weightPoints[0].weightKg ?? 0;
+  const previous = weightPoints[1].weightKg ?? 0;
+  return Math.round(kgToLbs(latest - previous) * 10) / 10;
 };
 
 const getMealStateTag = (status: Meal["analysisStatus"]) => {
@@ -195,9 +229,11 @@ export function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary | null>(null);
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -219,6 +255,9 @@ export function App() {
     notes: ""
   });
   const [profileSaving, setProfileSaving] = useState(false);
+
+  const [weightForm, setWeightForm] = useState(defaultWeightForm);
+  const [weightSaving, setWeightSaving] = useState(false);
 
   const [mealForm, setMealForm] = useState(defaultMealForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
@@ -302,9 +341,10 @@ export function App() {
     setGlobalError("");
 
     try {
-      const [profileResponse, summaryResponse, foodsResponse, mealsResponse] =
+      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse] =
         await Promise.all([
           apiFetch<ProfileData>("/profile/me"),
+          apiFetch<{ metrics: HealthMetric[] }>("/profile/me/health-metrics?limit=12"),
           apiFetch<NutritionSummary>(
             `/nutrition/summary?timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
           ),
@@ -314,6 +354,7 @@ export function App() {
 
       startTransition(() => {
         setProfileData(profileResponse);
+        setHealthMetrics(metricsResponse.metrics);
         setNutritionSummary(summaryResponse);
         setSavedFoods(foodsResponse.foods);
         setMeals(mealsResponse.meals);
@@ -351,11 +392,13 @@ export function App() {
       setSession({ authenticated: false });
       setGlobalNotice("Signed out.");
       setProfileData(null);
+      setHealthMetrics([]);
       setNutritionSummary(null);
       setSavedFoods([]);
       setMeals([]);
       setMealEstimate(null);
       setIsMealModalOpen(false);
+      setIsWeightModalOpen(false);
       setIsProfileDrawerOpen(false);
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
@@ -391,6 +434,35 @@ export function App() {
       setGlobalError(getApiErrorMessage(error));
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleWeightSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWeightSaving(true);
+    setGlobalError("");
+    setGlobalNotice("");
+
+    try {
+      await apiFetch("/profile/me/health-metrics", {
+        method: "POST",
+        body: JSON.stringify({
+          recordedAt: weightForm.recordedAt ? new Date(weightForm.recordedAt).toISOString() : undefined,
+          weightKg: (() => {
+            const weightLbs = toOptionalNumber(weightForm.weightLbs);
+            return weightLbs === undefined ? undefined : lbsToKg(weightLbs);
+          })()
+        })
+      });
+
+      setWeightForm(defaultWeightForm());
+      await loadDashboard();
+      setIsWeightModalOpen(false);
+      setGlobalNotice("Weight logged.");
+    } catch (error) {
+      setGlobalError(getApiErrorMessage(error));
+    } finally {
+      setWeightSaving(false);
     }
   }
 
@@ -617,6 +689,10 @@ export function App() {
     .filter((template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch))
     .slice(0, 8);
   const displayedMeals = meals.slice(0, 3);
+  const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
+  const weightTrendPoints = weightTrend.slice(-6);
+  const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
+  const weightDelta = getWeightDelta(healthMetrics);
 
   if (!session) {
     return (
@@ -710,6 +786,13 @@ export function App() {
             Log food
           </button>
           <button
+            className="secondary-button weight-log-button"
+            onClick={() => setIsWeightModalOpen(true)}
+            type="button"
+          >
+            Log weight
+          </button>
+          <button
             aria-label="Open profile"
             className="avatar-trigger"
             onClick={() => setIsProfileDrawerOpen(true)}
@@ -749,12 +832,12 @@ export function App() {
               </section>
 
               <section className="summary-metric-block">
-                <span className="summary-label">Protein today</span>
-                <strong>{todaySummary.proteinGrams}g</strong>
+                <span className="summary-label">Latest weight</span>
+                <strong>{formatWeight(latestWeight?.weightKg)}</strong>
                 <small>
-                  {nutritionSummary?.goals?.proteinGoalGrams
-                    ? `${getProgressPercent(todaySummary.proteinGrams, nutritionSummary.goals.proteinGoalGrams)}% of goal`
-                    : "Goal not set"}
+                  {latestWeight
+                    ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
+                    : "Log weight to start tracking"}
                 </small>
               </section>
             </div>
@@ -823,13 +906,21 @@ export function App() {
           </Card>
         </div>
 
-        <div className="dashboard-trend-row single-trend-row">
+        <div className="dashboard-trend-row">
           <Card className="trend-card compact-card">
             <SectionHeading
               title="7-day calorie trend"
               description={`${weeklyAverageCalories} kcal per day average`}
             />
             <DailyTrendChart goalCalories={calorieGoal} points={calorieTrend} />
+          </Card>
+
+          <Card className="trend-card compact-card">
+            <SectionHeading
+              title="Weight trend"
+              description={latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries yet"}
+            />
+            <WeightTrendChart points={weightTrendPoints} />
           </Card>
         </div>
       </div>
@@ -1085,6 +1176,55 @@ export function App() {
       </OverlayPanel>
 
       <OverlayPanel
+        description="Add a weight entry without leaving the dashboard."
+        onClose={() => {
+          setIsWeightModalOpen(false);
+          setWeightForm(defaultWeightForm());
+        }}
+        open={isWeightModalOpen}
+        title="Log weight"
+        variant="dialog"
+      >
+        <form className="form-stack" onSubmit={handleWeightSave}>
+          <TwoColumnFields>
+            <Field label="Weight (lb)">
+              <input
+                required
+                min="0"
+                step="0.1"
+                type="number"
+                value={weightForm.weightLbs}
+                onChange={(event) => setWeightForm({ ...weightForm, weightLbs: event.target.value })}
+              />
+            </Field>
+            <Field label="When">
+              <input
+                type="datetime-local"
+                value={weightForm.recordedAt}
+                onChange={(event) => setWeightForm({ ...weightForm, recordedAt: event.target.value })}
+              />
+            </Field>
+          </TwoColumnFields>
+
+          <div className="panel-actions">
+            <button
+              className="ghost-button"
+              onClick={() => {
+                setIsWeightModalOpen(false);
+                setWeightForm(defaultWeightForm());
+              }}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="primary-button" disabled={weightSaving || !weightForm.weightLbs} type="submit">
+              {weightSaving ? "Saving..." : "Save weight"}
+            </button>
+          </div>
+        </form>
+      </OverlayPanel>
+
+      <OverlayPanel
         description="Update your profile settings and sign out of your private account."
         onClose={() => setIsProfileDrawerOpen(false)}
         open={isProfileDrawerOpen}
@@ -1278,6 +1418,97 @@ function DailyTrendChart({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function WeightTrendChart({ points }: { points: HealthMetric[] }) {
+  if (points.length === 0) {
+    return <p className="empty-state">No weight data yet.</p>;
+  }
+
+  const weights = points.map((point) => point.weightKg ?? 0);
+  const minWeight = Math.min(...weights);
+  const maxWeight = Math.max(...weights);
+  const width = 560;
+  const height = 210;
+  const paddingX = 28;
+  const paddingY = 20;
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingY * 2;
+  const labelGridStyle = {
+    gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`
+  } satisfies CSSProperties;
+
+  const coordinates = points.map((point, index) => {
+    const weight = point.weightKg ?? minWeight;
+    const x =
+      points.length === 1
+        ? width / 2
+        : paddingX + (index / (points.length - 1)) * usableWidth;
+    const y =
+      maxWeight === minWeight
+        ? height / 2
+        : height - paddingY - ((weight - minWeight) / (maxWeight - minWeight)) * usableHeight;
+
+    return { id: point.id, recordedAt: point.recordedAt, x, y };
+  });
+
+  const pathData = coordinates
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+
+  return (
+    <div className="weight-chart">
+      <svg
+        aria-hidden="true"
+        className="weight-chart-plot"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        {[0, 1, 2, 3].map((lineIndex) => {
+          const y = paddingY + (usableHeight / 3) * lineIndex;
+          return (
+            <line
+              className="weight-chart-grid"
+              key={lineIndex}
+              x1={paddingX}
+              x2={width - paddingX}
+              y1={y}
+              y2={y}
+            />
+          );
+        })}
+        {coordinates.length > 1 ? <path className="weight-chart-line" d={pathData} /> : null}
+        {coordinates.map((point, index) => {
+          const labelY = Math.max(point.y - 10, paddingY + 12);
+
+          return (
+            <text
+              className="weight-chart-value"
+              key={`${point.id}-value`}
+              textAnchor="middle"
+              x={point.x}
+              y={labelY}
+            >
+              {kgToLbs(weights[index]).toFixed(1)}
+            </text>
+          );
+        })}
+        {coordinates.map((point) => (
+          <circle
+            className="weight-chart-point"
+            cx={point.x}
+            cy={point.y}
+            key={point.id}
+            r="4"
+          />
+        ))}
+      </svg>
+      <div className="weight-chart-labels" style={labelGridStyle}>
+        {points.map((point) => (
+          <small key={point.id}>{formatShortDay(point.recordedAt)}</small>
+        ))}
       </div>
     </div>
   );
