@@ -67,6 +67,7 @@ export interface NutritionEstimate {
     carbsGrams: number;
     fatGrams: number;
   }>;
+  rawAnalysis: unknown;
 }
 
 export interface NutritionSummary {

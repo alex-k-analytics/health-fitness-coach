@@ -187,6 +187,15 @@ const confirmedAnalysisSchema = z.object({
   rawAnalysis: z.unknown()
 });
 
+const updateMealBodySchema = z.object({
+  title: z.string().min(1).max(160),
+  notes: z.string().max(1000).nullable().optional(),
+  eatenAt: z.string().datetime().optional(),
+  servingDescription: z.string().max(160).nullable().optional(),
+  quantity: z.number().positive().max(1000).optional(),
+  confirmedAnalysis: confirmedAnalysisSchema.optional()
+});
+
 const mealUploadFields = [
   { name: "plateImages", maxCount: 5 },
   { name: "labelImages", maxCount: 3 },
@@ -255,7 +264,7 @@ const resolveAnalysisContext = async (
       ok: false as const,
       error: {
         status: 400,
-        message: "Add food photos, a nutrition label screenshot, a reusable food, or a serving quantity/weight"
+        message: "Add food photos, a nutrition label screenshot, a reusable food, or servings"
       }
     };
   }
@@ -332,6 +341,62 @@ nutritionRoutes.get("/meals", async (req: AuthenticatedRequest, res) => {
   });
 
   return res.json({ meals: meals.map(serializeMeal) });
+});
+
+nutritionRoutes.patch("/meals/:mealId", async (req: AuthenticatedRequest, res) => {
+  const parsed = updateMealBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const auth = getRequiredAuth(req);
+  const existingMeal = await prisma.mealEntry.findFirst({
+    where: {
+      id: req.params.mealId,
+      accountId: auth.accountId
+    }
+  });
+
+  if (!existingMeal) {
+    return res.status(404).json({ error: "Meal was not found" });
+  }
+
+  const analysis = parsed.data.confirmedAnalysis;
+  const meal = await prisma.mealEntry.update({
+    where: {
+      id: existingMeal.id
+    },
+    data: {
+      title: parsed.data.title.trim(),
+      notes: parsed.data.notes?.trim() || null,
+      eatenAt: parsed.data.eatenAt ? new Date(parsed.data.eatenAt) : existingMeal.eatenAt,
+      servingDescription: parsed.data.servingDescription?.trim() || null,
+      quantity: parsed.data.quantity ?? null,
+      ...(analysis
+        ? {
+            analysisStatus: analysis.status,
+            analysisSummary: analysis.summary,
+            confidenceScore: analysis.confidenceScore,
+            estimatedCalories: analysis.estimatedCalories,
+            proteinGrams: analysis.proteinGrams,
+            carbsGrams: analysis.carbsGrams,
+            fatGrams: analysis.fatGrams,
+            fiberGrams: analysis.fiberGrams,
+            sugarGrams: analysis.sugarGrams,
+            sodiumMg: analysis.sodiumMg,
+            micronutrients: analysis.micronutrients as Prisma.InputJsonValue,
+            vitamins: analysis.vitamins as Prisma.InputJsonValue,
+            assumptions: analysis.assumptions as Prisma.InputJsonValue,
+            foodBreakdown: analysis.foodBreakdown as Prisma.InputJsonValue,
+            rawAnalysis: analysis.rawAnalysis as Prisma.InputJsonValue,
+            aiModel: analysis.model
+          }
+        : {})
+    },
+    include: mealInclude
+  });
+
+  return res.json({ meal: serializeMeal(meal) });
 });
 
 nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
@@ -537,6 +602,7 @@ nutritionRoutes.post(
     });
 
     let analysis;
+    let reusableAnalysis;
     if (req.body.confirmedAnalysis) {
       let parsedAnalysisJson: unknown;
       try {
@@ -551,6 +617,22 @@ nutritionRoutes.post(
       }
 
       analysis = confirmedAnalysis.data;
+
+      if (req.body.reusableAnalysis) {
+        let parsedReusableAnalysisJson: unknown;
+        try {
+          parsedReusableAnalysisJson = JSON.parse(String(req.body.reusableAnalysis));
+        } catch {
+          return res.status(400).json({ error: "Reusable analysis payload is not valid JSON" });
+        }
+
+        const parsedReusableAnalysis = confirmedAnalysisSchema.safeParse(parsedReusableAnalysisJson);
+        if (!parsedReusableAnalysis.success) {
+          return res.status(400).json({ error: parsedReusableAnalysis.error.flatten() });
+        }
+
+        reusableAnalysis = parsedReusableAnalysis.data;
+      }
     } else {
       analysis = await nutritionAnalysisService.analyzeMeal({
         title: parsed.data.title.trim(),
@@ -600,21 +682,22 @@ nutritionRoutes.post(
 
     let createdFoodId: string | null = null;
     if (parsed.data.saveAsReusableFood) {
+      const savedAnalysis = reusableAnalysis ?? analysis;
       const createdFood = await prisma.savedFood.create({
         data: {
           accountId: context.auth.accountId,
           name: parsed.data.title.trim(),
-          servingDescription: parsed.data.servingDescription?.trim() || "Logged serving",
+          servingDescription: parsed.data.servingDescription?.trim() || "1 serving",
           servingWeightGrams: parsed.data.weightGrams ?? null,
-          calories: analysis.estimatedCalories,
-          proteinGrams: analysis.proteinGrams,
-          carbsGrams: analysis.carbsGrams,
-          fatGrams: analysis.fatGrams,
-          fiberGrams: analysis.fiberGrams,
-          sugarGrams: analysis.sugarGrams,
-          sodiumMg: analysis.sodiumMg,
-          micronutrients: analysis.micronutrients as Prisma.InputJsonValue,
-          notes: analysis.summary
+          calories: savedAnalysis.estimatedCalories,
+          proteinGrams: savedAnalysis.proteinGrams,
+          carbsGrams: savedAnalysis.carbsGrams,
+          fatGrams: savedAnalysis.fatGrams,
+          fiberGrams: savedAnalysis.fiberGrams,
+          sugarGrams: savedAnalysis.sugarGrams,
+          sodiumMg: savedAnalysis.sodiumMg,
+          micronutrients: savedAnalysis.micronutrients as Prisma.InputJsonValue,
+          notes: savedAnalysis.summary
         }
       });
       createdFoodId = createdFood.id;

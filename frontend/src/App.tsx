@@ -11,7 +11,6 @@ import {
 import { ApiError, apiFetch } from "./api";
 import { Card } from "./components/Card";
 import type {
-  HealthMetric,
   Meal,
   NutritionEstimate,
   NutritionSummary,
@@ -40,18 +39,12 @@ type MealTemplateResult =
       food: SavedFood;
     };
 
-const defaultWeightForm = () => ({
-  recordedAt: "",
-  weightLbs: ""
-});
-
 const defaultMealForm = () => ({
   title: "",
   notes: "",
   eatenAt: "",
   servingDescription: "",
-  quantity: "",
-  weightGrams: "",
+  quantity: "1",
   savedFoodId: "",
   saveAsReusableFood: false
 });
@@ -94,18 +87,10 @@ const formatDate = (value: string) =>
 const formatShortDay = (value: string) =>
   new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(value));
 
-const KG_PER_LB = 0.45359237;
-
-const kgToLbs = (value: number) => value / KG_PER_LB;
-
-const lbsToKg = (value: number) => value * KG_PER_LB;
-
-const formatWeightValue = (value: number | null | undefined) =>
-  value === null || value === undefined ? null : kgToLbs(value).toFixed(1);
-
-const formatWeight = (value: number | null | undefined) => {
-  const formatted = formatWeightValue(value);
-  return formatted ? `${formatted} lb` : "No weight";
+const toDateTimeLocalInput = (value: string) => {
+  const date = new Date(value);
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 };
 
 const getApiErrorMessage = (error: unknown) => {
@@ -136,17 +121,6 @@ const getProgressPercent = (current: number, goal?: number | null) => {
   return Math.min(100, Math.max(0, Math.round((current / goal) * 100)));
 };
 
-const getWeightDelta = (metrics: HealthMetric[]) => {
-  const weightPoints = metrics.filter((metric) => metric.weightKg !== null);
-  if (weightPoints.length < 2) {
-    return null;
-  }
-
-  const latest = weightPoints[0].weightKg ?? 0;
-  const previous = weightPoints[1].weightKg ?? 0;
-  return Math.round(kgToLbs(latest - previous) * 10) / 10;
-};
-
 const getMealStateTag = (status: Meal["analysisStatus"]) => {
   switch (status) {
     case "PENDING":
@@ -160,6 +134,66 @@ const getMealStateTag = (status: Meal["analysisStatus"]) => {
   }
 };
 
+const getServingCount = (quantity: string) => {
+  const parsed = toOptionalNumber(quantity);
+  return parsed && parsed > 0 ? parsed : 1;
+};
+
+const scaleNutritionEstimate = (
+  estimate: NutritionEstimate,
+  multiplier: number
+): NutritionEstimate => {
+  const scale = (value: number) => Math.round(value * multiplier * 10) / 10;
+
+  return {
+    ...estimate,
+    estimatedCalories: Math.round(estimate.estimatedCalories * multiplier),
+    proteinGrams: scale(estimate.proteinGrams),
+    carbsGrams: scale(estimate.carbsGrams),
+    fatGrams: scale(estimate.fatGrams),
+    fiberGrams: scale(estimate.fiberGrams),
+    sugarGrams: scale(estimate.sugarGrams),
+    sodiumMg: Math.round(estimate.sodiumMg * multiplier),
+    micronutrients: estimate.micronutrients.map((item) => ({
+      ...item,
+      amount: scale(item.amount)
+    })),
+    vitamins: estimate.vitamins.map((item) => ({
+      ...item,
+      amount: scale(item.amount)
+    })),
+    foodBreakdown: estimate.foodBreakdown.map((item) => ({
+      ...item,
+      calories: Math.round(item.calories * multiplier),
+      proteinGrams: scale(item.proteinGrams),
+      carbsGrams: scale(item.carbsGrams),
+      fatGrams: scale(item.fatGrams)
+    }))
+  };
+};
+
+const estimateFromMeal = (meal: Meal): NutritionEstimate => ({
+  status: meal.analysisStatus,
+  model: meal.aiModel ?? "stored-meal",
+  summary: meal.analysisSummary ?? "Stored nutrition estimate.",
+  confidenceScore: meal.confidenceScore ?? 0.5,
+  estimatedCalories: meal.estimatedCalories ?? 0,
+  proteinGrams: meal.proteinGrams ?? 0,
+  carbsGrams: meal.carbsGrams ?? 0,
+  fatGrams: meal.fatGrams ?? 0,
+  fiberGrams: meal.fiberGrams ?? 0,
+  sugarGrams: meal.sugarGrams ?? 0,
+  sodiumMg: meal.sodiumMg ?? 0,
+  micronutrients: meal.micronutrients ?? [],
+  vitamins: meal.vitamins ?? [],
+  assumptions: meal.assumptions ?? [],
+  foodBreakdown: meal.foodBreakdown ?? [],
+  rawAnalysis: {
+    source: "stored-meal",
+    mealId: meal.id
+  }
+});
+
 export function App() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [globalError, setGlobalError] = useState("");
@@ -167,11 +201,9 @@ export function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
-  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary | null>(null);
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -194,16 +226,15 @@ export function App() {
   });
   const [profileSaving, setProfileSaving] = useState(false);
 
-  const [weightForm, setWeightForm] = useState(defaultWeightForm);
-  const [weightSaving, setWeightSaving] = useState(false);
-
   const [mealForm, setMealForm] = useState(defaultMealForm);
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [mealSearchQuery, setMealSearchQuery] = useState("");
   const [mealTemplateLabel, setMealTemplateLabel] = useState<string | null>(null);
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
   const [labelFiles, setLabelFiles] = useState<File[]>([]);
   const [otherFiles, setOtherFiles] = useState<File[]>([]);
   const [mealEstimate, setMealEstimate] = useState<NutritionEstimate | null>(null);
+  const [mealEstimateBaseServings, setMealEstimateBaseServings] = useState(1);
   const [mealEstimating, setMealEstimating] = useState(false);
   const [mealSaving, setMealSaving] = useState(false);
   const plateInputRef = useRef<HTMLInputElement | null>(null);
@@ -245,14 +276,17 @@ export function App() {
       return;
     }
 
+    if (editingMealId) {
+      return;
+    }
+
     setMealEstimate(null);
   }, [
+    editingMealId,
     mealForm.title,
     mealForm.notes,
     mealForm.eatenAt,
     mealForm.servingDescription,
-    mealForm.quantity,
-    mealForm.weightGrams,
     mealForm.savedFoodId,
     plateFiles,
     labelFiles,
@@ -274,10 +308,9 @@ export function App() {
     setGlobalError("");
 
     try {
-      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse] =
+      const [profileResponse, summaryResponse, foodsResponse, mealsResponse] =
         await Promise.all([
           apiFetch<ProfileData>("/profile/me"),
-          apiFetch<{ metrics: HealthMetric[] }>("/profile/me/health-metrics?limit=12"),
           apiFetch<NutritionSummary>("/nutrition/summary"),
           apiFetch<{ foods: SavedFood[] }>("/nutrition/saved-foods"),
           apiFetch<{ meals: Meal[] }>("/nutrition/meals?limit=24")
@@ -285,7 +318,6 @@ export function App() {
 
       startTransition(() => {
         setProfileData(profileResponse);
-        setHealthMetrics(metricsResponse.metrics);
         setNutritionSummary(summaryResponse);
         setSavedFoods(foodsResponse.foods);
         setMeals(mealsResponse.meals);
@@ -323,13 +355,11 @@ export function App() {
       setSession({ authenticated: false });
       setGlobalNotice("Signed out.");
       setProfileData(null);
-      setHealthMetrics([]);
       setNutritionSummary(null);
       setSavedFoods([]);
       setMeals([]);
       setMealEstimate(null);
       setIsMealModalOpen(false);
-      setIsWeightModalOpen(false);
       setIsProfileDrawerOpen(false);
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
@@ -368,35 +398,6 @@ export function App() {
     }
   }
 
-  async function handleWeightSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setWeightSaving(true);
-    setGlobalError("");
-    setGlobalNotice("");
-
-    try {
-      await apiFetch("/profile/me/health-metrics", {
-        method: "POST",
-        body: JSON.stringify({
-          recordedAt: weightForm.recordedAt ? new Date(weightForm.recordedAt).toISOString() : undefined,
-          weightKg: (() => {
-            const weightLbs = toOptionalNumber(weightForm.weightLbs);
-            return weightLbs === undefined ? undefined : lbsToKg(weightLbs);
-          })()
-        })
-      });
-
-      setWeightForm(defaultWeightForm());
-      await loadDashboard();
-      setIsWeightModalOpen(false);
-      setGlobalNotice("Weight logged.");
-    } catch (error) {
-      setGlobalError(getApiErrorMessage(error));
-    } finally {
-      setWeightSaving(false);
-    }
-  }
-
   function buildMealFormData() {
     const formData = new FormData();
     formData.append("title", mealForm.title);
@@ -404,13 +405,23 @@ export function App() {
     if (mealForm.eatenAt) formData.append("eatenAt", new Date(mealForm.eatenAt).toISOString());
     if (mealForm.servingDescription) formData.append("servingDescription", mealForm.servingDescription);
     if (mealForm.quantity) formData.append("quantity", mealForm.quantity);
-    if (mealForm.weightGrams) formData.append("weightGrams", mealForm.weightGrams);
     if (mealForm.savedFoodId) formData.append("savedFoodId", mealForm.savedFoodId);
     formData.append("saveAsReusableFood", String(mealForm.saveAsReusableFood));
     plateFiles.forEach((file) => formData.append("plateImages", file));
     labelFiles.forEach((file) => formData.append("labelImages", file));
     otherFiles.forEach((file) => formData.append("otherImages", file));
     return formData;
+  }
+
+  function buildMealUpdateBody(analysis: NutritionEstimate) {
+    return {
+      title: mealForm.title,
+      notes: mealForm.notes || null,
+      eatenAt: mealForm.eatenAt ? new Date(mealForm.eatenAt).toISOString() : undefined,
+      servingDescription: mealForm.servingDescription || null,
+      quantity: getServingCount(mealForm.quantity),
+      confirmedAnalysis: analysis
+    };
   }
 
   async function handleMealEstimate() {
@@ -425,6 +436,7 @@ export function App() {
       });
 
       setMealEstimate(result.analysis);
+      setMealEstimateBaseServings(getServingCount(mealForm.quantity));
       setGlobalNotice(
         result.analysis.status === "COMPLETED"
           ? "Nutrition estimate ready."
@@ -449,8 +461,25 @@ export function App() {
     setGlobalNotice("");
 
     try {
+      const servingMultiplier = getServingCount(mealForm.quantity) / mealEstimateBaseServings;
+      const scaledAnalysis = scaleNutritionEstimate(mealEstimate, servingMultiplier);
+
+      if (editingMealId) {
+        const result = await apiFetch<{ meal: Meal }>(`/nutrition/meals/${editingMealId}`, {
+          method: "PATCH",
+          body: JSON.stringify(buildMealUpdateBody(scaledAnalysis))
+        });
+
+        startNewMeal();
+        setIsMealModalOpen(false);
+        await loadDashboard();
+        setGlobalNotice(`Updated ${result.meal.title}.`);
+        return;
+      }
+
       const formData = buildMealFormData();
-      formData.append("confirmedAnalysis", JSON.stringify(mealEstimate));
+      formData.append("confirmedAnalysis", JSON.stringify(scaledAnalysis));
+      formData.append("reusableAnalysis", JSON.stringify(mealEstimate));
 
       const result = await apiFetch<{ meal: Meal; savedFoodId: string | null }>("/nutrition/meals", {
         method: "POST",
@@ -478,11 +507,13 @@ export function App() {
   }
 
   function resetMealComposer() {
+    setEditingMealId(null);
     setMealForm(defaultMealForm());
     setPlateFiles([]);
     setLabelFiles([]);
     setOtherFiles([]);
     setMealEstimate(null);
+    setMealEstimateBaseServings(1);
 
     if (plateInputRef.current) plateInputRef.current.value = "";
     if (labelInputRef.current) labelInputRef.current.value = "";
@@ -505,6 +536,27 @@ export function App() {
     setIsMealModalOpen(true);
   }
 
+  function openMealEditor(meal: Meal) {
+    resetMealComposer();
+
+    const servings = meal.quantity && meal.quantity > 0 ? meal.quantity : 1;
+    setEditingMealId(meal.id);
+    setMealForm({
+      ...defaultMealForm(),
+      title: meal.title,
+      notes: meal.notes ?? "",
+      eatenAt: toDateTimeLocalInput(meal.eatenAt),
+      servingDescription: meal.servingDescription ?? "",
+      quantity: valueToInput(servings),
+      savedFoodId: meal.savedFood?.id ?? ""
+    });
+    setMealEstimate(estimateFromMeal(meal));
+    setMealEstimateBaseServings(servings);
+    setMealSearchQuery("");
+    setMealTemplateLabel(`Editing ${meal.title}`);
+    setIsMealModalOpen(true);
+  }
+
   function applySavedFoodTemplate(food: SavedFood) {
     resetMealComposer();
 
@@ -513,7 +565,7 @@ export function App() {
       savedFoodId: food.id,
       title: food.name,
       servingDescription: food.servingDescription ?? "",
-      weightGrams: valueToInput(food.servingWeightGrams)
+      quantity: "1"
     });
     setMealSearchQuery(food.name);
     setMealTemplateLabel(food.brand ? `${food.name} · ${food.brand}` : food.name);
@@ -527,8 +579,7 @@ export function App() {
       title: meal.title,
       notes: meal.notes ?? "",
       servingDescription: meal.servingDescription ?? "",
-      quantity: valueToInput(meal.quantity),
-      weightGrams: valueToInput(meal.weightGrams),
+      quantity: valueToInput(meal.quantity ?? 1),
       savedFoodId: meal.savedFood?.id ?? ""
     });
     setMealSearchQuery(meal.title);
@@ -542,8 +593,7 @@ export function App() {
     labelFiles.length > 0 ||
     otherFiles.length > 0 ||
     Boolean(mealForm.savedFoodId) ||
-    Boolean(mealForm.quantity) ||
-    Boolean(mealForm.weightGrams);
+    Boolean(mealForm.quantity);
   const canEstimateMeal = Boolean(mealForm.title.trim()) && hasMealEstimateInputs;
   const todaySummary = nutritionSummary?.today ?? {
     mealCount: 0,
@@ -566,24 +616,10 @@ export function App() {
     ? Math.round(calorieTrend.reduce((sum, point) => sum + point.calories, 0) / calorieTrend.length)
     : 0;
   const normalizedMealSearch = mealSearchQuery.trim().toLowerCase();
+  const displayedMealEstimate = mealEstimate
+    ? scaleNutritionEstimate(mealEstimate, getServingCount(mealForm.quantity) / mealEstimateBaseServings)
+    : null;
   const mealTemplates: MealTemplateResult[] = [
-    ...meals.map((meal) => ({
-      key: `meal-${meal.id}`,
-      kind: "meal" as const,
-      title: meal.title,
-      subtitle: meal.servingDescription ?? "Recent meal",
-      detail: `Last logged ${formatDateTime(meal.eatenAt)}${meal.estimatedCalories ? ` · ${meal.estimatedCalories} kcal` : ""}`,
-      searchText: [
-        meal.title,
-        meal.notes,
-        meal.servingDescription,
-        meal.savedFood?.name
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase(),
-      meal
-    })),
     ...savedFoods.map((food) => ({
       key: `saved-food-${food.id}`,
       kind: "savedFood" as const,
@@ -595,17 +631,30 @@ export function App() {
         .join(" ")
         .toLowerCase(),
       food
-    }))
+    })),
+    ...meals
+      .filter((meal) => !meal.savedFood)
+      .map((meal) => ({
+        key: `meal-${meal.id}`,
+        kind: "meal" as const,
+        title: meal.title,
+        subtitle: meal.servingDescription ?? "Recent meal",
+        detail: `Last logged ${formatDateTime(meal.eatenAt)}${meal.estimatedCalories ? ` · ${meal.estimatedCalories} kcal` : ""}`,
+        searchText: [
+          meal.title,
+          meal.notes,
+          meal.servingDescription
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase(),
+        meal
+      }))
   ];
   const mealSearchResults = mealTemplates
     .filter((template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch))
     .slice(0, 8);
   const displayedMeals = meals.slice(0, 3);
-
-  const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
-  const weightTrendPoints = weightTrend.slice(-6);
-  const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
-  const weightDelta = getWeightDelta(healthMetrics);
 
   if (!session) {
     return (
@@ -624,7 +673,7 @@ export function App() {
       <main className="app-shell auth-shell">
         <section className="hero auth-hero">
           <p className="eyebrow">Private Health Coach</p>
-          <h1>Track meals, weight, and nutrition from food photos and label screenshots.</h1>
+          <h1>Track meals and nutrition from food photos and label screenshots.</h1>
           <p className="subtitle">
             This workspace is private. Sign in with your existing email and password, then log a
             meal by taking a picture of the plate, snapping the nutrition label, or uploading a
@@ -699,13 +748,6 @@ export function App() {
             Log food
           </button>
           <button
-            className="secondary-button weight-log-button"
-            onClick={() => setIsWeightModalOpen(true)}
-            type="button"
-          >
-            Log weight
-          </button>
-          <button
             aria-label="Open profile"
             className="avatar-trigger"
             onClick={() => setIsProfileDrawerOpen(true)}
@@ -745,12 +787,12 @@ export function App() {
               </section>
 
               <section className="summary-metric-block">
-                <span className="summary-label">Latest weight</span>
-                <strong>{formatWeight(latestWeight?.weightKg)}</strong>
+                <span className="summary-label">Protein today</span>
+                <strong>{todaySummary.proteinGrams}g</strong>
                 <small>
-                  {latestWeight
-                    ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
-                    : "Log weight to start tracking"}
+                  {nutritionSummary?.goals?.proteinGoalGrams
+                    ? `${getProgressPercent(todaySummary.proteinGrams, nutritionSummary.goals.proteinGoalGrams)}% of goal`
+                    : "Goal not set"}
                 </small>
               </section>
             </div>
@@ -793,6 +835,9 @@ export function App() {
                           <strong className="meal-calories">
                             {meal.estimatedCalories ? `${meal.estimatedCalories} kcal` : "No calories"}
                           </strong>
+                          <button className="inline-action-button" onClick={() => openMealEditor(meal)} type="button">
+                            Edit
+                          </button>
                           {mealStateTag ? (
                             <span className={`tag ${mealStateTag.tone}`}>{mealStateTag.label}</span>
                           ) : null}
@@ -816,7 +861,7 @@ export function App() {
           </Card>
         </div>
 
-        <div className="dashboard-trend-row">
+        <div className="dashboard-trend-row single-trend-row">
           <Card className="trend-card compact-card">
             <SectionHeading
               title="7-day calorie trend"
@@ -824,19 +869,11 @@ export function App() {
             />
             <DailyTrendChart goalCalories={calorieGoal} points={calorieTrend} />
           </Card>
-
-          <Card className="trend-card compact-card">
-            <SectionHeading
-              title="Weight trend"
-              description={latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries yet"}
-            />
-            <WeightTrendChart points={weightTrendPoints} />
-          </Card>
         </div>
       </div>
 
       <OverlayPanel
-        description="Search an existing meal or reusable food, or choose New meal before editing the details."
+        description="Start from a reusable food, a recent one-off meal, or a fresh photo or nutrition label."
         onClose={() => {
           setIsMealModalOpen(false);
           startNewMeal();
@@ -847,14 +884,14 @@ export function App() {
       >
         <form className="form-stack" onSubmit={handleMealSave}>
           <SectionHeading
-            title="Find a saved meal"
-            description="Search recent meals or reusable foods, then use one as a starting point. Choose New meal to clear the form."
+            title="Start with"
+            description="Reusable foods show first. Recent meals that were already saved as reusable are hidden to avoid duplicates."
           />
 
           <div className="template-toolbar">
-            <Field label="Search saved meals">
+            <Field label="Search saved foods">
               <input
-                placeholder="Search meals you have already logged"
+                placeholder="Search reusable foods or recent meals"
                 value={mealSearchQuery}
                 onChange={(event) => setMealSearchQuery(event.target.value)}
               />
@@ -874,7 +911,7 @@ export function App() {
                     <div className="template-card-heading">
                       <strong>{template.title}</strong>
                       <span className="template-badge">
-                        {template.kind === "meal" ? "Meal" : "Reusable"}
+                        {template.kind === "meal" ? "Recent" : "Reusable"}
                       </span>
                     </div>
                     <span>{template.subtitle}</span>
@@ -901,7 +938,7 @@ export function App() {
             <span>
               {mealTemplateLabel
                 ? "Adjust the amount, add fresh photos, then save this entry."
-                : "Enter a brand new meal below, or search above to load an existing one first."}
+                : "Add a food photo, a nutrition label, or pick a reusable food."}
             </span>
           </div>
 
@@ -922,29 +959,21 @@ export function App() {
             </Field>
             <Field label="Serving">
               <input
-                placeholder="1 bowl, 2 slices, 1 shake"
+                placeholder="bowl, slice, bar, shake"
                 value={mealForm.servingDescription}
                 onChange={(event) =>
                   setMealForm({ ...mealForm, servingDescription: event.target.value })
                 }
               />
             </Field>
-            <Field label="Quantity">
+            <Field label="Servings">
               <input
-                min="0"
+                aria-label="Servings"
+                min="0.1"
                 step="0.1"
                 type="number"
                 value={mealForm.quantity}
                 onChange={(event) => setMealForm({ ...mealForm, quantity: event.target.value })}
-              />
-            </Field>
-            <Field label="Weight (g)">
-              <input
-                min="0"
-                step="0.1"
-                type="number"
-                value={mealForm.weightGrams}
-                onChange={(event) => setMealForm({ ...mealForm, weightGrams: event.target.value })}
               />
             </Field>
           </TwoColumnFields>
@@ -1000,36 +1029,38 @@ export function App() {
           <div className={`analysis-preview ${mealEstimate ? "" : "empty"}`}>
             <SectionHeading
               title="Nutrition preview"
-              description="Estimate with ChatGPT first, review the calories and macros, then save the meal."
+              description="Estimate one serving with ChatGPT, then adjust Servings to scale what gets saved."
             />
 
-            {mealEstimate ? (
+            {displayedMealEstimate ? (
               <>
                 <div className="analysis-preview-header">
-                  <span className={`tag ${mealEstimate.status === "COMPLETED" ? "" : "subtle"}`}>
-                    {mealEstimate.status === "COMPLETED" ? "AI estimate" : "Fallback estimate"}
+                  <span className={`tag ${displayedMealEstimate.status === "COMPLETED" ? "" : "subtle"}`}>
+                    {displayedMealEstimate.status === "COMPLETED" ? "AI estimate" : "Fallback estimate"}
                   </span>
                   <span className="list-item-copy">
-                    Confidence {Math.round(mealEstimate.confidenceScore * 100)}%
+                    {getServingCount(mealForm.quantity)} serving
+                    {getServingCount(mealForm.quantity) === 1 ? "" : "s"} · Confidence{" "}
+                    {Math.round(displayedMealEstimate.confidenceScore * 100)}%
                   </span>
                 </div>
 
                 <div className="summary-metrics-grid">
                   <section className="summary-metric-block">
                     <span className="summary-label">Calories</span>
-                    <strong>{Math.round(mealEstimate.estimatedCalories)}</strong>
-                    <small>{mealEstimate.summary}</small>
+                    <strong>{Math.round(displayedMealEstimate.estimatedCalories)}</strong>
+                    <small>{displayedMealEstimate.summary}</small>
                   </section>
                   <section className="summary-metric-block">
                     <span className="summary-label">Protein</span>
-                    <strong>{mealEstimate.proteinGrams}g</strong>
-                    <small>Carbs {mealEstimate.carbsGrams}g · Fat {mealEstimate.fatGrams}g</small>
+                    <strong>{displayedMealEstimate.proteinGrams}g</strong>
+                    <small>Carbs {displayedMealEstimate.carbsGrams}g · Fat {displayedMealEstimate.fatGrams}g</small>
                   </section>
                 </div>
 
-                {mealEstimate.foodBreakdown.length ? (
+                {displayedMealEstimate.foodBreakdown.length ? (
                   <div className="analysis-breakdown">
-                    {mealEstimate.foodBreakdown.map((item) => (
+                    {displayedMealEstimate.foodBreakdown.map((item) => (
                       <article className="analysis-breakdown-item" key={`${item.label}-${item.quantityDescription}`}>
                         <strong>{item.label}</strong>
                         <span>{item.quantityDescription}</span>
@@ -1041,11 +1072,11 @@ export function App() {
                   </div>
                 ) : null}
 
-                {mealEstimate.assumptions.length ? (
+                {displayedMealEstimate.assumptions.length ? (
                   <div className="analysis-assumptions">
                     <p className="section-label">Assumptions</p>
                     <ul className="analysis-list">
-                      {mealEstimate.assumptions.map((assumption) => (
+                      {displayedMealEstimate.assumptions.map((assumption) => (
                         <li key={assumption}>{assumption}</li>
                       ))}
                     </ul>
@@ -1054,8 +1085,8 @@ export function App() {
               </>
             ) : (
               <p className="empty-state">
-                Add a meal title plus at least one food photo, label screenshot, reusable food, quantity,
-                or weight, then click <strong>Estimate nutrition</strong>.
+                Add a meal title plus a food photo, label screenshot, or reusable food, then click{" "}
+                <strong>Estimate nutrition</strong>.
               </p>
             )}
           </div>
@@ -1092,55 +1123,6 @@ export function App() {
             </button>
             <button className="primary-button" disabled={mealSaving || !mealEstimate} type="submit">
               {mealSaving ? "Saving..." : "Save meal"}
-            </button>
-          </div>
-        </form>
-      </OverlayPanel>
-
-      <OverlayPanel
-        description="Add a weight entry without leaving the dashboard."
-        onClose={() => {
-          setIsWeightModalOpen(false);
-          setWeightForm(defaultWeightForm());
-        }}
-        open={isWeightModalOpen}
-        title="Log weight"
-        variant="dialog"
-      >
-        <form className="form-stack" onSubmit={handleWeightSave}>
-          <TwoColumnFields>
-            <Field label="Weight (lb)">
-              <input
-                required
-                min="0"
-                step="0.1"
-                type="number"
-                value={weightForm.weightLbs}
-                onChange={(event) => setWeightForm({ ...weightForm, weightLbs: event.target.value })}
-              />
-            </Field>
-            <Field label="When">
-              <input
-                type="datetime-local"
-                value={weightForm.recordedAt}
-                onChange={(event) => setWeightForm({ ...weightForm, recordedAt: event.target.value })}
-              />
-            </Field>
-          </TwoColumnFields>
-
-          <div className="panel-actions">
-            <button
-              className="ghost-button"
-              onClick={() => {
-                setIsWeightModalOpen(false);
-                setWeightForm(defaultWeightForm());
-              }}
-              type="button"
-            >
-              Cancel
-            </button>
-            <button className="primary-button" disabled={weightSaving || !weightForm.weightLbs} type="submit">
-              {weightSaving ? "Saving..." : "Save weight"}
             </button>
           </div>
         </form>
@@ -1340,97 +1322,6 @@ function DailyTrendChart({
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function WeightTrendChart({ points }: { points: HealthMetric[] }) {
-  if (points.length === 0) {
-    return <p className="empty-state">No weight data yet.</p>;
-  }
-
-  const weights = points.map((point) => point.weightKg ?? 0);
-  const minWeight = Math.min(...weights);
-  const maxWeight = Math.max(...weights);
-  const width = 560;
-  const height = 210;
-  const paddingX = 28;
-  const paddingY = 20;
-  const usableWidth = width - paddingX * 2;
-  const usableHeight = height - paddingY * 2;
-  const labelGridStyle = {
-    gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`
-  } satisfies CSSProperties;
-
-  const coordinates = points.map((point, index) => {
-    const weight = point.weightKg ?? minWeight;
-    const x =
-      points.length === 1
-        ? width / 2
-        : paddingX + (index / (points.length - 1)) * usableWidth;
-    const y =
-      maxWeight === minWeight
-        ? height / 2
-        : height - paddingY - ((weight - minWeight) / (maxWeight - minWeight)) * usableHeight;
-
-    return { id: point.id, recordedAt: point.recordedAt, x, y };
-  });
-
-  const pathData = coordinates
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
-
-  return (
-    <div className="weight-chart">
-      <svg
-        aria-hidden="true"
-        className="weight-chart-plot"
-        viewBox={`0 0 ${width} ${height}`}
-      >
-        {[0, 1, 2, 3].map((lineIndex) => {
-          const y = paddingY + (usableHeight / 3) * lineIndex;
-          return (
-            <line
-              className="weight-chart-grid"
-              key={lineIndex}
-              x1={paddingX}
-              x2={width - paddingX}
-              y1={y}
-              y2={y}
-            />
-          );
-        })}
-        {coordinates.length > 1 ? <path className="weight-chart-line" d={pathData} /> : null}
-        {coordinates.map((point, index) => {
-          const labelY = Math.max(point.y - 10, paddingY + 12);
-
-          return (
-            <text
-              className="weight-chart-value"
-              key={`${point.id}-value`}
-              textAnchor="middle"
-              x={point.x}
-              y={labelY}
-            >
-              {kgToLbs(weights[index]).toFixed(1)}
-            </text>
-          );
-        })}
-        {coordinates.map((point) => (
-          <circle
-            className="weight-chart-point"
-            cx={point.x}
-            cy={point.y}
-            key={point.id}
-            r="4"
-          />
-        ))}
-      </svg>
-      <div className="weight-chart-labels" style={labelGridStyle}>
-        {points.map((point) => (
-          <small key={point.id}>{formatShortDay(point.recordedAt)}</small>
-        ))}
       </div>
     </div>
   );
