@@ -29,9 +29,14 @@ body,
   min-height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   color: var(--ink);
+  overflow-x: hidden;
 }
 
 button,
@@ -53,6 +58,7 @@ img {
   max-width: 1320px;
   margin: 0 auto;
   padding: 18px 18px 48px;
+  width: 100%;
 }
 
 .loading-shell,
@@ -228,6 +234,7 @@ img {
 .ghost-button {
   padding: 11px 16px;
   font-weight: 800;
+  min-height: 44px;
 }
 
 .primary-button {
@@ -583,6 +590,7 @@ img {
   padding: 12px 13px;
   background: var(--surface-strong);
   color: var(--ink);
+  font-size: 1rem;
 }
 
 .field textarea {
@@ -1109,6 +1117,7 @@ img {
   border-radius: 24px;
   padding: 20px;
   box-shadow: 0 28px 60px rgba(10, 24, 49, 0.22);
+  overscroll-behavior: contain;
 }
 
 .drawer-panel {
@@ -1263,6 +1272,13 @@ img {
     justify-self: start;
   }
 
+  .dashboard-toolbar .primary-button,
+  .dashboard-toolbar .secondary-button,
+  .avatar-trigger {
+    flex: 1 1 150px;
+    justify-content: center;
+  }
+
   .template-toolbar {
     grid-template-columns: 1fr;
   }
@@ -1275,8 +1291,12 @@ img {
 }
 
 @media (max-width: 640px) {
+  :root {
+    --shadow: 0 6px 18px rgba(20, 45, 96, 0.05);
+  }
+
   .app-shell {
-    padding: 16px 14px 42px;
+    padding: 14px 12px calc(112px + env(safe-area-inset-bottom));
   }
 
   .card,
@@ -1285,11 +1305,317 @@ img {
     padding: 16px;
   }
 
+  .auth-shell,
+  .loading-shell {
+    min-height: 100svh;
+  }
+
+  .auth-shell {
+    align-content: start;
+    gap: 14px;
+  }
+
+  .auth-hero {
+    padding-top: 12px;
+  }
+
+  .hero {
+    gap: 12px;
+  }
+
+  .hero h1 {
+    max-width: 100%;
+    font-size: clamp(2rem, 12vw, 2.9rem);
+    line-height: 1;
+  }
+
+  .dashboard-header h1 {
+    font-size: clamp(1.6rem, 9vw, 2.1rem);
+  }
+
+  .auth-login-card h2,
+  .hero-card h2 {
+    font-size: clamp(1.75rem, 10vw, 2.35rem);
+  }
+
+  .subtitle {
+    font-size: 0.95rem;
+  }
+
+  .auth-feature-grid {
+    gap: 10px;
+  }
+
+  .auth-feature-card {
+    padding: 14px;
+  }
+
+  .auth-feature-card h2 {
+    font-size: 1rem;
+  }
+
+  .dashboard-header {
+    margin-bottom: 12px;
+  }
+
+  .dashboard-toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(247, 251, 255, 0.94);
+    border-top: 1px solid rgba(216, 227, 243, 0.9);
+    box-shadow: 0 -12px 30px rgba(20, 45, 96, 0.1);
+    backdrop-filter: blur(16px);
+  }
+
+  .dashboard-toolbar .primary-button,
+  .dashboard-toolbar .secondary-button,
+  .avatar-trigger {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+
+  .avatar-trigger {
+    aspect-ratio: 1;
+    padding: 6px;
+  }
+
+  .avatar-copy {
+    display: none;
+  }
+
+  .avatar-badge {
+    width: 34px;
+    height: 34px;
+  }
+
+  .status-banner {
+    border-radius: 14px;
+    font-size: 0.92rem;
+  }
+
+  .dashboard-stack {
+    gap: 12px;
+  }
+
+  .summary-card,
+  .meals-card,
+  .trend-card {
+    gap: 12px;
+  }
+
+  .summary-card-header {
+    gap: 8px;
+  }
+
   .segmented-control {
     grid-template-columns: 1fr;
   }
 
   .summary-metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .summary-metric-block {
+    padding: 13px;
+  }
+
+  .summary-metric-block strong {
+    font-size: 1.35rem;
+  }
+
+  .progress-copy {
+    display: grid;
+    gap: 4px;
+  }
+
+  .meal-item-header {
+    gap: 10px;
+  }
+
+  .meal-row-side {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: start;
+    align-items: center;
+  }
+
+  .meal-row-side .tag {
+    grid-column: 1 / -1;
+  }
+
+  .inline-action-button {
+    min-height: 36px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: #eef4ff;
+  }
+
+  .trend-bars {
+    gap: 8px;
+    min-height: 180px;
+    padding-top: 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .trend-column {
+    min-width: 42px;
+  }
+
+  .trend-column strong {
+    font-size: 0.8rem;
+  }
+
+  .trend-column span,
+  .trend-column small,
+  .trend-target-note {
+    font-size: 0.72rem;
+  }
+
+  .trend-track {
+    min-height: 108px;
+    height: 108px;
+    padding: 0 3px;
+  }
+
+  .weight-chart {
+    gap: 8px;
+  }
+
+  .weight-chart-plot {
+    min-height: 180px;
+  }
+
+  .weight-chart-labels {
+    overflow: hidden;
+  }
+
+  .overlay-shell {
+    align-items: end;
+    padding: 0;
+  }
+
+  .overlay-panel {
+    width: 100%;
+    max-height: 92svh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 20px 20px 0 0;
+    padding: 16px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .drawer-panel {
+    height: 92svh;
+  }
+
+  .overlay-panel-header {
+    margin-bottom: 14px;
+  }
+
+  .overlay-panel-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .overlay-panel-header p {
+    font-size: 0.9rem;
+  }
+
+  .icon-button {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .form-stack,
+  .two-column-grid,
+  .upload-grid,
+  .template-toolbar,
+  .template-results {
+    gap: 12px;
+  }
+
+  .field {
+    gap: 7px;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    min-height: 46px;
+  }
+
+  .input-help {
+    margin: 0;
+    font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  .template-results {
+    max-height: 260px;
+  }
+
+  .template-card {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .template-card .ghost-button {
+    width: 100%;
+  }
+
+  .analysis-preview {
+    padding: 14px;
+  }
+
+  .analysis-preview-header {
+    align-items: flex-start;
+  }
+
+  .panel-actions,
+  .panel-actions-spread {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .panel-actions button {
+    width: 100%;
+  }
+
+  .checkbox-row {
+    align-items: flex-start;
+  }
+
+  .checkbox-row input {
+    margin-top: 2px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-toolbar {
+    grid-template-columns: 1fr 1fr 48px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .dashboard-toolbar .primary-button,
+  .dashboard-toolbar .secondary-button {
+    padding-right: 8px;
+    padding-left: 8px;
+    font-size: 0.9rem;
+  }
+
+  .summary-metric-block strong {
+    font-size: 1.22rem;
   }
 }
