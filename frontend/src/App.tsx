@@ -11,16 +11,14 @@ import {
 import { ApiError, apiFetch } from "./api";
 import { Card } from "./components/Card";
 import type {
-  BootstrapStatus,
   HealthMetric,
   Meal,
+  NutritionEstimate,
   NutritionSummary,
   ProfileData,
   SavedFood,
   SessionData
 } from "./types";
-
-type AuthMode = "login" | "register";
 
 type MealTemplateResult =
   | {
@@ -164,8 +162,6 @@ const getMealStateTag = (status: Meal["analysisStatus"]) => {
 
 export function App() {
   const [session, setSession] = useState<SessionData | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
   const [globalError, setGlobalError] = useState("");
   const [globalNotice, setGlobalNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -183,13 +179,6 @@ export function App() {
   const [loginForm, setLoginForm] = useState({
     email: "",
     password: ""
-  });
-  const [registerForm, setRegisterForm] = useState({
-    displayName: "",
-    email: "",
-    password: "",
-    goalSummary: "",
-    calorieGoal: ""
   });
 
   const [profileForm, setProfileForm] = useState({
@@ -214,6 +203,8 @@ export function App() {
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
   const [labelFiles, setLabelFiles] = useState<File[]>([]);
   const [otherFiles, setOtherFiles] = useState<File[]>([]);
+  const [mealEstimate, setMealEstimate] = useState<NutritionEstimate | null>(null);
+  const [mealEstimating, setMealEstimating] = useState(false);
   const [mealSaving, setMealSaving] = useState(false);
   const plateInputRef = useRef<HTMLInputElement | null>(null);
   const labelInputRef = useRef<HTMLInputElement | null>(null);
@@ -249,22 +240,32 @@ export function App() {
     });
   }, [profileData]);
 
+  useEffect(() => {
+    if (!mealEstimate) {
+      return;
+    }
+
+    setMealEstimate(null);
+  }, [
+    mealForm.title,
+    mealForm.notes,
+    mealForm.eatenAt,
+    mealForm.servingDescription,
+    mealForm.quantity,
+    mealForm.weightGrams,
+    mealForm.savedFoodId,
+    plateFiles,
+    labelFiles,
+    otherFiles
+  ]);
+
   async function loadSession() {
     try {
       const nextSession = await apiFetch<SessionData>("/auth/session");
-      if (nextSession.authenticated) {
-        setRegistrationOpen(false);
-        setAuthMode("login");
-      } else {
-        const bootstrapStatus = await apiFetch<BootstrapStatus>("/auth/bootstrap-status");
-        setRegistrationOpen(bootstrapStatus.registrationOpen);
-        setAuthMode(bootstrapStatus.registrationOpen ? "register" : "login");
-      }
       setSession(nextSession);
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
       setSession({ authenticated: false });
-      setRegistrationOpen(false);
     }
   }
 
@@ -303,30 +304,12 @@ export function App() {
     setGlobalNotice("");
 
     try {
-      let nextSession: SessionData;
-
-      if (authMode === "register") {
-        nextSession = await apiFetch<SessionData>("/auth/register", {
-          method: "POST",
-          body: JSON.stringify({
-            displayName: registerForm.displayName,
-            email: registerForm.email,
-            password: registerForm.password,
-            goalSummary: registerForm.goalSummary || undefined,
-            calorieGoal: toOptionalNumber(registerForm.calorieGoal)
-          })
-        });
-      } else {
-        nextSession = await apiFetch<SessionData>("/auth/login", {
-          method: "POST",
-          body: JSON.stringify(loginForm)
-        });
-      }
-
+      const nextSession = await apiFetch<SessionData>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(loginForm)
+      });
       setSession(nextSession);
-      setRegistrationOpen(false);
-      setAuthMode("login");
-      setGlobalNotice(authMode === "register" ? "Account created and signed in." : "Signed in.");
+      setGlobalNotice("Signed in.");
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
     } finally {
@@ -338,14 +321,13 @@ export function App() {
     try {
       await apiFetch<void>("/auth/logout", { method: "POST" });
       setSession({ authenticated: false });
-      setRegistrationOpen(false);
-      setAuthMode("login");
       setGlobalNotice("Signed out.");
       setProfileData(null);
       setHealthMetrics([]);
       setNutritionSummary(null);
       setSavedFoods([]);
       setMeals([]);
+      setMealEstimate(null);
       setIsMealModalOpen(false);
       setIsWeightModalOpen(false);
       setIsProfileDrawerOpen(false);
@@ -415,25 +397,60 @@ export function App() {
     }
   }
 
+  function buildMealFormData() {
+    const formData = new FormData();
+    formData.append("title", mealForm.title);
+    if (mealForm.notes) formData.append("notes", mealForm.notes);
+    if (mealForm.eatenAt) formData.append("eatenAt", new Date(mealForm.eatenAt).toISOString());
+    if (mealForm.servingDescription) formData.append("servingDescription", mealForm.servingDescription);
+    if (mealForm.quantity) formData.append("quantity", mealForm.quantity);
+    if (mealForm.weightGrams) formData.append("weightGrams", mealForm.weightGrams);
+    if (mealForm.savedFoodId) formData.append("savedFoodId", mealForm.savedFoodId);
+    formData.append("saveAsReusableFood", String(mealForm.saveAsReusableFood));
+    plateFiles.forEach((file) => formData.append("plateImages", file));
+    labelFiles.forEach((file) => formData.append("labelImages", file));
+    otherFiles.forEach((file) => formData.append("otherImages", file));
+    return formData;
+  }
+
+  async function handleMealEstimate() {
+    setMealEstimating(true);
+    setGlobalError("");
+    setGlobalNotice("");
+
+    try {
+      const result = await apiFetch<{ analysis: NutritionEstimate }>("/nutrition/estimate", {
+        method: "POST",
+        body: buildMealFormData()
+      });
+
+      setMealEstimate(result.analysis);
+      setGlobalNotice(
+        result.analysis.status === "COMPLETED"
+          ? "Nutrition estimate ready."
+          : "Estimate ready. Review before saving."
+      );
+    } catch (error) {
+      setGlobalError(getApiErrorMessage(error));
+    } finally {
+      setMealEstimating(false);
+    }
+  }
+
   async function handleMealSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!mealEstimate) {
+      setGlobalError("Estimate nutrition first so you can review the calories and macros before saving.");
+      return;
+    }
+
     setMealSaving(true);
     setGlobalError("");
     setGlobalNotice("");
 
     try {
-      const formData = new FormData();
-      formData.append("title", mealForm.title);
-      if (mealForm.notes) formData.append("notes", mealForm.notes);
-      if (mealForm.eatenAt) formData.append("eatenAt", new Date(mealForm.eatenAt).toISOString());
-      if (mealForm.servingDescription) formData.append("servingDescription", mealForm.servingDescription);
-      if (mealForm.quantity) formData.append("quantity", mealForm.quantity);
-      if (mealForm.weightGrams) formData.append("weightGrams", mealForm.weightGrams);
-      if (mealForm.savedFoodId) formData.append("savedFoodId", mealForm.savedFoodId);
-      formData.append("saveAsReusableFood", String(mealForm.saveAsReusableFood));
-      plateFiles.forEach((file) => formData.append("plateImages", file));
-      labelFiles.forEach((file) => formData.append("labelImages", file));
-      otherFiles.forEach((file) => formData.append("otherImages", file));
+      const formData = buildMealFormData();
+      formData.append("confirmedAnalysis", JSON.stringify(mealEstimate));
 
       const result = await apiFetch<{ meal: Meal; savedFoodId: string | null }>("/nutrition/meals", {
         method: "POST",
@@ -465,6 +482,7 @@ export function App() {
     setPlateFiles([]);
     setLabelFiles([]);
     setOtherFiles([]);
+    setMealEstimate(null);
 
     if (plateInputRef.current) plateInputRef.current.value = "";
     if (labelInputRef.current) labelInputRef.current.value = "";
@@ -519,6 +537,14 @@ export function App() {
 
   const currentMemberName = session?.member?.displayName ?? "User";
   const currentMemberInitials = getInitials(currentMemberName);
+  const hasMealEstimateInputs =
+    plateFiles.length > 0 ||
+    labelFiles.length > 0 ||
+    otherFiles.length > 0 ||
+    Boolean(mealForm.savedFoodId) ||
+    Boolean(mealForm.quantity) ||
+    Boolean(mealForm.weightGrams);
+  const canEstimateMeal = Boolean(mealForm.title.trim()) && hasMealEstimateInputs;
   const todaySummary = nutritionSummary?.today ?? {
     mealCount: 0,
     calories: 0,
@@ -596,133 +622,63 @@ export function App() {
   if (!session.authenticated) {
     return (
       <main className="app-shell auth-shell">
-        <section className="hero">
-          <p className="eyebrow">Private health coach</p>
-          <h1>Track meals, weight, and daily progress in one place.</h1>
+        <section className="hero auth-hero">
+          <p className="eyebrow">Private Health Coach</p>
+          <h1>Track meals, weight, and nutrition from food photos and label screenshots.</h1>
           <p className="subtitle">
-            This app is private and protected by email and password. Log meals with photos, keep a
-            reusable meal library, and start with simple weight tracking.
+            This workspace is private. Sign in with your existing email and password, then log a
+            meal by taking a picture of the plate, snapping the nutrition label, or uploading a
+            screenshot of digital nutrition facts.
           </p>
 
-          <div className="feature-grid">
-            <Card className="feature-card">
-              <h2>Daily dashboard</h2>
-              <p>See calories, macros, weight, and short-term trends at a glance.</p>
+          <div className="feature-grid auth-feature-grid">
+            <Card className="feature-card auth-feature-card">
+              <h2>Photo-first meal logging</h2>
+              <p>Upload food photos, packaging photos, or screenshots before you save the meal.</p>
             </Card>
-            <Card className="feature-card">
-              <h2>Reusable meal flow</h2>
-              <p>Save a meal while logging it so the next entry starts faster.</p>
+            <Card className="feature-card auth-feature-card">
+              <h2>Estimate before submit</h2>
+              <p>Review calories and macros from the AI estimate first, then confirm and store it.</p>
             </Card>
-            <Card className="feature-card">
+            <Card className="feature-card auth-feature-card">
               <h2>Private account</h2>
-              <p>Your data stays inside a single personal account instead of a shared workspace.</p>
+              <p>No public signup. Access is locked down to the credentials you already created.</p>
             </Card>
           </div>
         </section>
 
-        <Card className="auth-card">
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={authMode === "login" ? "active" : ""}
-              onClick={() => setAuthMode("login")}
-            >
-              Sign In
-            </button>
-            {registrationOpen ? (
-              <button
-                type="button"
-                className={authMode === "register" ? "active" : ""}
-                onClick={() => setAuthMode("register")}
-              >
-                Create Account
-              </button>
-            ) : null}
-          </div>
+        <Card className="auth-card auth-login-card">
+          <p className="eyebrow">Private Access</p>
+          <h2>Sign in</h2>
+          <p className="subtitle auth-card-subtitle">
+            Use the email and password you already created to enter your dashboard.
+          </p>
 
           {globalError && <p className="status-banner error">{globalError}</p>}
           {globalNotice && <p className="status-banner success">{globalNotice}</p>}
-          {!registrationOpen ? (
-            <p className="list-item-copy">
-              Account setup is complete. Sign in with the email and password you already created.
-            </p>
-          ) : null}
 
           <form className="form-stack" onSubmit={handleAuthSubmit}>
-            {authMode === "login" && (
-              <>
-                <Field label="Email">
-                  <input
-                    required
-                    type="email"
-                    value={loginForm.email}
-                    onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })}
-                  />
-                </Field>
-                <Field label="Password">
-                  <input
-                    required
-                    type="password"
-                    value={loginForm.password}
-                    onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
-                  />
-                </Field>
-              </>
-            )}
-
-            {authMode === "register" && (
-              <>
-                <Field label="Your name">
-                  <input
-                    required
-                    value={registerForm.displayName}
-                    onChange={(event) =>
-                      setRegisterForm({ ...registerForm, displayName: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Email">
-                  <input
-                    required
-                    type="email"
-                    value={registerForm.email}
-                    onChange={(event) => setRegisterForm({ ...registerForm, email: event.target.value })}
-                  />
-                </Field>
-                <Field label="Password">
-                  <input
-                    required
-                    type="password"
-                    value={registerForm.password}
-                    onChange={(event) =>
-                      setRegisterForm({ ...registerForm, password: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Goal summary">
-                  <textarea
-                    rows={3}
-                    value={registerForm.goalSummary}
-                    onChange={(event) =>
-                      setRegisterForm({ ...registerForm, goalSummary: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Daily calorie goal">
-                  <input
-                    type="number"
-                    min="0"
-                    value={registerForm.calorieGoal}
-                    onChange={(event) =>
-                      setRegisterForm({ ...registerForm, calorieGoal: event.target.value })
-                    }
-                  />
-                </Field>
-              </>
-            )}
+            <Field label="Email">
+              <input
+                required
+                autoComplete="email"
+                type="email"
+                value={loginForm.email}
+                onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })}
+              />
+            </Field>
+            <Field label="Password">
+              <input
+                required
+                autoComplete="current-password"
+                type="password"
+                value={loginForm.password}
+                onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
+              />
+            </Field>
 
             <button className="primary-button" disabled={authLoading} type="submit">
-              {authLoading ? "Working..." : authMode === "register" ? "Create account" : "Sign in"}
+              {authLoading ? "Signing in..." : "Sign in"}
             </button>
           </form>
         </Card>
@@ -1003,17 +959,19 @@ export function App() {
           </Field>
 
           <div className="upload-grid">
-            <Field label="Plate photos">
+            <Field label="Food photos">
               <input
                 ref={plateInputRef}
                 accept="image/*"
+                capture="environment"
                 multiple
                 type="file"
                 onChange={(event) => handleFileChange(event, setPlateFiles)}
               />
+              <p className="input-help">Take a picture of the meal or upload one from your camera roll.</p>
               <FileSummary files={plateFiles} />
             </Field>
-            <Field label="Label photos">
+            <Field label="Nutrition label photos">
               <input
                 ref={labelInputRef}
                 accept="image/*"
@@ -1021,9 +979,12 @@ export function App() {
                 type="file"
                 onChange={(event) => handleFileChange(event, setLabelFiles)}
               />
+              <p className="input-help">
+                Add package labels or screenshots of digital nutrition facts.
+              </p>
               <FileSummary files={labelFiles} />
             </Field>
-            <Field label="Other photos">
+            <Field label="Extra reference images">
               <input
                 ref={otherInputRef}
                 accept="image/*"
@@ -1031,8 +992,72 @@ export function App() {
                 type="file"
                 onChange={(event) => handleFileChange(event, setOtherFiles)}
               />
+              <p className="input-help">Use this for menus, ingredient lists, or anything else that helps.</p>
               <FileSummary files={otherFiles} />
             </Field>
+          </div>
+
+          <div className={`analysis-preview ${mealEstimate ? "" : "empty"}`}>
+            <SectionHeading
+              title="Nutrition preview"
+              description="Estimate with ChatGPT first, review the calories and macros, then save the meal."
+            />
+
+            {mealEstimate ? (
+              <>
+                <div className="analysis-preview-header">
+                  <span className={`tag ${mealEstimate.status === "COMPLETED" ? "" : "subtle"}`}>
+                    {mealEstimate.status === "COMPLETED" ? "AI estimate" : "Fallback estimate"}
+                  </span>
+                  <span className="list-item-copy">
+                    Confidence {Math.round(mealEstimate.confidenceScore * 100)}%
+                  </span>
+                </div>
+
+                <div className="summary-metrics-grid">
+                  <section className="summary-metric-block">
+                    <span className="summary-label">Calories</span>
+                    <strong>{Math.round(mealEstimate.estimatedCalories)}</strong>
+                    <small>{mealEstimate.summary}</small>
+                  </section>
+                  <section className="summary-metric-block">
+                    <span className="summary-label">Protein</span>
+                    <strong>{mealEstimate.proteinGrams}g</strong>
+                    <small>Carbs {mealEstimate.carbsGrams}g · Fat {mealEstimate.fatGrams}g</small>
+                  </section>
+                </div>
+
+                {mealEstimate.foodBreakdown.length ? (
+                  <div className="analysis-breakdown">
+                    {mealEstimate.foodBreakdown.map((item) => (
+                      <article className="analysis-breakdown-item" key={`${item.label}-${item.quantityDescription}`}>
+                        <strong>{item.label}</strong>
+                        <span>{item.quantityDescription}</span>
+                        <small>
+                          {Math.round(item.calories)} kcal · P {item.proteinGrams}g · C {item.carbsGrams}g · F {item.fatGrams}g
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+
+                {mealEstimate.assumptions.length ? (
+                  <div className="analysis-assumptions">
+                    <p className="section-label">Assumptions</p>
+                    <ul className="analysis-list">
+                      {mealEstimate.assumptions.map((assumption) => (
+                        <li key={assumption}>{assumption}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="empty-state">
+                Add a meal title plus at least one food photo, label screenshot, reusable food, quantity,
+                or weight, then click <strong>Estimate nutrition</strong>.
+              </p>
+            )}
           </div>
 
           <label className="checkbox-row">
@@ -1057,8 +1082,16 @@ export function App() {
             >
               Cancel
             </button>
-            <button className="primary-button" disabled={mealSaving} type="submit">
-              {mealSaving ? "Analyzing..." : "Save meal"}
+            <button
+              className="secondary-button"
+              disabled={mealEstimating || mealSaving || !canEstimateMeal}
+              onClick={handleMealEstimate}
+              type="button"
+            >
+              {mealEstimating ? "Estimating..." : "Estimate nutrition"}
+            </button>
+            <button className="primary-button" disabled={mealSaving || !mealEstimate} type="submit">
+              {mealSaving ? "Saving..." : "Save meal"}
             </button>
           </div>
         </form>

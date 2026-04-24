@@ -1,7 +1,3 @@
-export interface BootstrapStatus {
-  registrationOpen: boolean;
-}
-
 export interface SessionData {
   authenticated: boolean;
   account?: {
@@ -46,6 +42,31 @@ export interface ProfileData {
     notes: string | null;
   };
   latestMetric: HealthMetric | null;
+}
+
+export interface NutritionEstimate {
+  status: "PENDING" | "COMPLETED" | "FALLBACK" | "FAILED";
+  model: string;
+  summary: string;
+  confidenceScore: number;
+  estimatedCalories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+  sugarGrams: number;
+  sodiumMg: number;
+  micronutrients: Array<{ name: string; amount: number; unit: string }>;
+  vitamins: Array<{ name: string; amount: number; unit: string }>;
+  assumptions: string[];
+  foodBreakdown: Array<{
+    label: string;
+    quantityDescription: string;
+    calories: number;
+    proteinGrams: number;
+    carbsGrams: number;
+    fatGrams: number;
+  }>;
 }
 
 export interface NutritionSummary {

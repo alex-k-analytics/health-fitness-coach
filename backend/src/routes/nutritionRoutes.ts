@@ -147,6 +147,128 @@ const createMealBodySchema = z.object({
   saveAsReusableFood: z.boolean().optional()
 });
 
+const confirmedAnalysisSchema = z.object({
+  status: z.enum(["PENDING", "COMPLETED", "FALLBACK", "FAILED"]),
+  model: z.string(),
+  summary: z.string(),
+  confidenceScore: z.number().min(0).max(1),
+  estimatedCalories: z.number().min(0),
+  proteinGrams: z.number().min(0),
+  carbsGrams: z.number().min(0),
+  fatGrams: z.number().min(0),
+  fiberGrams: z.number().min(0),
+  sugarGrams: z.number().min(0),
+  sodiumMg: z.number().min(0),
+  micronutrients: z.array(
+    z.object({
+      name: z.string(),
+      amount: z.number().min(0),
+      unit: z.string()
+    })
+  ),
+  vitamins: z.array(
+    z.object({
+      name: z.string(),
+      amount: z.number().min(0),
+      unit: z.string()
+    })
+  ),
+  assumptions: z.array(z.string()),
+  foodBreakdown: z.array(
+    z.object({
+      label: z.string(),
+      quantityDescription: z.string(),
+      calories: z.number().min(0),
+      proteinGrams: z.number().min(0),
+      carbsGrams: z.number().min(0),
+      fatGrams: z.number().min(0)
+    })
+  ),
+  rawAnalysis: z.unknown()
+});
+
+const mealUploadFields = [
+  { name: "plateImages", maxCount: 5 },
+  { name: "labelImages", maxCount: 3 },
+  { name: "otherImages", maxCount: 3 }
+] as const;
+
+const extractUploadedImages = (files: AuthenticatedRequest["files"]) => {
+  const filesByField = (files ?? {}) as Record<string, Express.Multer.File[] | undefined>;
+
+  return [
+    ...(filesByField.plateImages ?? []).map((file) => ({ file, kind: "PLATE" as const })),
+    ...(filesByField.labelImages ?? []).map((file) => ({ file, kind: "LABEL" as const })),
+    ...(filesByField.otherImages ?? []).map((file) => ({ file, kind: "OTHER" as const }))
+  ];
+};
+
+const resolveSavedFood = async (
+  auth: ReturnType<typeof getRequiredAuth>,
+  savedFoodId: string | undefined
+) => {
+  if (!savedFoodId) {
+    return null;
+  }
+
+  return prisma.savedFood.findFirst({
+    where: {
+      id: savedFoodId,
+      accountId: auth.accountId
+    }
+  });
+};
+
+const resolveAnalysisContext = async (
+  req: AuthenticatedRequest,
+  parsed: z.infer<typeof createMealBodySchema>
+) => {
+  const auth = getRequiredAuth(req);
+  const [account, savedFood] = await Promise.all([
+    prisma.account.findUnique({
+      where: {
+        id: auth.accountId
+      },
+      include: {
+        healthMetrics: {
+          take: 1,
+          orderBy: {
+            recordedAt: "desc"
+          }
+        }
+      }
+    }),
+    resolveSavedFood(auth, parsed.savedFoodId)
+  ]);
+
+  if (!account) {
+    return { ok: false as const, error: { status: 404, message: "Profile not found" } };
+  }
+
+  if (parsed.savedFoodId && !savedFood) {
+    return { ok: false as const, error: { status: 404, message: "Reusable food was not found" } };
+  }
+
+  const uploadedImages = extractUploadedImages(req.files);
+  if (uploadedImages.length === 0 && !savedFood && !parsed.weightGrams && !parsed.quantity) {
+    return {
+      ok: false as const,
+      error: {
+        status: 400,
+        message: "Add food photos, a nutrition label screenshot, a reusable food, or a serving quantity/weight"
+      }
+    };
+  }
+
+  return {
+    ok: true as const,
+    auth,
+    account,
+    savedFood,
+    uploadedImages
+  } as const;
+};
+
 nutritionRoutes.get("/saved-foods", async (req: AuthenticatedRequest, res) => {
   const auth = getRequiredAuth(req);
   const foods = await prisma.savedFood.findMany({
@@ -317,12 +439,8 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
 });
 
 nutritionRoutes.post(
-  "/meals",
-  upload.fields([
-    { name: "plateImages", maxCount: 5 },
-    { name: "labelImages", maxCount: 3 },
-    { name: "otherImages", maxCount: 3 }
-  ]),
+  "/estimate",
+  upload.fields(mealUploadFields),
   async (req: AuthenticatedRequest, res) => {
     const parsed = createMealBodySchema.safeParse({
       title: req.body.title,
@@ -339,58 +457,75 @@ nutritionRoutes.post(
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    const auth = getRequiredAuth(req);
-    const member = await prisma.account.findUnique({
-      where: {
-        id: auth.accountId
+    const context = await resolveAnalysisContext(req, parsed.data);
+    if (!context.ok) {
+      const error = context.error;
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    const eatenAt = parsed.data.eatenAt ? new Date(parsed.data.eatenAt) : new Date();
+    const analysis = await nutritionAnalysisService.analyzeMeal({
+      title: parsed.data.title.trim(),
+      notes: parsed.data.notes?.trim() || undefined,
+      eatenAtISO: eatenAt.toISOString(),
+      servingDescription: parsed.data.servingDescription?.trim(),
+      quantity: parsed.data.quantity,
+      weightGrams: parsed.data.weightGrams,
+      goals: {
+        calorieGoal: context.account.calorieGoal,
+        proteinGoalGrams: context.account.proteinGoalGrams,
+        carbGoalGrams: context.account.carbGoalGrams,
+        fatGoalGrams: context.account.fatGoalGrams,
+        goalSummary: context.account.goalSummary
       },
-      include: {
-        healthMetrics: {
-          take: 1,
-          orderBy: {
-            recordedAt: "desc"
+      recentMetric: context.account.healthMetrics[0]
+        ? {
+            weightKg: context.account.healthMetrics[0].weightKg,
+            systolicBloodPressure: context.account.healthMetrics[0].systolicBloodPressure,
+            diastolicBloodPressure: context.account.healthMetrics[0].diastolicBloodPressure
           }
-        }
-      }
+        : null,
+      savedFood: context.savedFood,
+      images: context.uploadedImages.map(({ file, kind }) => ({
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+        kind
+      }))
     });
 
-    if (!member) {
-      return res.status(404).json({ error: "Profile not found" });
+    return res.json({ analysis });
+  }
+);
+
+nutritionRoutes.post(
+  "/meals",
+  upload.fields(mealUploadFields),
+  async (req: AuthenticatedRequest, res) => {
+    const parsed = createMealBodySchema.safeParse({
+      title: req.body.title,
+      notes: req.body.notes || undefined,
+      eatenAt: req.body.eatenAt || undefined,
+      servingDescription: req.body.servingDescription || undefined,
+      quantity: parseOptionalNumber(req.body.quantity),
+      weightGrams: parseOptionalNumber(req.body.weightGrams),
+      savedFoodId: req.body.savedFoodId || undefined,
+      saveAsReusableFood: parseOptionalBoolean(req.body.saveAsReusableFood)
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    let savedFood:
-      | Awaited<ReturnType<typeof prisma.savedFood.findFirst>>
-      | null = null;
-    if (parsed.data.savedFoodId) {
-      savedFood = await prisma.savedFood.findFirst({
-        where: {
-          id: parsed.data.savedFoodId,
-          accountId: auth.accountId
-        }
-      });
-
-      if (!savedFood) {
-        return res.status(404).json({ error: "Reusable food was not found" });
-      }
-    }
-
-    const filesByField = (req.files ?? {}) as Record<string, Express.Multer.File[] | undefined>;
-    const uploadedImages = [
-      ...(filesByField.plateImages ?? []).map((file) => ({ file, kind: "PLATE" as const })),
-      ...(filesByField.labelImages ?? []).map((file) => ({ file, kind: "LABEL" as const })),
-      ...(filesByField.otherImages ?? []).map((file) => ({ file, kind: "OTHER" as const }))
-    ];
-
-    if (uploadedImages.length === 0 && !savedFood && !parsed.data.weightGrams && !parsed.data.quantity) {
-      return res.status(400).json({
-        error: "Add meal photos, select a reusable food, or provide a serving quantity/weight"
-      });
+    const context = await resolveAnalysisContext(req, parsed.data);
+    if (!context.ok) {
+      const error = context.error;
+      return res.status(error.status).json({ error: error.message });
     }
 
     const meal = await prisma.mealEntry.create({
       data: {
-        accountId: auth.accountId,
-        savedFoodId: savedFood?.id ?? null,
+        accountId: context.auth.accountId,
+        savedFoodId: context.savedFood?.id ?? null,
         title: parsed.data.title.trim(),
         notes: parsed.data.notes?.trim() || null,
         eatenAt: parsed.data.eatenAt ? new Date(parsed.data.eatenAt) : new Date(),
@@ -401,39 +536,56 @@ nutritionRoutes.post(
       }
     });
 
-    const analysis = await nutritionAnalysisService.analyzeMeal({
-      title: parsed.data.title.trim(),
-      notes: parsed.data.notes?.trim() || undefined,
-      eatenAtISO: meal.eatenAt.toISOString(),
-      servingDescription: parsed.data.servingDescription?.trim(),
-      quantity: parsed.data.quantity,
-      weightGrams: parsed.data.weightGrams,
-      goals: {
-        calorieGoal: member.calorieGoal,
-        proteinGoalGrams: member.proteinGoalGrams,
-        carbGoalGrams: member.carbGoalGrams,
-        fatGoalGrams: member.fatGoalGrams,
-        goalSummary: member.goalSummary
-      },
-      recentMetric: member.healthMetrics[0]
-        ? {
-            weightKg: member.healthMetrics[0].weightKg,
-            systolicBloodPressure: member.healthMetrics[0].systolicBloodPressure,
-            diastolicBloodPressure: member.healthMetrics[0].diastolicBloodPressure
-          }
-        : null,
-      savedFood,
-      images: uploadedImages.map(({ file, kind }) => ({
-        buffer: file.buffer,
-        mimeType: file.mimetype,
-        kind
-      }))
-    });
+    let analysis;
+    if (req.body.confirmedAnalysis) {
+      let parsedAnalysisJson: unknown;
+      try {
+        parsedAnalysisJson = JSON.parse(String(req.body.confirmedAnalysis));
+      } catch {
+        return res.status(400).json({ error: "Confirmed analysis payload is not valid JSON" });
+      }
+
+      const confirmedAnalysis = confirmedAnalysisSchema.safeParse(parsedAnalysisJson);
+      if (!confirmedAnalysis.success) {
+        return res.status(400).json({ error: confirmedAnalysis.error.flatten() });
+      }
+
+      analysis = confirmedAnalysis.data;
+    } else {
+      analysis = await nutritionAnalysisService.analyzeMeal({
+        title: parsed.data.title.trim(),
+        notes: parsed.data.notes?.trim() || undefined,
+        eatenAtISO: meal.eatenAt.toISOString(),
+        servingDescription: parsed.data.servingDescription?.trim(),
+        quantity: parsed.data.quantity,
+        weightGrams: parsed.data.weightGrams,
+        goals: {
+          calorieGoal: context.account.calorieGoal,
+          proteinGoalGrams: context.account.proteinGoalGrams,
+          carbGoalGrams: context.account.carbGoalGrams,
+          fatGoalGrams: context.account.fatGoalGrams,
+          goalSummary: context.account.goalSummary
+        },
+        recentMetric: context.account.healthMetrics[0]
+          ? {
+              weightKg: context.account.healthMetrics[0].weightKg,
+              systolicBloodPressure: context.account.healthMetrics[0].systolicBloodPressure,
+              diastolicBloodPressure: context.account.healthMetrics[0].diastolicBloodPressure
+            }
+          : null,
+        savedFood: context.savedFood,
+        images: context.uploadedImages.map(({ file, kind }) => ({
+          buffer: file.buffer,
+          mimeType: file.mimetype,
+          kind
+        }))
+      });
+    }
 
     const imageRecords = await Promise.all(
-      uploadedImages.map(async ({ file, kind }) =>
+      context.uploadedImages.map(async ({ file, kind }) =>
         storageService.saveMealImage({
-          accountId: auth.accountId,
+          accountId: context.auth.accountId,
           mealEntryId: meal.id,
           image: {
             buffer: file.buffer,
@@ -450,7 +602,7 @@ nutritionRoutes.post(
     if (parsed.data.saveAsReusableFood) {
       const createdFood = await prisma.savedFood.create({
         data: {
-          accountId: auth.accountId,
+          accountId: context.auth.accountId,
           name: parsed.data.title.trim(),
           servingDescription: parsed.data.servingDescription?.trim() || "Logged serving",
           servingWeightGrams: parsed.data.weightGrams ?? null,

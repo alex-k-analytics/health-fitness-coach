@@ -67,11 +67,10 @@ The frontend expects the API at `http://localhost:4000/api` by default.
 
 ## Auth and data flow
 
-- `GET /api/auth/bootstrap-status`: check whether first-time account setup is still open.
-- `POST /api/auth/register`: create the initial account if setup is still open.
 - `POST /api/auth/login`: sign in.
 - `PATCH /api/profile/me`: update goals/profile.
 - `POST /api/profile/me/health-metrics`: append a health snapshot.
+- `POST /api/nutrition/estimate`: analyze food photos and label screenshots before saving a meal.
 - `POST /api/nutrition/meals`: multipart meal submission with `plateImages`, `labelImages`, and `otherImages`.
 - `POST /api/nutrition/saved-foods`: create reusable food entries.
 
