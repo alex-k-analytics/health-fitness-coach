@@ -395,6 +395,10 @@ img {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.dashboard-trend-row.single-trend-row {
+  grid-template-columns: 1fr;
+}
+
 .span-two {
   grid-column: span 2;
 }
@@ -809,6 +813,21 @@ img {
 .meal-calories {
   font-size: 0.84rem;
   color: var(--accent-deep);
+}
+
+.inline-action-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inline-action-button:hover {
+  text-decoration: underline;
 }
 
 .macro-pills,

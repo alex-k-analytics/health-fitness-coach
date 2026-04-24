@@ -198,8 +198,7 @@ const createPrompt = (input: NutritionAnalysisInput) => {
     `Meal title: ${input.title}`,
     `Logged at: ${input.eatenAtISO}`,
     `Serving description: ${input.servingDescription || "not provided"}`,
-    `Quantity/count: ${input.quantity ?? "not provided"}`,
-    `Weight in grams: ${input.weightGrams ?? "not provided"}`,
+    `Servings: ${input.quantity ?? 1}`,
     `Notes: ${input.notes || "none"}`,
     `Nutrition goals: ${JSON.stringify(input.goals ?? {})}`,
     `Recent health context: ${JSON.stringify(input.recentMetric ?? {})}`,
@@ -279,7 +278,7 @@ const createFallback = (input: NutritionAnalysisInput, reason: string): Nutritio
     vitamins: [],
     assumptions: [
       reason,
-      "Estimated from serving size, weight, and a generic mixed-meal density heuristic."
+      "Estimated from serving count and a generic mixed-meal density heuristic."
     ],
     foodBreakdown: [
       {
