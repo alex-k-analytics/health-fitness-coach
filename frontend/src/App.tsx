@@ -688,6 +688,9 @@ export function App() {
   const mealSearchResults = mealTemplates
     .filter((template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch))
     .slice(0, 8);
+  const matchingMealTemplateCount = mealTemplates.filter(
+    (template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch)
+  ).length;
   const displayedMeals = meals.slice(0, 3);
   const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
   const weightTrendPoints = weightTrend.slice(-6);
@@ -949,9 +952,6 @@ export function App() {
                 onChange={(event) => setMealSearchQuery(event.target.value)}
               />
             </Field>
-            <button className="secondary-button template-new-button" onClick={startNewMeal} type="button">
-              New meal
-            </button>
           </div>
 
           <div className="template-results">
@@ -979,6 +979,11 @@ export function App() {
               ))
             )}
           </div>
+          {matchingMealTemplateCount > mealSearchResults.length ? (
+            <p className="input-help">
+              Showing {mealSearchResults.length} of {matchingMealTemplateCount} saved foods. Search to narrow the list.
+            </p>
+          ) : null}
 
           <div className={`template-status ${mealTemplateLabel ? "" : "neutral"}`}>
             <strong>{mealTemplateLabel ? `Using ${mealTemplateLabel}` : "New meal"}</strong>

@@ -1009,12 +1009,14 @@ img {
 }
 
 .template-toolbar {
-  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-columns: 1fr;
   align-items: end;
 }
 
-.template-new-button {
-  height: fit-content;
+.template-results {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .template-card {
