@@ -305,14 +305,6 @@ img {
   font-size: 0.95rem;
 }
 
-.weight-log-button,
-.workout-log-button {
-  background: #dbe8ff;
-  color: var(--accent-deep);
-  border: 1px solid #c7d9f7;
-  box-shadow: none;
-}
-
 .avatar-trigger {
   display: flex;
   align-items: center;

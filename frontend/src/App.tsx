@@ -848,14 +848,14 @@ export function App() {
             Log food
           </button>
           <button
-            className="secondary-button weight-log-button"
+            className="primary-button"
             onClick={() => setIsWeightModalOpen(true)}
             type="button"
           >
             Log weight
           </button>
           <button
-            className="secondary-button workout-log-button"
+            className="primary-button"
             onClick={() => setIsWorkoutModalOpen(true)}
             type="button"
           >
