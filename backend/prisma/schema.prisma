@@ -36,6 +36,7 @@ model Account {
   healthMetrics    HealthMetric[]
   savedFoods       SavedFood[]
   meals            MealEntry[]
+  workouts         WorkoutEntry[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }
@@ -128,4 +129,17 @@ model MealImage {
   createdAt        DateTime      @default(now())
 
   @@index([mealEntryId])
+}
+
+model WorkoutEntry {
+  id             String   @id @default(cuid())
+  accountId      String
+  title          String
+  caloriesBurned Int
+  performedAt    DateTime @default(now())
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([accountId, performedAt(sort: Desc)])
 }

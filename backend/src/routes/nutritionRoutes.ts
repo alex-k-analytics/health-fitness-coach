@@ -449,7 +449,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const startOfTrendWindow = new Date();
   startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
-  const [recentMeals, member] = await Promise.all([
+  const [recentMeals, recentWorkouts, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
         accountId: auth.accountId,
@@ -463,6 +463,18 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         proteinGrams: true,
         carbsGrams: true,
         fatGrams: true
+      }
+    }),
+    prisma.workoutEntry.findMany({
+      where: {
+        accountId: auth.accountId,
+        performedAt: {
+          gte: startOfTrendWindow
+        }
+      },
+      select: {
+        performedAt: true,
+        caloriesBurned: true
       }
     }),
     prisma.account.findUnique({
@@ -483,8 +495,13 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const dailyCalories = trendDateKeys.map((date) => ({
     date,
     calories: 0,
-    mealCount: 0
+    mealCount: 0,
+    caloriesBurned: 0
   }));
+
+  const caloriesBurnedToday = recentWorkouts.reduce((total, workout) => {
+    return total + (getDateKeyInTimeZone(workout.performedAt, timeZone) === todayKey ? workout.caloriesBurned : 0);
+  }, 0);
 
   const totals = recentMeals.reduce(
     (accumulator, meal) => {
@@ -511,17 +528,33 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     }
   });
 
+  recentWorkouts.forEach((workout) => {
+    const dateKey = getDateKeyInTimeZone(workout.performedAt, timeZone);
+    const matchingDay = dailyCalories.find((day) => day.date === dateKey);
+
+    if (matchingDay) {
+      matchingDay.caloriesBurned += workout.caloriesBurned;
+    }
+  });
+
+  const baseCalorieGoal = member?.calorieGoal ?? null;
+  const adjustedCalorieGoal = baseCalorieGoal === null ? null : baseCalorieGoal + caloriesBurnedToday;
+
   return res.json({
     today: {
       mealCount: totals.mealCount,
       calories: Math.round(totals.calories),
+      caloriesBurned: caloriesBurnedToday,
+      netCalories: Math.round(totals.calories - caloriesBurnedToday),
       proteinGrams: Math.round(totals.proteinGrams * 10) / 10,
       carbsGrams: Math.round(totals.carbsGrams * 10) / 10,
       fatGrams: Math.round(totals.fatGrams * 10) / 10
     },
     goals: member
       ? {
-          calorieGoal: member.calorieGoal,
+          calorieGoal: adjustedCalorieGoal,
+          baseCalorieGoal,
+          adjustedCalorieGoal,
           proteinGoalGrams: member.proteinGoalGrams,
           carbGoalGrams: member.carbGoalGrams,
           fatGoalGrams: member.fatGoalGrams
@@ -531,7 +564,9 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     dailyCalories: dailyCalories.map((day) => ({
       date: day.date,
       calories: Math.round(day.calories),
-      mealCount: day.mealCount
+      mealCount: day.mealCount,
+      caloriesBurned: day.caloriesBurned,
+      netCalories: Math.round(day.calories - day.caloriesBurned)
     }))
   });
 });

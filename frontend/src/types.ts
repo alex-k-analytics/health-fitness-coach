@@ -74,12 +74,16 @@ export interface NutritionSummary {
   today: {
     mealCount: number;
     calories: number;
+    caloriesBurned: number;
+    netCalories: number;
     proteinGrams: number;
     carbsGrams: number;
     fatGrams: number;
   };
   goals: {
     calorieGoal: number | null;
+    baseCalorieGoal: number | null;
+    adjustedCalorieGoal: number | null;
     proteinGoalGrams: number | null;
     carbGoalGrams: number | null;
     fatGoalGrams: number | null;
@@ -89,7 +93,18 @@ export interface NutritionSummary {
     date: string;
     calories: number;
     mealCount: number;
+    caloriesBurned: number;
+    netCalories: number;
   }>;
+}
+
+export interface Workout {
+  id: string;
+  title: string;
+  caloriesBurned: number;
+  performedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SavedFood {

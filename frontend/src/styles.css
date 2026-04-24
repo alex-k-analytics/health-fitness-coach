@@ -304,7 +304,8 @@ img {
   border-radius: 12px;
 }
 
-.weight-log-button {
+.weight-log-button,
+.workout-log-button {
   background: #dce8fb;
   color: var(--accent-deep);
   box-shadow: none;
@@ -399,7 +400,7 @@ img {
 }
 
 .dashboard-trend-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dashboard-trend-row.single-trend-row {
@@ -777,6 +778,28 @@ img {
 
 .meal-list {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workout-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workout-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f9fbfe;
+}
+
+.workout-calories {
+  flex-shrink: 0;
+  color: var(--success);
+  font-size: 0.9rem;
 }
 
 .compact-meal-list {
@@ -1365,7 +1388,7 @@ img {
     bottom: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 1fr 1fr 1fr auto;
     gap: 8px;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     background: rgba(247, 251, 255, 0.94);
@@ -1440,6 +1463,10 @@ img {
 
   .meal-item-header {
     gap: 10px;
+  }
+
+  .workout-item {
+    align-items: center;
   }
 
   .meal-row-side {
@@ -1603,9 +1630,13 @@ img {
 
 @media (max-width: 380px) {
   .dashboard-toolbar {
-    grid-template-columns: 1fr 1fr 48px;
+    grid-template-columns: 1fr 1fr;
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .avatar-trigger {
+    aspect-ratio: auto;
   }
 
   .dashboard-toolbar .primary-button,

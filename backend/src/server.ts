@@ -9,6 +9,7 @@ import { requireAuth } from "./middleware/auth.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { profileRoutes } from "./routes/profileRoutes.js";
 import { nutritionRoutes } from "./routes/nutritionRoutes.js";
+import { workoutRoutes } from "./routes/workoutRoutes.js";
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", requireAuth, profileRoutes);
 app.use("/api/nutrition", requireAuth, nutritionRoutes);
+app.use("/api/workouts", requireAuth, workoutRoutes);
 
 if (fs.existsSync(config.frontendDistDir)) {
   app.use(express.static(config.frontendDistDir));

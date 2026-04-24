@@ -17,7 +17,8 @@ import type {
   NutritionSummary,
   ProfileData,
   SavedFood,
-  SessionData
+  SessionData,
+  Workout
 } from "./types";
 
 type MealTemplateResult =
@@ -43,6 +44,12 @@ const defaultMealForm = () => ({
   quantity: "1",
   savedFoodId: "",
   saveAsReusableFood: false
+});
+
+const defaultWorkoutForm = () => ({
+  title: "",
+  caloriesBurned: "",
+  performedAt: ""
 });
 
 const valueToInput = (value: number | string | null | undefined) => (value ?? "").toString();
@@ -230,6 +237,7 @@ export function App() {
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -237,6 +245,7 @@ export function App() {
   const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary | null>(null);
   const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
 
   const [loginForm, setLoginForm] = useState({
     email: "",
@@ -258,6 +267,9 @@ export function App() {
 
   const [weightForm, setWeightForm] = useState(defaultWeightForm);
   const [weightSaving, setWeightSaving] = useState(false);
+
+  const [workoutForm, setWorkoutForm] = useState(defaultWorkoutForm);
+  const [workoutSaving, setWorkoutSaving] = useState(false);
 
   const [mealForm, setMealForm] = useState(defaultMealForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
@@ -341,7 +353,7 @@ export function App() {
     setGlobalError("");
 
     try {
-      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse] =
+      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse, workoutsResponse] =
         await Promise.all([
           apiFetch<ProfileData>("/profile/me"),
           apiFetch<{ metrics: HealthMetric[] }>("/profile/me/health-metrics?limit=12"),
@@ -349,7 +361,8 @@ export function App() {
             `/nutrition/summary?timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
           ),
           apiFetch<{ foods: SavedFood[] }>("/nutrition/saved-foods"),
-          apiFetch<{ meals: Meal[] }>("/nutrition/meals?limit=24")
+          apiFetch<{ meals: Meal[] }>("/nutrition/meals?limit=24"),
+          apiFetch<{ workouts: Workout[] }>("/workouts?limit=24")
         ]);
 
       startTransition(() => {
@@ -358,6 +371,7 @@ export function App() {
         setNutritionSummary(summaryResponse);
         setSavedFoods(foodsResponse.foods);
         setMeals(mealsResponse.meals);
+        setWorkouts(workoutsResponse.workouts);
       });
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
@@ -396,9 +410,11 @@ export function App() {
       setNutritionSummary(null);
       setSavedFoods([]);
       setMeals([]);
+      setWorkouts([]);
       setMealEstimate(null);
       setIsMealModalOpen(false);
       setIsWeightModalOpen(false);
+      setIsWorkoutModalOpen(false);
       setIsProfileDrawerOpen(false);
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
@@ -463,6 +479,35 @@ export function App() {
       setGlobalError(getApiErrorMessage(error));
     } finally {
       setWeightSaving(false);
+    }
+  }
+
+  async function handleWorkoutSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorkoutSaving(true);
+    setGlobalError("");
+    setGlobalNotice("");
+
+    try {
+      await apiFetch("/workouts", {
+        method: "POST",
+        body: JSON.stringify({
+          title: workoutForm.title,
+          caloriesBurned: toOptionalNumber(workoutForm.caloriesBurned),
+          performedAt: workoutForm.performedAt
+            ? new Date(workoutForm.performedAt).toISOString()
+            : undefined
+        })
+      });
+
+      setWorkoutForm(defaultWorkoutForm());
+      await loadDashboard();
+      setIsWorkoutModalOpen(false);
+      setGlobalNotice("Workout logged.");
+    } catch (error) {
+      setGlobalError(getApiErrorMessage(error));
+    } finally {
+      setWorkoutSaving(false);
     }
   }
 
@@ -651,11 +696,18 @@ export function App() {
   const todaySummary = nutritionSummary?.today ?? {
     mealCount: 0,
     calories: 0,
+    caloriesBurned: 0,
+    netCalories: 0,
     proteinGrams: 0,
     carbsGrams: 0,
     fatGrams: 0
   };
-  const calorieGoal = nutritionSummary?.goals?.calorieGoal ?? profileData?.profile.calorieGoal ?? null;
+  const baseCalorieGoal = nutritionSummary?.goals?.baseCalorieGoal ?? profileData?.profile.calorieGoal ?? null;
+  const calorieGoal =
+    nutritionSummary?.goals?.adjustedCalorieGoal ??
+    nutritionSummary?.goals?.calorieGoal ??
+    profileData?.profile.calorieGoal ??
+    null;
   const calorieProgress = getProgressPercent(todaySummary.calories, calorieGoal);
   const calorieBalance =
     calorieGoal === null
@@ -692,6 +744,7 @@ export function App() {
     (template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch)
   ).length;
   const displayedMeals = meals.slice(0, 3);
+  const displayedWorkouts = workouts.slice(0, 3);
   const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
   const weightTrendPoints = weightTrend.slice(-6);
   const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
@@ -796,6 +849,13 @@ export function App() {
             Log weight
           </button>
           <button
+            className="secondary-button workout-log-button"
+            onClick={() => setIsWorkoutModalOpen(true)}
+            type="button"
+          >
+            Log workout
+          </button>
+          <button
             aria-label="Open profile"
             className="avatar-trigger"
             onClick={() => setIsProfileDrawerOpen(true)}
@@ -831,7 +891,17 @@ export function App() {
               <section className="summary-metric-block">
                 <span className="summary-label">Calories today</span>
                 <strong>{todaySummary.calories}</strong>
-                <small>{calorieGoal ? `${calorieProgress}% of goal` : "Goal not set"}</small>
+                <small>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</small>
+              </section>
+
+              <section className="summary-metric-block">
+                <span className="summary-label">Workout burn</span>
+                <strong>{todaySummary.caloriesBurned}</strong>
+                <small>
+                  {baseCalorieGoal && calorieGoal
+                    ? `${baseCalorieGoal} base + ${todaySummary.caloriesBurned} burned`
+                    : "Log workouts to adjust your goal"}
+                </small>
               </section>
 
               <section className="summary-metric-block">
@@ -847,7 +917,7 @@ export function App() {
 
             <div className="overview-progress">
               <div className="progress-copy">
-                <strong>{calorieGoal ? `${calorieProgress}% of goal` : "Goal not set"}</strong>
+                <strong>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</strong>
                 <span>{calorieBalance}</span>
               </div>
               <div className="progress-track">
@@ -910,10 +980,39 @@ export function App() {
         </div>
 
         <div className="dashboard-trend-row">
+          <Card className="compact-card workout-card">
+            <SectionHeading
+              title="Workouts"
+              description={`${todaySummary.caloriesBurned} kcal burned today`}
+            />
+            {dashboardLoading ? (
+              <p className="empty-state">Refreshing workouts…</p>
+            ) : workouts.length === 0 ? (
+              <div className="empty-panel">
+                <p className="empty-state">No workouts logged yet.</p>
+                <button className="secondary-button" onClick={() => setIsWorkoutModalOpen(true)} type="button">
+                  Log a workout
+                </button>
+              </div>
+            ) : (
+              <div className="workout-list">
+                {displayedWorkouts.map((workout) => (
+                  <article className="workout-item" key={workout.id}>
+                    <div>
+                      <strong>{workout.title}</strong>
+                      <p className="list-item-copy">{formatDateTime(workout.performedAt)}</p>
+                    </div>
+                    <strong className="workout-calories">+{workout.caloriesBurned} kcal</strong>
+                  </article>
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Card className="trend-card compact-card">
             <SectionHeading
               title="7-day calorie trend"
-              description={`${weeklyAverageCalories} kcal per day average`}
+              description={`${weeklyAverageCalories} kcal eaten per day average`}
             />
             <DailyTrendChart goalCalories={calorieGoal} points={calorieTrend} />
           </Card>
@@ -1230,6 +1329,72 @@ export function App() {
       </OverlayPanel>
 
       <OverlayPanel
+        description="Log calories burned so today's calorie budget adjusts automatically."
+        onClose={() => {
+          setIsWorkoutModalOpen(false);
+          setWorkoutForm(defaultWorkoutForm());
+        }}
+        open={isWorkoutModalOpen}
+        title="Log workout"
+        variant="dialog"
+      >
+        <form className="form-stack" onSubmit={handleWorkoutSave}>
+          <Field label="Workout">
+            <input
+              required
+              placeholder="Walk, run, lift, bike"
+              value={workoutForm.title}
+              onChange={(event) => setWorkoutForm({ ...workoutForm, title: event.target.value })}
+            />
+          </Field>
+
+          <TwoColumnFields>
+            <Field label="Calories burned">
+              <input
+                required
+                min="1"
+                step="1"
+                type="number"
+                value={workoutForm.caloriesBurned}
+                onChange={(event) =>
+                  setWorkoutForm({ ...workoutForm, caloriesBurned: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="When">
+              <input
+                type="datetime-local"
+                value={workoutForm.performedAt}
+                onChange={(event) =>
+                  setWorkoutForm({ ...workoutForm, performedAt: event.target.value })
+                }
+              />
+            </Field>
+          </TwoColumnFields>
+
+          <div className="panel-actions">
+            <button
+              className="ghost-button"
+              onClick={() => {
+                setIsWorkoutModalOpen(false);
+                setWorkoutForm(defaultWorkoutForm());
+              }}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="primary-button"
+              disabled={workoutSaving || !workoutForm.title.trim() || !workoutForm.caloriesBurned}
+              type="submit"
+            >
+              {workoutSaving ? "Saving..." : "Save workout"}
+            </button>
+          </div>
+        </form>
+      </OverlayPanel>
+
+      <OverlayPanel
         description="Update your profile settings and sign out of your private account."
         onClose={() => setIsProfileDrawerOpen(false)}
         open={isProfileDrawerOpen}
@@ -1419,7 +1584,10 @@ function DailyTrendChart({
               </div>
               <strong>{point.calories}</strong>
               <span>{formatDateKeyShortDay(point.date)}</span>
-              <small>{point.mealCount} meal{point.mealCount === 1 ? "" : "s"}</small>
+              <small>
+                {point.mealCount} meal{point.mealCount === 1 ? "" : "s"}
+                {point.caloriesBurned ? ` · ${point.caloriesBurned} burned` : ""}
+              </small>
             </div>
           );
         })}
