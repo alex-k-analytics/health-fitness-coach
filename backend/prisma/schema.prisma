@@ -7,18 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum HouseholdRole {
-  OWNER
-  MEMBER
-}
-
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  REVOKED
-  EXPIRED
-}
-
 enum MealAnalysisStatus {
   PENDING
   COMPLETED
@@ -33,32 +21,10 @@ enum MealImageKind {
 }
 
 model Account {
-  id              String            @id @default(cuid())
-  email           String            @unique
-  passwordHash    String
-  member          HouseholdMember?
-  acceptedInvites HouseholdInvite[] @relation("InviteAcceptedBy")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-}
-
-model Household {
-  id        String           @id @default(cuid())
-  name      String
-  members   HouseholdMember[]
-  invites   HouseholdInvite[]
-  savedFoods SavedFood[]
-  meals     MealEntry[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-}
-
-model HouseholdMember {
-  id               String            @id @default(cuid())
-  householdId      String
-  accountId        String            @unique
+  id               String         @id @default(cuid())
+  email            String         @unique
+  passwordHash     String
   displayName      String
-  role             HouseholdRole     @default(MEMBER)
   goalSummary      String?
   calorieGoal      Int?
   proteinGoalGrams Float?
@@ -67,118 +33,87 @@ model HouseholdMember {
   heightCm         Float?
   activityLevel    String?
   notes            String?
-  household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
   healthMetrics    HealthMetric[]
+  savedFoods       SavedFood[]
   meals            MealEntry[]
-  createdInvites   HouseholdInvite[] @relation("InviteCreatedBy")
-  createdFoods     SavedFood[]       @relation("FoodCreatedBy")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-
-  @@index([householdId])
-}
-
-model HouseholdInvite {
-  id                 String           @id @default(cuid())
-  householdId        String
-  email              String
-  suggestedName      String?
-  role               HouseholdRole    @default(MEMBER)
-  tokenHash          String           @unique
-  invitedByMemberId  String
-  expiresAt          DateTime
-  status             InvitationStatus @default(PENDING)
-  acceptedAt         DateTime?
-  acceptedByAccountId String?
-  household          Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  invitedBy          HouseholdMember  @relation("InviteCreatedBy", fields: [invitedByMemberId], references: [id], onDelete: Cascade)
-  acceptedByAccount  Account?         @relation("InviteAcceptedBy", fields: [acceptedByAccountId], references: [id], onDelete: SetNull)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-
-  @@index([householdId, status])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
 model HealthMetric {
-  id                      String          @id @default(cuid())
-  memberId                String
-  recordedAt              DateTime        @default(now())
-  weightKg                Float?
-  systolicBloodPressure   Int?
-  diastolicBloodPressure  Int?
-  restingHeartRate        Int?
-  bodyFatPercent          Float?
-  waistCm                 Float?
-  note                    String?
-  member                  HouseholdMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  createdAt               DateTime        @default(now())
+  id                     String   @id @default(cuid())
+  accountId              String
+  recordedAt             DateTime @default(now())
+  weightKg               Float?
+  systolicBloodPressure  Int?
+  diastolicBloodPressure Int?
+  restingHeartRate       Int?
+  bodyFatPercent         Float?
+  waistCm                Float?
+  note                   String?
+  account                Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt              DateTime @default(now())
 
-  @@index([memberId, recordedAt(sort: Desc)])
+  @@index([accountId, recordedAt(sort: Desc)])
 }
 
 model SavedFood {
-  id                String          @id @default(cuid())
-  householdId       String
-  createdByMemberId String
-  name              String
-  brand             String?
+  id                 String      @id @default(cuid())
+  accountId          String
+  name               String
+  brand              String?
   servingDescription String?
   servingWeightGrams Float?
-  calories          Float?
-  proteinGrams      Float?
-  carbsGrams        Float?
-  fatGrams          Float?
-  fiberGrams        Float?
-  sugarGrams        Float?
-  sodiumMg          Float?
-  micronutrients    Json?
-  notes             String?
-  household         Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  createdBy         HouseholdMember @relation("FoodCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Cascade)
-  meals             MealEntry[]
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  calories           Float?
+  proteinGrams       Float?
+  carbsGrams         Float?
+  fatGrams           Float?
+  fiberGrams         Float?
+  sugarGrams         Float?
+  sodiumMg           Float?
+  micronutrients     Json?
+  notes              String?
+  account            Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  meals              MealEntry[]
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  @@index([householdId, name])
+  @@index([accountId, name])
 }
 
 model MealEntry {
-  id                String             @id @default(cuid())
-  householdId       String
-  memberId          String
-  savedFoodId       String?
-  title             String
-  notes             String?
-  eatenAt           DateTime
+  id                 String             @id @default(cuid())
+  accountId          String
+  savedFoodId        String?
+  title              String
+  notes              String?
+  eatenAt            DateTime
   servingDescription String?
-  quantity          Float?
-  weightGrams       Float?
-  analysisStatus    MealAnalysisStatus @default(PENDING)
-  analysisSummary   String?
-  confidenceScore   Float?
-  estimatedCalories Float?
-  proteinGrams      Float?
-  carbsGrams        Float?
-  fatGrams          Float?
-  fiberGrams        Float?
-  sugarGrams        Float?
-  sodiumMg          Float?
-  micronutrients    Json?
-  vitamins          Json?
-  assumptions       Json?
-  foodBreakdown     Json?
-  rawAnalysis       Json?
-  aiModel           String?
-  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  member            HouseholdMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  savedFood         SavedFood?         @relation(fields: [savedFoodId], references: [id], onDelete: SetNull)
-  images            MealImage[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  quantity           Float?
+  weightGrams        Float?
+  analysisStatus     MealAnalysisStatus @default(PENDING)
+  analysisSummary    String?
+  confidenceScore    Float?
+  estimatedCalories  Float?
+  proteinGrams       Float?
+  carbsGrams         Float?
+  fatGrams           Float?
+  fiberGrams         Float?
+  sugarGrams         Float?
+  sodiumMg           Float?
+  micronutrients     Json?
+  vitamins           Json?
+  assumptions        Json?
+  foodBreakdown      Json?
+  rawAnalysis        Json?
+  aiModel            String?
+  account            Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  savedFood          SavedFood?         @relation(fields: [savedFoodId], references: [id], onDelete: SetNull)
+  images             MealImage[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  @@index([memberId, eatenAt(sort: Desc)])
-  @@index([householdId, eatenAt(sort: Desc)])
+  @@index([accountId, eatenAt(sort: Desc)])
 }
 
 model MealImage {

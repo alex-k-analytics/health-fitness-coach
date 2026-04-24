@@ -151,7 +151,7 @@ nutritionRoutes.get("/saved-foods", async (req: AuthenticatedRequest, res) => {
   const auth = getRequiredAuth(req);
   const foods = await prisma.savedFood.findMany({
     where: {
-      householdId: auth.householdId
+      accountId: auth.accountId
     },
     orderBy: [
       { name: "asc" },
@@ -171,8 +171,7 @@ nutritionRoutes.post("/saved-foods", async (req: AuthenticatedRequest, res) => {
   const auth = getRequiredAuth(req);
   const food = await prisma.savedFood.create({
     data: {
-      householdId: auth.householdId,
-      createdByMemberId: auth.memberId,
+      accountId: auth.accountId,
       name: parsed.data.name.trim(),
       brand: parsed.data.brand?.trim() || null,
       servingDescription: parsed.data.servingDescription?.trim() || null,
@@ -201,7 +200,7 @@ nutritionRoutes.get("/meals", async (req: AuthenticatedRequest, res) => {
   const auth = getRequiredAuth(req);
   const meals = await prisma.mealEntry.findMany({
     where: {
-      memberId: auth.memberId
+      accountId: auth.accountId
     },
     include: mealInclude,
     orderBy: {
@@ -223,7 +222,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const [recentMeals, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
-        memberId: auth.memberId,
+        accountId: auth.accountId,
         eatenAt: {
           gte: startOfTrendWindow
         }
@@ -236,9 +235,9 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         fatGrams: true
       }
     }),
-    prisma.householdMember.findUnique({
+    prisma.account.findUnique({
       where: {
-        id: auth.memberId
+        id: auth.accountId
       },
       include: {
         healthMetrics: {
@@ -341,9 +340,9 @@ nutritionRoutes.post(
     }
 
     const auth = getRequiredAuth(req);
-    const member = await prisma.householdMember.findUnique({
+    const member = await prisma.account.findUnique({
       where: {
-        id: auth.memberId
+        id: auth.accountId
       },
       include: {
         healthMetrics: {
@@ -366,7 +365,7 @@ nutritionRoutes.post(
       savedFood = await prisma.savedFood.findFirst({
         where: {
           id: parsed.data.savedFoodId,
-          householdId: auth.householdId
+          accountId: auth.accountId
         }
       });
 
@@ -390,8 +389,7 @@ nutritionRoutes.post(
 
     const meal = await prisma.mealEntry.create({
       data: {
-        householdId: auth.householdId,
-        memberId: auth.memberId,
+        accountId: auth.accountId,
         savedFoodId: savedFood?.id ?? null,
         title: parsed.data.title.trim(),
         notes: parsed.data.notes?.trim() || null,
@@ -435,8 +433,7 @@ nutritionRoutes.post(
     const imageRecords = await Promise.all(
       uploadedImages.map(async ({ file, kind }) =>
         storageService.saveMealImage({
-          householdId: auth.householdId,
-          memberId: auth.memberId,
+          accountId: auth.accountId,
           mealEntryId: meal.id,
           image: {
             buffer: file.buffer,
@@ -453,8 +450,7 @@ nutritionRoutes.post(
     if (parsed.data.saveAsReusableFood) {
       const createdFood = await prisma.savedFood.create({
         data: {
-          householdId: auth.householdId,
-          createdByMemberId: auth.memberId,
+          accountId: auth.accountId,
           name: parsed.data.title.trim(),
           servingDescription: parsed.data.servingDescription?.trim() || "Logged serving",
           servingWeightGrams: parsed.data.weightGrams ?? null,
@@ -511,7 +507,7 @@ nutritionRoutes.get("/images/:imageId", async (req: AuthenticatedRequest, res) =
     where: {
       id: req.params.imageId,
       mealEntry: {
-        memberId: auth.memberId
+        accountId: auth.accountId
       }
     }
   });

@@ -11,7 +11,6 @@ export interface SessionData {
   member?: {
     id: string;
     displayName: string;
-    role: "OWNER" | "MEMBER";
     goalSummary: string | null;
     calorieGoal: number | null;
     proteinGoalGrams: number | null;
@@ -37,7 +36,6 @@ export interface ProfileData {
   profile: {
     id: string;
     displayName: string;
-    role: "OWNER" | "MEMBER";
     goalSummary: string | null;
     calorieGoal: number | null;
     proteinGoalGrams: number | null;

@@ -45,8 +45,8 @@ const metricQuerySchema = z.object({
 
 profileRoutes.get("/me", async (req: AuthenticatedRequest, res) => {
   const auth = getRequiredAuth(req);
-  const member = await prisma.householdMember.findUnique({
-    where: { id: auth.memberId },
+  const account = await prisma.account.findUnique({
+    where: { id: auth.accountId },
     include: {
       healthMetrics: {
         take: 1,
@@ -57,25 +57,24 @@ profileRoutes.get("/me", async (req: AuthenticatedRequest, res) => {
     }
   });
 
-  if (!member) {
+  if (!account) {
     return res.status(404).json({ error: "Profile not found" });
   }
 
   return res.json({
     profile: {
-      id: member.id,
-      displayName: member.displayName,
-      role: member.role,
-      goalSummary: member.goalSummary,
-      calorieGoal: member.calorieGoal,
-      proteinGoalGrams: member.proteinGoalGrams,
-      carbGoalGrams: member.carbGoalGrams,
-      fatGoalGrams: member.fatGoalGrams,
-      heightCm: member.heightCm,
-      activityLevel: member.activityLevel,
-      notes: member.notes
+      id: account.id,
+      displayName: account.displayName,
+      goalSummary: account.goalSummary,
+      calorieGoal: account.calorieGoal,
+      proteinGoalGrams: account.proteinGoalGrams,
+      carbGoalGrams: account.carbGoalGrams,
+      fatGoalGrams: account.fatGoalGrams,
+      heightCm: account.heightCm,
+      activityLevel: account.activityLevel,
+      notes: account.notes
     },
-    latestMetric: member.healthMetrics[0] ?? null
+    latestMetric: account.healthMetrics[0] ?? null
   });
 });
 
@@ -86,8 +85,8 @@ profileRoutes.patch("/me", async (req: AuthenticatedRequest, res) => {
   }
 
   const auth = getRequiredAuth(req);
-  const updated = await prisma.householdMember.update({
-    where: { id: auth.memberId },
+  const updated = await prisma.account.update({
+    where: { id: auth.accountId },
     data: {
       displayName: parsed.data.displayName?.trim(),
       goalSummary: parsed.data.goalSummary === undefined ? undefined : parsed.data.goalSummary?.trim() || null,
@@ -106,7 +105,6 @@ profileRoutes.patch("/me", async (req: AuthenticatedRequest, res) => {
     profile: {
       id: updated.id,
       displayName: updated.displayName,
-      role: updated.role,
       goalSummary: updated.goalSummary,
       calorieGoal: updated.calorieGoal,
       proteinGoalGrams: updated.proteinGoalGrams,
@@ -128,7 +126,7 @@ profileRoutes.get("/me/health-metrics", async (req: AuthenticatedRequest, res) =
   const auth = getRequiredAuth(req);
   const metrics = await prisma.healthMetric.findMany({
     where: {
-      memberId: auth.memberId
+      accountId: auth.accountId
     },
     orderBy: {
       recordedAt: "desc"
@@ -148,7 +146,7 @@ profileRoutes.post("/me/health-metrics", async (req: AuthenticatedRequest, res) 
   const auth = getRequiredAuth(req);
   const metric = await prisma.healthMetric.create({
     data: {
-      memberId: auth.memberId,
+      accountId: auth.accountId,
       recordedAt: parsed.data.recordedAt ? new Date(parsed.data.recordedAt) : new Date(),
       weightKg: parsed.data.weightKg,
       systolicBloodPressure: parsed.data.systolicBloodPressure,

@@ -21,7 +21,7 @@ Private nutrition tracking app with:
 
 - The app is designed for a single private account.
 - The first account setup is allowed once, then public registration closes and the app becomes login-only.
-- The existing Prisma schema still uses `Household` and `HouseholdMember` internally, but that structure is hidden from the product surface.
+- The database schema is account-centric: goals, health metrics, meals, and reusable foods all belong directly to one account.
 - Users can set goals, log health metrics, upload meal photos, and reuse saved food entries.
 - Meal analysis stores calories, macros, assumptions, micronutrients, vitamins, and image references.
 

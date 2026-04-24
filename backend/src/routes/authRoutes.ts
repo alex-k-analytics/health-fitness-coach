@@ -11,41 +11,28 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const serializeSession = (account: {
   id: string;
   email: string;
+  displayName: string;
+  goalSummary: string | null;
+  calorieGoal: number | null;
+  proteinGoalGrams: number | null;
+  carbGoalGrams: number | null;
+  fatGoalGrams: number | null;
+}) => ({
+  authenticated: true,
+  account: {
+    id: account.id,
+    email: account.email
+  },
   member: {
-    id: string;
-    displayName: string;
-    role: "OWNER" | "MEMBER";
-    goalSummary: string | null;
-    calorieGoal: number | null;
-    proteinGoalGrams: number | null;
-    carbGoalGrams: number | null;
-    fatGoalGrams: number | null;
-  } | null;
-}) => {
-  if (!account.member) {
-    return {
-      authenticated: false
-    } as const;
+    id: account.id,
+    displayName: account.displayName,
+    goalSummary: account.goalSummary,
+    calorieGoal: account.calorieGoal,
+    proteinGoalGrams: account.proteinGoalGrams,
+    carbGoalGrams: account.carbGoalGrams,
+    fatGoalGrams: account.fatGoalGrams
   }
-
-  return {
-    authenticated: true,
-    account: {
-      id: account.id,
-      email: account.email
-    },
-    member: {
-      id: account.member.id,
-      displayName: account.member.displayName,
-      role: account.member.role,
-      goalSummary: account.member.goalSummary,
-      calorieGoal: account.member.calorieGoal,
-      proteinGoalGrams: account.member.proteinGoalGrams,
-      carbGoalGrams: account.member.carbGoalGrams,
-      fatGoalGrams: account.member.fatGoalGrams
-    }
-  };
-};
+});
 
 const registrationSchema = z.object({
   displayName: z.string().min(1).max(120),
@@ -76,23 +63,17 @@ authRoutes.get("/session", async (req, res) => {
   }
 
   const account = await prisma.account.findUnique({
-    where: { id: auth.accountId },
-    include: {
-      member: true
-    }
+    where: { id: auth.accountId }
   });
 
-  if (!account || !account.member) {
+  if (!account) {
     clearAuthCookie(res);
     return res.json({ authenticated: false });
   }
 
   setAuthCookie(res, {
     accountId: account.id,
-    email: account.email,
-    memberId: account.member.id,
-    householdId: account.member.householdId,
-    role: account.member.role
+    email: account.email
   });
 
   return res.json(serializeSession(account));
@@ -117,56 +98,28 @@ const registerHandler = async (req: Request, res: Response) => {
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const account = await prisma.$transaction(async (tx) => {
       if ((await tx.account.count()) > 0) {
         throw new Error("REGISTRATION_CLOSED");
       }
 
-      const household = await tx.household.create({
-        data: {
-          name: "Personal Workspace"
-        }
-      });
-
-      const account = await tx.account.create({
+      return tx.account.create({
         data: {
           email,
-          passwordHash
-        }
-      });
-
-      const member = await tx.householdMember.create({
-        data: {
-          householdId: household.id,
-          accountId: account.id,
+          passwordHash,
           displayName: parsed.data.displayName.trim(),
-          role: "OWNER",
           goalSummary: parsed.data.goalSummary?.trim() || null,
           calorieGoal: parsed.data.calorieGoal ?? null
         }
       });
-
-      return {
-        account,
-        member
-      };
     });
 
     setAuthCookie(res, {
-      accountId: result.account.id,
-      email: result.account.email,
-      memberId: result.member.id,
-      householdId: result.member.householdId,
-      role: result.member.role
+      accountId: account.id,
+      email: account.email
     });
 
-    return res.status(201).json(
-      serializeSession({
-        id: result.account.id,
-        email: result.account.email,
-        member: result.member
-      })
-    );
+    return res.status(201).json(serializeSession(account));
   } catch (error) {
     if (error instanceof Error && error.message === "REGISTRATION_CLOSED") {
       return res
@@ -189,13 +142,10 @@ authRoutes.post("/login", async (req, res) => {
 
   const email = normalizeEmail(parsed.data.email);
   const account = await prisma.account.findUnique({
-    where: { email },
-    include: {
-      member: true
-    }
+    where: { email }
   });
 
-  if (!account || !account.member) {
+  if (!account) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
@@ -206,10 +156,7 @@ authRoutes.post("/login", async (req, res) => {
 
   setAuthCookie(res, {
     accountId: account.id,
-    email: account.email,
-    memberId: account.member.id,
-    householdId: account.member.householdId,
-    role: account.member.role
+    email: account.email
   });
 
   return res.json(serializeSession(account));

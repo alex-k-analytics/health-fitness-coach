@@ -28,17 +28,14 @@ export class StorageService {
       : null;
 
   async saveMealImage(input: {
-    householdId: string;
-    memberId: string;
+    accountId: string;
     mealEntryId: string;
     image: UploadableMealImage;
   }) {
     const safeName = sanitizeFileName(input.image.originalName || "meal-image.jpg") || "meal-image.jpg";
     const storageKey = path.posix.join(
-      "households",
-      input.householdId,
-      "members",
-      input.memberId,
+      "accounts",
+      input.accountId,
       "meals",
       input.mealEntryId,
       `${randomUUID()}-${safeName}`

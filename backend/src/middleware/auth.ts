@@ -1,4 +1,3 @@
-import type { HouseholdRole } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
@@ -6,9 +5,6 @@ import { config } from "../config.js";
 export interface AuthTokenPayload {
   accountId: string;
   email: string;
-  memberId: string;
-  householdId: string;
-  role: HouseholdRole;
 }
 
 export type AuthenticatedRequest = Request & {
@@ -65,18 +61,6 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   }
 
   req.auth = payload;
-  return next();
-}
-
-export function requireOwner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  if (!req.auth) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-
-  if (req.auth.role !== "OWNER") {
-    return res.status(403).json({ error: "Owner access required" });
-  }
-
   return next();
 }
 
