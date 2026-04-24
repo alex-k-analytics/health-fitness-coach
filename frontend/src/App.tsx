@@ -273,6 +273,7 @@ export function App() {
 
   const [mealForm, setMealForm] = useState(defaultMealForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [mealPage, setMealPage] = useState(1);
   const [mealSearchQuery, setMealSearchQuery] = useState("");
   const [mealTemplateLabel, setMealTemplateLabel] = useState<string | null>(null);
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
@@ -743,7 +744,13 @@ export function App() {
   const matchingMealTemplateCount = mealTemplates.filter(
     (template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch)
   ).length;
-  const displayedMeals = meals.slice(0, 3);
+  const mealsPerPage = 5;
+  const mealPageCount = Math.max(1, Math.ceil(meals.length / mealsPerPage));
+  const activeMealPage = Math.min(mealPage, mealPageCount);
+  const displayedMeals = meals.slice(
+    (activeMealPage - 1) * mealsPerPage,
+    activeMealPage * mealsPerPage
+  );
   const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
   const weightTrendPoints = weightTrend.slice(-6);
   const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
@@ -872,117 +879,69 @@ export function App() {
       {globalNotice && <p className="status-banner success">{globalNotice}</p>}
 
       <div className="dashboard-stack">
-        <div className="dashboard-top-row">
-          <Card className="compact-card summary-card">
-            <div className="summary-card-header">
-              <div>
-                <p className="eyebrow">Today</p>
-                <h2>Daily snapshot</h2>
-              </div>
-              <span className="status-chip">
-                {dashboardLoading
-                  ? "Refreshing"
-                  : `${todaySummary.mealCount} meal${todaySummary.mealCount === 1 ? "" : "s"}`}
-              </span>
+        <Card className="compact-card summary-card summary-strip-card">
+          <div className="summary-card-header">
+            <div>
+              <p className="eyebrow">Today</p>
+              <h2>Daily snapshot</h2>
             </div>
+            <span className="status-chip">
+              {dashboardLoading
+                ? "Refreshing"
+                : `${todaySummary.mealCount} logged item${todaySummary.mealCount === 1 ? "" : "s"}`}
+            </span>
+          </div>
 
-            <div className="summary-metrics-grid">
-              <section className="summary-metric-block">
-                <span className="summary-label">Calories today</span>
-                <strong>{todaySummary.calories}</strong>
-                <small>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</small>
-              </section>
+          <div className="summary-strip">
+            <section className="summary-metric-block">
+              <span className="summary-label">Calories consumed</span>
+              <strong>{todaySummary.calories}</strong>
+              <small>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</small>
+            </section>
 
-              <section className="summary-metric-block">
-                <span className="summary-label">Workout burn</span>
-                <strong>{todaySummary.caloriesBurned}</strong>
-                <small>
-                  {baseCalorieGoal && calorieGoal
-                    ? `${baseCalorieGoal} base + ${todaySummary.caloriesBurned} burned`
-                    : "Log workouts to adjust your goal"}
-                </small>
-              </section>
+            <section className="summary-metric-block">
+              <span className="summary-label">Workout burn</span>
+              <strong>{todaySummary.caloriesBurned}</strong>
+              <small>
+                {baseCalorieGoal && calorieGoal
+                  ? `${baseCalorieGoal} base + ${todaySummary.caloriesBurned} burned`
+                  : "Log workouts to adjust your goal"}
+              </small>
+            </section>
 
-              <section className="summary-metric-block">
-                <span className="summary-label">Latest weight</span>
-                <strong>{formatWeight(latestWeight?.weightKg)}</strong>
-                <small>
-                  {latestWeight
-                    ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
-                    : "Log weight to start tracking"}
-                </small>
-              </section>
+            <section className="summary-metric-block">
+              <span className="summary-label">Remaining</span>
+              <strong>{calorieGoal ? Math.max(0, calorieGoal - todaySummary.calories) : "—"}</strong>
+              <small>{calorieBalance}</small>
+            </section>
+
+            <section className="summary-metric-block">
+              <span className="summary-label">Latest weight</span>
+              <strong>{formatWeight(latestWeight?.weightKg)}</strong>
+              <small>
+                {latestWeight
+                  ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
+                  : "Log weight to start tracking"}
+              </small>
+            </section>
+          </div>
+
+          <div className="overview-progress">
+            <div className="progress-copy">
+              <strong>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</strong>
+              <span>{calorieBalance}</span>
             </div>
-
-            <div className="overview-progress">
-              <div className="progress-copy">
-                <strong>{calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}</strong>
-                <span>{calorieBalance}</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${calorieProgress}%` }} />
-              </div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${calorieProgress}%` }} />
             </div>
-          </Card>
-
-          <Card className="compact-card meals-card">
-            <SectionHeading title="Last 3 meals" description="Most recent logs" />
-            {dashboardLoading ? (
-              <p className="empty-state">Refreshing meals…</p>
-            ) : meals.length === 0 ? (
-              <div className="empty-panel">
-                <p className="empty-state">No meals logged yet.</p>
-                <button className="secondary-button" onClick={() => openMealComposer()} type="button">
-                  Log your first meal
-                </button>
-              </div>
-            ) : (
-              <div className="meal-list compact-meal-list">
-                {displayedMeals.map((meal) => {
-                  const mealStateTag = getMealStateTag(meal.analysisStatus);
-
-                  return (
-                    <article className="meal-item compact-meal-item" key={meal.id}>
-                      <div className="meal-item-header">
-                        <div className="meal-row-copy">
-                          <strong>{meal.title}</strong>
-                          <p className="list-item-copy">{formatDateTime(meal.eatenAt)}</p>
-                        </div>
-                        <div className="meal-row-side">
-                          <strong className="meal-calories">
-                            {meal.estimatedCalories ? `${meal.estimatedCalories} kcal` : "No calories"}
-                          </strong>
-                          <button className="inline-action-button" onClick={() => openMealEditor(meal)} type="button">
-                            Edit
-                          </button>
-                          {mealStateTag ? (
-                            <span className={`tag ${mealStateTag.tone}`}>{mealStateTag.label}</span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="macro-pills compact-pills">
-                        {meal.servingDescription ? <span className="pill">{meal.servingDescription}</span> : null}
-                        {meal.images.length ? (
-                          <span className="pill">
-                            {meal.images.length} photo{meal.images.length === 1 ? "" : "s"}
-                          </span>
-                        ) : null}
-                        {meal.savedFood ? <span className="tag subtle">Reusable base</span> : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
+          </div>
+        </Card>
 
         <div className="dashboard-trend-row">
           <Card className="trend-card compact-card">
             <SectionHeading
               title="7-day calorie trend"
-              description={`${weeklyAverageCalories} kcal eaten per day average`}
+              description={`${weeklyAverageCalories} kcal consumed per day average`}
             />
             <DailyTrendChart
               baseGoalCalories={baseCalorieGoal}
@@ -1000,6 +959,83 @@ export function App() {
             <WeightTrendChart points={weightTrendPoints} />
           </Card>
         </div>
+
+        <Card className="compact-card meals-card meal-history-card">
+          <div className="section-heading-row">
+            <SectionHeading title="Last 5 logs" description="Most recent food, drink, and nutrition entries" />
+            {meals.length > mealsPerPage ? (
+              <div className="pagination-controls" aria-label="Log pagination">
+                <button
+                  className="secondary-button"
+                  disabled={activeMealPage === 1}
+                  onClick={() => setMealPage((page) => Math.max(1, page - 1))}
+                  type="button"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {activeMealPage} of {mealPageCount}
+                </span>
+                <button
+                  className="secondary-button"
+                  disabled={activeMealPage === mealPageCount}
+                  onClick={() => setMealPage((page) => Math.min(mealPageCount, page + 1))}
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </div>
+          {dashboardLoading ? (
+            <p className="empty-state">Refreshing logs…</p>
+          ) : meals.length === 0 ? (
+            <div className="empty-panel">
+              <p className="empty-state">No logs yet.</p>
+              <button className="secondary-button" onClick={() => openMealComposer()} type="button">
+                Log your first item
+              </button>
+            </div>
+          ) : (
+            <div className="meal-list meal-history-list">
+              {displayedMeals.map((meal) => {
+                const mealStateTag = getMealStateTag(meal.analysisStatus);
+
+                return (
+                  <article className="meal-item compact-meal-item" key={meal.id}>
+                    <div className="meal-item-header">
+                      <div className="meal-row-copy">
+                        <strong>{meal.title}</strong>
+                        <p className="list-item-copy">{formatDateTime(meal.eatenAt)}</p>
+                      </div>
+                      <div className="meal-row-side">
+                        <strong className="meal-calories">
+                          {meal.estimatedCalories ? `${meal.estimatedCalories} kcal` : "No calories"}
+                        </strong>
+                        <button className="inline-action-button" onClick={() => openMealEditor(meal)} type="button">
+                          Edit
+                        </button>
+                        {mealStateTag ? (
+                          <span className={`tag ${mealStateTag.tone}`}>{mealStateTag.label}</span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="macro-pills compact-pills">
+                      {meal.servingDescription ? <span className="pill">{meal.servingDescription}</span> : null}
+                      {meal.images.length ? (
+                        <span className="pill">
+                          {meal.images.length} photo{meal.images.length === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      {meal.savedFood ? <span className="tag subtle">Reusable base</span> : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       </div>
 
       <OverlayPanel
@@ -1538,7 +1574,7 @@ function DailyTrendChart({
   workoutCaloriesToday: number;
 }) {
   if (points.length === 0) {
-    return <p className="empty-state">No meal data yet.</p>;
+    return <p className="empty-state">No calorie data yet.</p>;
   }
 
   const chartMax = Math.max(...points.map((point) => point.calories), goalCalories ?? 0, 1);
@@ -1556,7 +1592,7 @@ function DailyTrendChart({
               : ""}
           </p>
           <div className="chart-legend" aria-label="Calorie chart legend">
-            <span><i className="legend-swatch eaten" /> Eaten</span>
+            <span><i className="legend-swatch consumed" /> Consumed</span>
             <span><i className="legend-swatch target" /> Adjusted target</span>
           </div>
         </div>
@@ -1576,9 +1612,6 @@ function DailyTrendChart({
               </div>
               <strong>{point.calories}</strong>
               <span>{formatDateKeyShortDay(point.date)}</span>
-              <small>
-                {point.mealCount} meal{point.mealCount === 1 ? "" : "s"}
-              </small>
             </div>
           );
         })}
