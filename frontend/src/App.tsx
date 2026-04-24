@@ -11,8 +11,8 @@ import {
 import { ApiError, apiFetch } from "./api";
 import { Card } from "./components/Card";
 import type {
+  BootstrapStatus,
   HealthMetric,
-  HouseholdData,
   Meal,
   NutritionSummary,
   ProfileData,
@@ -20,7 +20,7 @@ import type {
   SessionData
 } from "./types";
 
-type AuthMode = "login" | "register" | "invite";
+type AuthMode = "login" | "register";
 
 type MealTemplateResult =
   | {
@@ -41,8 +41,6 @@ type MealTemplateResult =
       searchText: string;
       food: SavedFood;
     };
-
-const getInitialInviteToken = () => new URLSearchParams(window.location.search).get("invite") ?? "";
 
 const defaultWeightForm = () => ({
   recordedAt: "",
@@ -166,7 +164,8 @@ const getMealStateTag = (status: Meal["analysisStatus"]) => {
 
 export function App() {
   const [session, setSession] = useState<SessionData | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode>(getInitialInviteToken() ? "invite" : "login");
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
   const [globalError, setGlobalError] = useState("");
   const [globalNotice, setGlobalNotice] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -175,7 +174,6 @@ export function App() {
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
-  const [householdData, setHouseholdData] = useState<HouseholdData | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
   const [nutritionSummary, setNutritionSummary] = useState<NutritionSummary | null>(null);
@@ -187,15 +185,6 @@ export function App() {
     password: ""
   });
   const [registerForm, setRegisterForm] = useState({
-    householdName: "Kalish Household",
-    displayName: "",
-    email: "",
-    password: "",
-    goalSummary: "",
-    calorieGoal: ""
-  });
-  const [inviteForm, setInviteForm] = useState({
-    token: getInitialInviteToken(),
     displayName: "",
     email: "",
     password: "",
@@ -230,17 +219,6 @@ export function App() {
   const labelInputRef = useRef<HTMLInputElement | null>(null);
   const otherInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [inviteCreateForm, setInviteCreateForm] = useState({
-    email: "",
-    suggestedName: "",
-    role: "MEMBER" as "OWNER" | "MEMBER"
-  });
-  const [inviteCreateResult, setInviteCreateResult] = useState<{
-    inviteToken: string;
-    inviteUrl: string;
-  } | null>(null);
-  const [inviteSaving, setInviteSaving] = useState(false);
-
   useEffect(() => {
     void loadSession();
   }, []);
@@ -274,10 +252,19 @@ export function App() {
   async function loadSession() {
     try {
       const nextSession = await apiFetch<SessionData>("/auth/session");
+      if (nextSession.authenticated) {
+        setRegistrationOpen(false);
+        setAuthMode("login");
+      } else {
+        const bootstrapStatus = await apiFetch<BootstrapStatus>("/auth/bootstrap-status");
+        setRegistrationOpen(bootstrapStatus.registrationOpen);
+        setAuthMode(bootstrapStatus.registrationOpen ? "register" : "login");
+      }
       setSession(nextSession);
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
       setSession({ authenticated: false });
+      setRegistrationOpen(false);
     }
   }
 
@@ -286,9 +273,8 @@ export function App() {
     setGlobalError("");
 
     try {
-      const [householdResponse, profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse] =
+      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse] =
         await Promise.all([
-          apiFetch<HouseholdData>("/household"),
           apiFetch<ProfileData>("/profile/me"),
           apiFetch<{ metrics: HealthMetric[] }>("/profile/me/health-metrics?limit=12"),
           apiFetch<NutritionSummary>("/nutrition/summary"),
@@ -297,7 +283,6 @@ export function App() {
         ]);
 
       startTransition(() => {
-        setHouseholdData(householdResponse);
         setProfileData(profileResponse);
         setHealthMetrics(metricsResponse.metrics);
         setNutritionSummary(summaryResponse);
@@ -321,10 +306,9 @@ export function App() {
       let nextSession: SessionData;
 
       if (authMode === "register") {
-        nextSession = await apiFetch<SessionData>("/auth/register-owner", {
+        nextSession = await apiFetch<SessionData>("/auth/register", {
           method: "POST",
           body: JSON.stringify({
-            householdName: registerForm.householdName,
             displayName: registerForm.displayName,
             email: registerForm.email,
             password: registerForm.password,
@@ -332,19 +316,6 @@ export function App() {
             calorieGoal: toOptionalNumber(registerForm.calorieGoal)
           })
         });
-      } else if (authMode === "invite") {
-        nextSession = await apiFetch<SessionData>("/auth/accept-invite", {
-          method: "POST",
-          body: JSON.stringify({
-            token: inviteForm.token,
-            displayName: inviteForm.displayName,
-            email: inviteForm.email,
-            password: inviteForm.password,
-            goalSummary: inviteForm.goalSummary || undefined,
-            calorieGoal: toOptionalNumber(inviteForm.calorieGoal)
-          })
-        });
-        window.history.replaceState({}, "", window.location.pathname);
       } else {
         nextSession = await apiFetch<SessionData>("/auth/login", {
           method: "POST",
@@ -353,7 +324,9 @@ export function App() {
       }
 
       setSession(nextSession);
-      setGlobalNotice(authMode === "register" ? "Household created and signed in." : "Signed in.");
+      setRegistrationOpen(false);
+      setAuthMode("login");
+      setGlobalNotice(authMode === "register" ? "Account created and signed in." : "Signed in.");
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
     } finally {
@@ -365,8 +338,9 @@ export function App() {
     try {
       await apiFetch<void>("/auth/logout", { method: "POST" });
       setSession({ authenticated: false });
+      setRegistrationOpen(false);
+      setAuthMode("login");
       setGlobalNotice("Signed out.");
-      setHouseholdData(null);
       setProfileData(null);
       setHealthMetrics([]);
       setNutritionSummary(null);
@@ -479,33 +453,6 @@ export function App() {
     }
   }
 
-  async function handleInviteSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setInviteSaving(true);
-    setGlobalError("");
-    setGlobalNotice("");
-
-    try {
-      const result = await apiFetch<{ inviteToken: string; inviteUrl: string }>("/household/invitations", {
-        method: "POST",
-        body: JSON.stringify(inviteCreateForm)
-      });
-
-      setInviteCreateResult(result);
-      setInviteCreateForm({
-        email: "",
-        suggestedName: "",
-        role: "MEMBER"
-      });
-      await loadDashboard();
-      setGlobalNotice("Invitation created.");
-    } catch (error) {
-      setGlobalError(getApiErrorMessage(error));
-    } finally {
-      setInviteSaving(false);
-    }
-  }
-
   function handleFileChange(
     event: ChangeEvent<HTMLInputElement>,
     setter: (files: File[]) => void
@@ -570,9 +517,8 @@ export function App() {
     setMealTemplateLabel(meal.title);
   }
 
-  const currentMemberName = session?.member?.displayName ?? "Member";
+  const currentMemberName = session?.member?.displayName ?? "User";
   const currentMemberInitials = getInitials(currentMemberName);
-  const isOwner = session?.member?.role === "OWNER";
   const todaySummary = nutritionSummary?.today ?? {
     mealCount: 0,
     calories: 0,
@@ -651,11 +597,11 @@ export function App() {
     return (
       <main className="app-shell auth-shell">
         <section className="hero">
-          <p className="eyebrow">Household health coach</p>
+          <p className="eyebrow">Private health coach</p>
           <h1>Track meals, weight, and daily progress in one place.</h1>
           <p className="subtitle">
-            Each household member gets a private dashboard. Log meals with photos, keep a reusable
-            meal library, and start with simple weight tracking.
+            This app is private and protected by email and password. Log meals with photos, keep a
+            reusable meal library, and start with simple weight tracking.
           </p>
 
           <div className="feature-grid">
@@ -668,8 +614,8 @@ export function App() {
               <p>Save a meal while logging it so the next entry starts faster.</p>
             </Card>
             <Card className="feature-card">
-              <h2>Private profiles</h2>
-              <p>Owners can invite other members while everyone keeps their own history.</p>
+              <h2>Private account</h2>
+              <p>Your data stays inside a single personal account instead of a shared workspace.</p>
             </Card>
           </div>
         </section>
@@ -683,24 +629,24 @@ export function App() {
             >
               Sign In
             </button>
-            <button
-              type="button"
-              className={authMode === "register" ? "active" : ""}
-              onClick={() => setAuthMode("register")}
-            >
-              Create Household
-            </button>
-            <button
-              type="button"
-              className={authMode === "invite" ? "active" : ""}
-              onClick={() => setAuthMode("invite")}
-            >
-              Accept Invite
-            </button>
+            {registrationOpen ? (
+              <button
+                type="button"
+                className={authMode === "register" ? "active" : ""}
+                onClick={() => setAuthMode("register")}
+              >
+                Create Account
+              </button>
+            ) : null}
           </div>
 
           {globalError && <p className="status-banner error">{globalError}</p>}
           {globalNotice && <p className="status-banner success">{globalNotice}</p>}
+          {!registrationOpen ? (
+            <p className="list-item-copy">
+              Account setup is complete. Sign in with the email and password you already created.
+            </p>
+          ) : null}
 
           <form className="form-stack" onSubmit={handleAuthSubmit}>
             {authMode === "login" && (
@@ -726,15 +672,6 @@ export function App() {
 
             {authMode === "register" && (
               <>
-                <Field label="Household name">
-                  <input
-                    required
-                    value={registerForm.householdName}
-                    onChange={(event) =>
-                      setRegisterForm({ ...registerForm, householdName: event.target.value })
-                    }
-                  />
-                </Field>
                 <Field label="Your name">
                   <input
                     required
@@ -784,72 +721,8 @@ export function App() {
               </>
             )}
 
-            {authMode === "invite" && (
-              <>
-                <Field label="Invite token">
-                  <input
-                    required
-                    value={inviteForm.token}
-                    onChange={(event) => setInviteForm({ ...inviteForm, token: event.target.value })}
-                  />
-                </Field>
-                <Field label="Your name">
-                  <input
-                    required
-                    value={inviteForm.displayName}
-                    onChange={(event) =>
-                      setInviteForm({ ...inviteForm, displayName: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Email">
-                  <input
-                    required
-                    type="email"
-                    value={inviteForm.email}
-                    onChange={(event) => setInviteForm({ ...inviteForm, email: event.target.value })}
-                  />
-                </Field>
-                <Field label="Password">
-                  <input
-                    required
-                    type="password"
-                    value={inviteForm.password}
-                    onChange={(event) =>
-                      setInviteForm({ ...inviteForm, password: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Goal summary">
-                  <textarea
-                    rows={3}
-                    value={inviteForm.goalSummary}
-                    onChange={(event) =>
-                      setInviteForm({ ...inviteForm, goalSummary: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Daily calorie goal">
-                  <input
-                    type="number"
-                    min="0"
-                    value={inviteForm.calorieGoal}
-                    onChange={(event) =>
-                      setInviteForm({ ...inviteForm, calorieGoal: event.target.value })
-                    }
-                  />
-                </Field>
-              </>
-            )}
-
             <button className="primary-button" disabled={authLoading} type="submit">
-              {authLoading
-                ? "Working..."
-                : authMode === "register"
-                  ? "Create household"
-                  : authMode === "invite"
-                    ? "Join household"
-                    : "Sign in"}
+              {authLoading ? "Working..." : authMode === "register" ? "Create account" : "Sign in"}
             </button>
           </form>
         </Card>
@@ -861,7 +734,7 @@ export function App() {
     <main className="app-shell dashboard-shell">
       <header className="dashboard-header">
         <div className="dashboard-header-copy">
-          <p className="eyebrow">{session.household?.name}</p>
+          <p className="eyebrow">Private account</p>
           <h1>Daily health dashboard</h1>
         </div>
 
@@ -1241,7 +1114,7 @@ export function App() {
       </OverlayPanel>
 
       <OverlayPanel
-        description="This module holds your profile settings and household access controls."
+        description="Update your profile settings and sign out of your private account."
         onClose={() => setIsProfileDrawerOpen(false)}
         open={isProfileDrawerOpen}
         title="Profile"
@@ -1251,9 +1124,7 @@ export function App() {
           <div className="drawer-avatar">{currentMemberInitials}</div>
           <div>
             <strong>{currentMemberName}</strong>
-            <p className="list-item-copy">
-              {session.account?.email} · {session.member?.role}
-            </p>
+            <p className="list-item-copy">{session.account?.email}</p>
           </div>
         </div>
 
@@ -1342,96 +1213,6 @@ export function App() {
             </button>
           </div>
         </form>
-
-        <div className="drawer-section-stack">
-          <SectionHeading
-            title="Household"
-            description={
-              isOwner
-                ? "Manage members and invites here instead of from the main dashboard."
-                : "Your data stays private to your own profile within this household."
-            }
-          />
-
-          <div className="member-list">
-            {householdData?.members.map((member) => (
-              <article className="member-item" key={member.id}>
-                <div className="member-avatar">{getInitials(member.displayName)}</div>
-                <div className="member-copy">
-                  <strong>{member.displayName}</strong>
-                  <span>{member.email}</span>
-                </div>
-                <span className="role-chip">{member.role}</span>
-              </article>
-            ))}
-          </div>
-
-          {householdData?.invites.length ? (
-            <div className="invite-list">
-              <p className="section-label">Pending invites</p>
-              {householdData.invites.map((invite) => (
-                <div className="invite-item" key={invite.id}>
-                  <strong>{invite.email}</strong>
-                  <span>
-                    {invite.role} · Expires {formatDate(invite.expiresAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {isOwner ? (
-            <>
-              <form className="form-stack" onSubmit={handleInviteSave}>
-                <Field label="Invite email">
-                  <input
-                    required
-                    type="email"
-                    value={inviteCreateForm.email}
-                    onChange={(event) =>
-                      setInviteCreateForm({ ...inviteCreateForm, email: event.target.value })
-                    }
-                  />
-                </Field>
-                <TwoColumnFields>
-                  <Field label="Suggested name">
-                    <input
-                      value={inviteCreateForm.suggestedName}
-                      onChange={(event) =>
-                        setInviteCreateForm({ ...inviteCreateForm, suggestedName: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="Role">
-                    <select
-                      value={inviteCreateForm.role}
-                      onChange={(event) =>
-                        setInviteCreateForm({
-                          ...inviteCreateForm,
-                          role: event.target.value as "OWNER" | "MEMBER"
-                        })
-                      }
-                    >
-                      <option value="MEMBER">Member</option>
-                      <option value="OWNER">Owner</option>
-                    </select>
-                  </Field>
-                </TwoColumnFields>
-                <button className="secondary-button full-width" disabled={inviteSaving} type="submit">
-                  {inviteSaving ? "Creating..." : "Create invite"}
-                </button>
-              </form>
-
-              {inviteCreateResult && (
-                <div className="invite-result">
-                  <p className="section-label">Share this invite</p>
-                  <textarea readOnly rows={2} value={inviteCreateResult.inviteUrl} />
-                  <p className="list-item-copy">Token: {inviteCreateResult.inviteToken}</p>
-                </div>
-              )}
-            </>
-          ) : null}
-        </div>
       </OverlayPanel>
     </main>
   );

@@ -189,7 +189,7 @@ const nutritionSchema = {
 
 const createPrompt = (input: NutritionAnalysisInput) => {
   const lines = [
-    "You are analyzing a meal log for a private household nutrition app.",
+    "You are analyzing a meal log for a private personal nutrition app.",
     "Estimate nutrition conservatively from the meal photos, nutrition label photos, and user-provided serving details.",
     "Use any visible nutrition label as the highest-confidence source when present.",
     "Return totals for the entire logged serving, not per 100g unless the user only supplied 100g information.",

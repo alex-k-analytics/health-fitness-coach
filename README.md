@@ -1,9 +1,9 @@
 # Health & Fitness Coach
 
-Household nutrition tracking app with:
+Private nutrition tracking app with:
 
-- authenticated owner/member access
-- per-member goals and health metrics
+- authenticated personal access
+- per-user goals and health metrics
 - meal logging with multiple food and label photos
 - OpenAI-powered nutrition analysis with fallback heuristics
 - reusable saved foods
@@ -19,10 +19,10 @@ Household nutrition tracking app with:
 
 ## Product model
 
-- One `Household` contains multiple authorized profiles.
-- Each signed-in person has a private `HouseholdMember` page.
-- Owners can invite additional users with invite links/tokens.
-- Members can set goals, log health metrics, upload meal photos, and reuse saved food entries.
+- The app is designed for a single private account.
+- The first account setup is allowed once, then public registration closes and the app becomes login-only.
+- The existing Prisma schema still uses `Household` and `HouseholdMember` internally, but that structure is hidden from the product surface.
+- Users can set goals, log health metrics, upload meal photos, and reuse saved food entries.
 - Meal analysis stores calories, macros, assumptions, micronutrients, vitamins, and image references.
 
 ## Local development
@@ -67,10 +67,9 @@ The frontend expects the API at `http://localhost:4000/api` by default.
 
 ## Auth and data flow
 
-- `POST /api/auth/register-owner`: create the first household owner.
+- `GET /api/auth/bootstrap-status`: check whether first-time account setup is still open.
+- `POST /api/auth/register`: create the initial account if setup is still open.
 - `POST /api/auth/login`: sign in.
-- `POST /api/auth/accept-invite`: join a household with an invite token.
-- `GET /api/household`: view members and pending invites.
 - `PATCH /api/profile/me`: update goals/profile.
 - `POST /api/profile/me/health-metrics`: append a health snapshot.
 - `POST /api/nutrition/meals`: multipart meal submission with `plateImages`, `labelImages`, and `otherImages`.
@@ -146,7 +145,7 @@ All three workflows are manual-only via `workflow_dispatch`.
 
 The deploy workflow checks for the Artifact Registry repository and Cloud Run service up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
 
-`APP_BASE_URL` is still important for production invite links and strict CORS. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
+`APP_BASE_URL` is still important for production redirects, cookie/CORS consistency, and any future custom domain setup. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
 
 ## Notes
 

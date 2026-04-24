@@ -7,7 +7,6 @@ import path from "node:path";
 import { config } from "./config.js";
 import { requireAuth } from "./middleware/auth.js";
 import { authRoutes } from "./routes/authRoutes.js";
-import { householdRoutes } from "./routes/householdRoutes.js";
 import { profileRoutes } from "./routes/profileRoutes.js";
 import { nutritionRoutes } from "./routes/nutritionRoutes.js";
 
@@ -38,7 +37,6 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/household", requireAuth, householdRoutes);
 app.use("/api/profile", requireAuth, profileRoutes);
 app.use("/api/nutrition", requireAuth, nutritionRoutes);
 

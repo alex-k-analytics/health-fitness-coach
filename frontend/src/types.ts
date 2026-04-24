@@ -1,3 +1,7 @@
+export interface BootstrapStatus {
+  registrationOpen: boolean;
+}
+
 export interface SessionData {
   authenticated: boolean;
   account?: {
@@ -14,33 +18,6 @@ export interface SessionData {
     carbGoalGrams: number | null;
     fatGoalGrams: number | null;
   };
-  household?: {
-    id: string;
-    name: string;
-  };
-}
-
-export interface HouseholdData {
-  household: {
-    id: string;
-    name: string;
-  };
-  members: Array<{
-    id: string;
-    displayName: string;
-    role: "OWNER" | "MEMBER";
-    email: string;
-    createdAt: string;
-  }>;
-  invites: Array<{
-    id: string;
-    email: string;
-    suggestedName: string | null;
-    role: "OWNER" | "MEMBER";
-    expiresAt: string;
-    createdAt: string;
-    invitedByName: string;
-  }>;
 }
 
 export interface HealthMetric {
