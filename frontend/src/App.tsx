@@ -31,6 +31,9 @@ type MealTemplateResult =
     food: SavedFood;
   };
 
+const LOGIN_PATH = "/login";
+const DASHBOARD_PATH = "/";
+
 const defaultWeightForm = () => ({
   recordedAt: "",
   weightLbs: ""
@@ -179,6 +182,9 @@ const formatServingCount = (quantity: string) =>
     maximumFractionDigits: 2
   }).format(getServingCount(quantity));
 
+const formatMacroValue = (value: number | null | undefined) =>
+  value === null || value === undefined ? "0g" : `${Math.round(value)}g`;
+
 const scaleNutritionEstimate = (
   estimate: NutritionEstimate,
   multiplier: number
@@ -278,7 +284,6 @@ export function App() {
 
   const [mealForm, setMealForm] = useState(defaultMealForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
-  const [mealPage, setMealPage] = useState(1);
   const [mealSearchQuery, setMealSearchQuery] = useState("");
   const [mealTemplateLabel, setMealTemplateLabel] = useState<string | null>(null);
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
@@ -295,6 +300,23 @@ export function App() {
   useEffect(() => {
     void loadSession();
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const isLoginPath = window.location.pathname === LOGIN_PATH;
+
+    if (!session.authenticated && !isLoginPath) {
+      window.history.replaceState(null, "", LOGIN_PATH);
+      return;
+    }
+
+    if (session.authenticated && isLoginPath) {
+      window.history.replaceState(null, "", DASHBOARD_PATH);
+    }
+  }, [session]);
 
   useEffect(() => {
     if (!session?.authenticated) {
@@ -380,6 +402,11 @@ export function App() {
         setWorkouts(workoutsResponse.workouts);
       });
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setSession({ authenticated: false });
+        return;
+      }
+
       setGlobalError(getApiErrorMessage(error));
     } finally {
       setDashboardLoading(false);
@@ -398,6 +425,7 @@ export function App() {
         body: JSON.stringify(loginForm)
       });
       setSession(nextSession);
+      window.history.replaceState(null, "", DASHBOARD_PATH);
       setGlobalNotice("Signed in.");
     } catch (error) {
       setGlobalError(getApiErrorMessage(error));
@@ -410,6 +438,7 @@ export function App() {
     try {
       await apiFetch<void>("/auth/logout", { method: "POST" });
       setSession({ authenticated: false });
+      window.history.replaceState(null, "", LOGIN_PATH);
       setGlobalNotice("Signed out.");
       setProfileData(null);
       setHealthMetrics([]);
@@ -749,13 +778,7 @@ export function App() {
   const matchingMealTemplateCount = mealTemplates.filter(
     (template) => !normalizedMealSearch || template.searchText.includes(normalizedMealSearch)
   ).length;
-  const mealsPerPage = 5;
-  const mealPageCount = Math.max(1, Math.ceil(meals.length / mealsPerPage));
-  const activeMealPage = Math.min(mealPage, mealPageCount);
-  const displayedMeals = meals.slice(
-    (activeMealPage - 1) * mealsPerPage,
-    activeMealPage * mealsPerPage
-  );
+  const displayedMeals = meals.slice(0, 3);
   const weightTrend = healthMetrics.filter((metric) => metric.weightKg !== null).slice().reverse();
   const weightTrendPoints = weightTrend.slice(-6);
   const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
@@ -967,30 +990,10 @@ export function App() {
 
         <Card className="compact-card meals-card meal-history-card">
           <div className="section-heading-row">
-            <SectionHeading title="Last 5 logs" description="Most recent food, drink, and nutrition entries" />
-            {meals.length > mealsPerPage ? (
-              <div className="pagination-controls" aria-label="Log pagination">
-                <button
-                  className="secondary-button"
-                  disabled={activeMealPage === 1}
-                  onClick={() => setMealPage((page) => Math.max(1, page - 1))}
-                  type="button"
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {activeMealPage} of {mealPageCount}
-                </span>
-                <button
-                  className="secondary-button"
-                  disabled={activeMealPage === mealPageCount}
-                  onClick={() => setMealPage((page) => Math.min(mealPageCount, page + 1))}
-                  type="button"
-                >
-                  Next
-                </button>
-              </div>
-            ) : null}
+            <SectionHeading title="Last 3 logs" description="Recent food, drink, and nutrition entries" />
+            <button className="secondary-button compact-button-auto" onClick={() => openMealComposer()} type="button">
+              Add meal
+            </button>
           </div>
           {dashboardLoading ? (
             <p className="empty-state">Refreshing logs…</p>
@@ -1008,32 +1011,40 @@ export function App() {
 
                 return (
                   <article className="meal-item compact-meal-item" key={meal.id}>
-                    <div className="meal-item-header">
-                      <div className="meal-row-copy">
+                    <div className="meal-log-row">
+                      <div className="meal-log-title">
                         <strong>{meal.title}</strong>
-                        <p className="list-item-copy">{formatDateTime(meal.eatenAt)}</p>
+                        <span>{formatDateTime(meal.eatenAt)}</span>
                       </div>
-                      <div className="meal-row-side">
-                        <strong className="meal-calories">
-                          {meal.estimatedCalories ? `${meal.estimatedCalories} kcal` : "No calories"}
-                        </strong>
-                        <button className="inline-action-button" onClick={() => openMealEditor(meal)} type="button">
-                          Edit
-                        </button>
+
+                      <strong className="meal-calories">
+                        {meal.estimatedCalories ? `${meal.estimatedCalories} kcal` : "No calories"}
+                      </strong>
+
+                      <div className="meal-log-macros" aria-label="Meal macros">
+                        <span>P {formatMacroValue(meal.proteinGrams)}</span>
+                        <span>C {formatMacroValue(meal.carbsGrams)}</span>
+                        <span>F {formatMacroValue(meal.fatGrams)}</span>
+                      </div>
+
+                      <div className="meal-log-meta">
+                        {meal.servingDescription ? <span className="pill">{meal.servingDescription}</span> : null}
+                        {meal.images.length ? (
+                          <span className="pill">
+                            {meal.images.length} photo{meal.images.length === 1 ? "" : "s"}
+                          </span>
+                        ) : null}
+                        {meal.savedFood ? <span className="tag subtle">Reusable</span> : null}
                         {mealStateTag ? (
                           <span className={`tag ${mealStateTag.tone}`}>{mealStateTag.label}</span>
                         ) : null}
                       </div>
-                    </div>
 
-                    <div className="macro-pills compact-pills">
-                      {meal.servingDescription ? <span className="pill">{meal.servingDescription}</span> : null}
-                      {meal.images.length ? (
-                        <span className="pill">
-                          {meal.images.length} photo{meal.images.length === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                      {meal.savedFood ? <span className="tag subtle">Reusable base</span> : null}
+                      <div className="meal-log-actions">
+                        <button className="inline-action-button" onClick={() => openMealEditor(meal)} type="button">
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
