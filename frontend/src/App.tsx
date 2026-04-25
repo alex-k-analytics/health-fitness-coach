@@ -174,6 +174,11 @@ const getServingCount = (quantity: string) => {
   return parsed && parsed > 0 ? parsed : 1;
 };
 
+const formatServingCount = (quantity: string) =>
+  new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2
+  }).format(getServingCount(quantity));
+
 const scaleNutritionEstimate = (
   estimate: NutritionEstimate,
   multiplier: number
@@ -1131,8 +1136,9 @@ export function App() {
             <Field label="Servings">
               <input
                 aria-label="Servings"
-                min="0.1"
-                step="0.1"
+                inputMode="decimal"
+                min="0.01"
+                step="any"
                 type="number"
                 value={mealForm.quantity}
                 onChange={(event) => setMealForm({ ...mealForm, quantity: event.target.value })}
@@ -1154,7 +1160,6 @@ export function App() {
               <input
                 ref={plateInputRef}
                 accept="image/*"
-                capture="environment"
                 multiple
                 type="file"
                 onChange={(event) => handleFileChange(event, setPlateFiles)}
@@ -1201,7 +1206,7 @@ export function App() {
                     {displayedMealEstimate.status === "COMPLETED" ? "AI estimate" : "Fallback estimate"}
                   </span>
                   <span className="list-item-copy">
-                    {getServingCount(mealForm.quantity)} serving
+                    {formatServingCount(mealForm.quantity)} serving
                     {getServingCount(mealForm.quantity) === 1 ? "" : "s"} · Confidence{" "}
                     {Math.round(displayedMealEstimate.confidenceScore * 100)}%
                   </span>
