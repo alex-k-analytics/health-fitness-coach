@@ -835,7 +835,7 @@ img {
 
 .meal-history-list {
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 0;
 }
 
 .section-heading-row {
@@ -845,29 +845,41 @@ img {
   align-items: flex-start;
 }
 
-.compact-button-auto {
-  width: auto;
+.meal-add-button {
+  width: 36px;
+  height: 36px;
   min-height: 36px;
-  padding: 8px 12px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
-.meal-item {
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fbfdff;
-}
-
-.compact-meal-item {
-  padding: 9px 10px;
-  border-radius: 8px;
-}
-
+.meal-table-header,
 .meal-log-row {
   display: grid;
-  grid-template-columns: minmax(170px, 1.25fr) minmax(86px, auto) minmax(150px, 0.95fr) minmax(210px, 1.3fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(190px, 1.35fr) minmax(90px, 0.55fr) minmax(160px, 0.85fr) minmax(210px, 1fr) 54px;
+  gap: 14px;
   align-items: center;
+}
+
+.meal-table-header {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #e5ecf6;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.meal-log-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #e8eef7;
+}
+
+.meal-log-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .meal-log-title {
@@ -892,21 +904,21 @@ img {
 .meal-log-macros,
 .meal-log-meta {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
 .meal-log-macros {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
-.meal-log-macros span {
-  padding: 4px 7px;
-  border-radius: 999px;
-  background: #f0f5fb;
+.meal-log-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .meal-log-actions {
@@ -922,9 +934,9 @@ img {
 
 .inline-action-button {
   border: 0;
-  padding: 7px 10px;
+  padding: 5px 0;
   border-radius: 8px;
-  background: #eef4ff;
+  background: transparent;
   color: var(--accent-deep);
   font: inherit;
   font-size: 0.78rem;
@@ -1368,6 +1380,10 @@ img {
   .meal-log-row {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
+  }
+
+  .meal-table-header {
+    display: none;
   }
 
   .meal-log-title,

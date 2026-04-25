@@ -185,6 +185,18 @@ const formatServingCount = (quantity: string) =>
 const formatMacroValue = (value: number | null | undefined) =>
   value === null || value === undefined ? "0g" : `${Math.round(value)}g`;
 
+const getMealDetailText = (meal: Meal) => {
+  const details = [
+    meal.servingDescription,
+    meal.images.length
+      ? `${meal.images.length} photo${meal.images.length === 1 ? "" : "s"}`
+      : null,
+    meal.savedFood ? "Reusable" : null
+  ].filter(Boolean);
+
+  return details.length ? details.join(" · ") : "No serving details";
+};
+
 const scaleNutritionEstimate = (
   estimate: NutritionEstimate,
   multiplier: number
@@ -991,8 +1003,13 @@ export function App() {
         <Card className="compact-card meals-card meal-history-card">
           <div className="section-heading-row">
             <SectionHeading title="Last 3 logs" description="Recent food, drink, and nutrition entries" />
-            <button className="secondary-button compact-button-auto" onClick={() => openMealComposer()} type="button">
-              Add meal
+            <button
+              aria-label="Add meal"
+              className="icon-button meal-add-button"
+              onClick={() => openMealComposer()}
+              type="button"
+            >
+              +
             </button>
           </div>
           {dashboardLoading ? (
@@ -1006,11 +1023,18 @@ export function App() {
             </div>
           ) : (
             <div className="meal-list meal-history-list">
+              <div className="meal-table-header" aria-hidden="true">
+                <span>Meal</span>
+                <span>Calories</span>
+                <span>Macros</span>
+                <span>Details</span>
+                <span />
+              </div>
               {displayedMeals.map((meal) => {
                 const mealStateTag = getMealStateTag(meal.analysisStatus);
 
                 return (
-                  <article className="meal-item compact-meal-item" key={meal.id}>
+                  <article className="meal-log-item" key={meal.id}>
                     <div className="meal-log-row">
                       <div className="meal-log-title">
                         <strong>{meal.title}</strong>
@@ -1022,19 +1046,12 @@ export function App() {
                       </strong>
 
                       <div className="meal-log-macros" aria-label="Meal macros">
-                        <span>P {formatMacroValue(meal.proteinGrams)}</span>
-                        <span>C {formatMacroValue(meal.carbsGrams)}</span>
-                        <span>F {formatMacroValue(meal.fatGrams)}</span>
+                        P {formatMacroValue(meal.proteinGrams)} · C {formatMacroValue(meal.carbsGrams)} · F{" "}
+                        {formatMacroValue(meal.fatGrams)}
                       </div>
 
                       <div className="meal-log-meta">
-                        {meal.servingDescription ? <span className="pill">{meal.servingDescription}</span> : null}
-                        {meal.images.length ? (
-                          <span className="pill">
-                            {meal.images.length} photo{meal.images.length === 1 ? "" : "s"}
-                          </span>
-                        ) : null}
-                        {meal.savedFood ? <span className="tag subtle">Reusable</span> : null}
+                        <span>{getMealDetailText(meal)}</span>
                         {mealStateTag ? (
                           <span className={`tag ${mealStateTag.tone}`}>{mealStateTag.label}</span>
                         ) : null}
