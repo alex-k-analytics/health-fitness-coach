@@ -1267,7 +1267,6 @@ export function App() {
                 onChange={(event) => handleFileChange(event, setPlateFiles)}
               />
               <p className="input-help">Take a picture of the meal or upload one from your camera roll.</p>
-              <FileSummary files={plateFiles} />
             </div>
             <div className="field">
               <span>Nutrition label photos</span>
@@ -1280,7 +1279,6 @@ export function App() {
               <p className="input-help">
                 Add package labels or screenshots of digital nutrition facts.
               </p>
-              <FileSummary files={labelFiles} />
             </div>
             <div className="field">
               <span>Extra reference images</span>
@@ -1291,7 +1289,6 @@ export function App() {
                 onChange={(event) => handleFileChange(event, setOtherFiles)}
               />
               <p className="input-help">Use this for menus, ingredient lists, or anything else that helps.</p>
-              <FileSummary files={otherFiles} />
             </div>
           </div>
 
@@ -1689,17 +1686,6 @@ function FileUploadControl({
   );
 }
 
-function FileSummary({ files }: { files: File[] }) {
-  if (files.length === 0) {
-    return null;
-  }
-
-  return (
-    <p className="input-help">
-      {files.length} file{files.length > 1 ? "s" : ""}: {files.map((file) => file.name).join(", ")}
-    </p>
-  );
-}
 
 function SnapshotTile({
   label,
