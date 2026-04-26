@@ -3,6 +3,7 @@ import {
   type CSSProperties,
   type FormEvent,
   type ReactNode,
+  type RefObject,
   startTransition,
   useEffect,
   useRef,
@@ -1184,41 +1185,41 @@ export function App() {
           </Field>
 
           <div className="upload-grid">
-            <Field label="Food photos">
-              <input
-                ref={plateInputRef}
+            <div className="field">
+              <span>Food photos</span>
+              <FileUploadControl
                 accept="image/*"
-                multiple
-                type="file"
+                files={plateFiles}
+                inputRef={plateInputRef}
                 onChange={(event) => handleFileChange(event, setPlateFiles)}
               />
               <p className="input-help">Take a picture of the meal or upload one from your camera roll.</p>
               <FileSummary files={plateFiles} />
-            </Field>
-            <Field label="Nutrition label photos">
-              <input
-                ref={labelInputRef}
+            </div>
+            <div className="field">
+              <span>Nutrition label photos</span>
+              <FileUploadControl
                 accept="image/*"
-                multiple
-                type="file"
+                files={labelFiles}
+                inputRef={labelInputRef}
                 onChange={(event) => handleFileChange(event, setLabelFiles)}
               />
               <p className="input-help">
                 Add package labels or screenshots of digital nutrition facts.
               </p>
               <FileSummary files={labelFiles} />
-            </Field>
-            <Field label="Extra reference images">
-              <input
-                ref={otherInputRef}
+            </div>
+            <div className="field">
+              <span>Extra reference images</span>
+              <FileUploadControl
                 accept="image/*"
-                multiple
-                type="file"
+                files={otherFiles}
+                inputRef={otherInputRef}
                 onChange={(event) => handleFileChange(event, setOtherFiles)}
               />
               <p className="input-help">Use this for menus, ingredient lists, or anything else that helps.</p>
               <FileSummary files={otherFiles} />
-            </Field>
+            </div>
           </div>
 
           <div className={`analysis-preview ${mealEstimate ? "" : "empty"}`}>
@@ -1565,9 +1566,47 @@ function TwoColumnFields({ children }: { children: ReactNode }) {
   return <div className="two-column-grid">{children}</div>;
 }
 
+function FileUploadControl({
+  accept,
+  files,
+  inputRef,
+  onChange
+}: {
+  accept: string;
+  files: File[];
+  inputRef: RefObject<HTMLInputElement>;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const status =
+    files.length === 0
+      ? "No files selected"
+      : files.length === 1
+        ? files[0].name
+        : `${files.length} files selected`;
+
+  return (
+    <div className="file-upload-control">
+      <input
+        ref={inputRef}
+        accept={accept}
+        className="visually-hidden-file-input"
+        multiple
+        type="file"
+        onChange={onChange}
+      />
+      <button className="file-upload-button" onClick={() => inputRef.current?.click()} type="button">
+        Choose files
+      </button>
+      <span className="file-upload-status" title={files.map((file) => file.name).join(", ") || status}>
+        {status}
+      </span>
+    </div>
+  );
+}
+
 function FileSummary({ files }: { files: File[] }) {
   if (files.length === 0) {
-    return <p className="input-help">No files selected.</p>;
+    return null;
   }
 
   return (
