@@ -19,10 +19,12 @@ export function DashboardHeader() {
   const memberInitials = getInitials(memberName);
 
   return (
-    <header className="w-full grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 items-end mb-3">
+    <header className="max-w-6xl mx-auto w-full grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 items-end mb-3">
       <div className="grid gap-0.5">
         <p className="text-xs font-extrabold uppercase tracking-widest text-primary/80">Private account</p>
-        <h1 className="text-2xl lg:text-3xl font-bold leading-tight tracking-tight">Daily health dashboard</h1>
+        <Link to="/" className="hover:opacity-80">
+          <h1 className="text-2xl lg:text-3xl font-bold leading-tight tracking-tight">Dashboard</h1>
+        </Link>
       </div>
       <div className="flex items-center flex-wrap gap-2.5 self-end">
         <Link to="/meals">
