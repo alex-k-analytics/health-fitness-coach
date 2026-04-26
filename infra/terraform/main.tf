@@ -8,7 +8,8 @@ locals {
     "sqladmin.googleapis.com",
     "storage.googleapis.com"
   ])
-  openai_api_key_enabled = nonsensitive(var.openai_api_key) != ""
+  openai_api_key_enabled     = nonsensitive(var.openai_api_key) != ""
+  openai_api_key_secret_name = var.openai_api_key_secret_name != "" ? var.openai_api_key_secret_name : "${local.sanitized_service_name}-openai-api-key"
 }
 
 resource "google_project_service" "required" {
@@ -133,7 +134,7 @@ resource "google_secret_manager_secret_version" "jwt_secret" {
 
 resource "google_secret_manager_secret" "openai_api_key" {
   count     = local.openai_api_key_enabled ? 1 : 0
-  secret_id = "${local.sanitized_service_name}-openai-api-key"
+  secret_id = local.openai_api_key_secret_name
 
   replication {
     auto {}
@@ -246,15 +247,22 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      dynamic "env" {
-        for_each = local.openai_api_key_enabled ? { enabled = true } : {}
-        content {
-          name = "OPENAI_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.openai_api_key[0].secret_id
-              version = "latest"
-            }
+      env {
+        name  = "NATIVE_APP_ORIGINS"
+        value = var.native_app_origins
+      }
+
+      env {
+        name  = "OPENAI_MODEL"
+        value = var.openai_model
+      }
+
+      env {
+        name = "OPENAI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = local.openai_api_key_secret_name
+            version = "latest"
           }
         }
       }
@@ -270,6 +278,7 @@ resource "google_cloud_run_v2_service" "app" {
     google_artifact_registry_repository.app,
     google_secret_manager_secret_version.database_url,
     google_secret_manager_secret_version.jwt_secret,
+    google_secret_manager_secret_version.openai_api_key,
     google_project_iam_member.runtime_cloudsql_client,
     google_project_iam_member.runtime_secret_accessor,
     google_storage_bucket_iam_member.runtime_bucket_admin

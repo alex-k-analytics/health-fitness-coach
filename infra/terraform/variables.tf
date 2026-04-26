@@ -68,11 +68,29 @@ variable "app_base_url" {
   default     = ""
 }
 
+variable "native_app_origins" {
+  description = "Comma-separated native WebView origins allowed by the API CORS policy."
+  type        = string
+  default     = "capacitor://localhost,ionic://localhost"
+}
+
 variable "openai_api_key" {
-  description = "OpenAI API key stored in Secret Manager."
+  description = "Optional OpenAI API key value. If provided, Terraform writes it to Secret Manager."
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "openai_api_key_secret_name" {
+  description = "Secret Manager secret name that Cloud Run should mount as OPENAI_API_KEY."
+  type        = string
+  default     = ""
+}
+
+variable "openai_model" {
+  description = "OpenAI model used for nutrition analysis."
+  type        = string
+  default     = "gpt-4.1"
 }
 
 variable "jwt_secret" {
