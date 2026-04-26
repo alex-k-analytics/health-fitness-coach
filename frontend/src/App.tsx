@@ -253,6 +253,67 @@ const estimateFromMeal = (meal: Meal): NutritionEstimate => ({
   }
 });
 
+const isMicronutrientList = (
+  value: unknown
+): value is Array<{ name: string; amount: number; unit: string }> =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      "name" in item &&
+      typeof item.name === "string" &&
+      "amount" in item &&
+      typeof item.amount === "number" &&
+      "unit" in item &&
+      typeof item.unit === "string"
+  );
+
+const estimateFromSavedFood = (food: SavedFood): NutritionEstimate | null => {
+  if (food.calories === null) {
+    return null;
+  }
+
+  const servingDescription = food.servingDescription ?? "1 serving";
+
+  return {
+    status: "COMPLETED",
+    model: "saved-food",
+    summary: food.notes ?? `Stored nutrition for ${servingDescription}.`,
+    confidenceScore: 1,
+    estimatedCalories: food.calories,
+    proteinGrams: food.proteinGrams ?? 0,
+    carbsGrams: food.carbsGrams ?? 0,
+    fatGrams: food.fatGrams ?? 0,
+    fiberGrams: food.fiberGrams ?? 0,
+    sugarGrams: food.sugarGrams ?? 0,
+    sodiumMg: food.sodiumMg ?? 0,
+    micronutrients: isMicronutrientList(food.micronutrients) ? food.micronutrients : [],
+    vitamins: [],
+    assumptions: ["Used stored nutrition from this reusable food."],
+    foodBreakdown: [
+      {
+        label: food.name,
+        quantityDescription: servingDescription,
+        calories: food.calories,
+        proteinGrams: food.proteinGrams ?? 0,
+        carbsGrams: food.carbsGrams ?? 0,
+        fatGrams: food.fatGrams ?? 0
+      }
+    ],
+    rawAnalysis: {
+      source: "saved-food",
+      savedFoodId: food.id
+    }
+  };
+};
+
+const isSavedFoodEstimate = (estimate: NutritionEstimate) =>
+  typeof estimate.rawAnalysis === "object" &&
+  estimate.rawAnalysis !== null &&
+  "source" in estimate.rawAnalysis &&
+  estimate.rawAnalysis.source === "saved-food";
+
 export function App() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [globalError, setGlobalError] = useState("");
@@ -363,6 +424,10 @@ export function App() {
     }
 
     if (editingMealId) {
+      return;
+    }
+
+    if (mealForm.savedFoodId && isSavedFoodEstimate(mealEstimate)) {
       return;
     }
 
@@ -735,6 +800,8 @@ export function App() {
     });
     setMealSearchQuery(food.name);
     setMealTemplateLabel(food.brand ? `${food.name} · ${food.brand}` : food.name);
+    setMealEstimate(estimateFromSavedFood(food));
+    setMealEstimateBaseServings(1);
   }
 
   const currentMemberName = session?.member?.displayName ?? "User";
@@ -777,6 +844,7 @@ export function App() {
   const displayedMealEstimate = mealEstimate
     ? scaleNutritionEstimate(mealEstimate, getServingCount(mealForm.quantity) / mealEstimateBaseServings)
     : null;
+  const selectedSavedFoodEstimateReady = mealEstimate ? isSavedFoodEstimate(mealEstimate) : false;
   const mealTemplates: MealTemplateResult[] = [
     ...savedFoods.map((food) => ({
       key: `saved-food-${food.id}`,
@@ -1230,14 +1298,22 @@ export function App() {
           <div className={`analysis-preview ${mealEstimate ? "" : "empty"}`}>
             <SectionHeading
               title="Nutrition preview"
-              description="Estimate one serving with ChatGPT, then adjust Servings to scale what gets saved."
+              description={
+                selectedSavedFoodEstimateReady
+                  ? "Using stored nutrition from this reusable food. Adjust Servings to scale what gets saved."
+                  : "Estimate one serving with ChatGPT, then adjust Servings to scale what gets saved."
+              }
             />
 
             {displayedMealEstimate ? (
               <>
                 <div className="analysis-preview-header">
                   <span className={`tag ${displayedMealEstimate.status === "COMPLETED" ? "" : "subtle"}`}>
-                    {displayedMealEstimate.status === "COMPLETED" ? "AI estimate" : "Fallback estimate"}
+                    {selectedSavedFoodEstimateReady
+                      ? "Stored nutrition"
+                      : displayedMealEstimate.status === "COMPLETED"
+                        ? "AI estimate"
+                        : "Fallback estimate"}
                   </span>
                   <span className="list-item-copy">
                     {formatServingCount(mealForm.quantity)} serving
@@ -1286,7 +1362,7 @@ export function App() {
               </>
             ) : (
               <p className="empty-state">
-                Add a meal title plus a food photo, label screenshot, or reusable food, then click{" "}
+                Add a meal title plus a food photo, label screenshot, or reusable food with stored calories, then click{" "}
                 <strong>Estimate nutrition</strong>.
               </p>
             )}
@@ -1320,7 +1396,11 @@ export function App() {
               onClick={handleMealEstimate}
               type="button"
             >
-              {mealEstimating ? "Estimating..." : "Estimate nutrition"}
+              {mealEstimating
+                ? "Estimating..."
+                : selectedSavedFoodEstimateReady
+                  ? "Re-estimate nutrition"
+                  : "Estimate nutrition"}
             </button>
             <button className="primary-button" disabled={mealSaving || !mealEstimate} type="submit">
               {mealSaving ? "Saving..." : "Save meal"}
