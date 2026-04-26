@@ -1907,7 +1907,7 @@ export function App() {
         <div className="workout-session-modal">
           {/* Activity type pills */}
           <div className="activity-type-pills">
-            {["RUNNING", "WALKING", "CYCLING", "SWIMMING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"].map(
+            {["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"].map(
               (type) => (
                 <button
                   key={type}

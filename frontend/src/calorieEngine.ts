@@ -5,6 +5,7 @@ const MET_TABLE: Record<string, Record<string, number>> = {
   RUNNING: { jog: 6.0, moderate: 9.8, fast: 10.5, sprint: 11.5 },
   CYCLING: { slow: 4.0, moderate: 6.0, fast: 8.0, sprint: 10.0 },
   SWIMMING: { casual: 6.0, moderate: 8.0, vigorous: 10.0 },
+  ROWING: { slow: 4.0, moderate: 7.0, fast: 10.0, sprint: 12.0 },
   WEIGHTLIFTING: { moderate: 3.5, vigorous: 6.0 },
   CALISTHENICS: { moderate: 3.5, vigorous: 6.0 },
   HIIT: { default: 8.0 }
@@ -29,7 +30,7 @@ export const LIFT_FACTORS: Record<string, number> = {
   "Lateral Raise": 0.010
 };
 
-const CARDIO_CATEGORIES = new Set(["RUNNING", "WALKING", "CYCLING", "SWIMMING"]);
+const CARDIO_CATEGORIES = new Set(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING"]);
 
 function resolveMet(category: string, distance?: number, durationSeconds?: number): number {
   const table = MET_TABLE[category];
@@ -59,6 +60,12 @@ function resolveMet(category: string, distance?: number, durationSeconds?: numbe
       if (speed > 14) return table.sprint;
       if (speed > 12) return table.fast;
       if (speed > 10) return table.moderate;
+      return table.slow;
+    }
+    if (category === "ROWING") {
+      if (speed > 8) return table.sprint;
+      if (speed > 6) return table.fast;
+      if (speed > 4) return table.moderate;
       return table.slow;
     }
     return table[speedKeys[1]] ?? table[speedKeys[0]];

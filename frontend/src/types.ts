@@ -113,6 +113,7 @@ export type WorkoutActivityType =
   | "WALKING"
   | "CYCLING"
   | "SWIMMING"
+  | "ROWING"
   | "WEIGHTLIFTING"
   | "CALISTHENICS"
   | "HIIT"

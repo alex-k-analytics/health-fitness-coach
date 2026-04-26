@@ -3,6 +3,7 @@ const MET_TABLE: Record<string, Record<string, number>> = {
   RUNNING: { jog: 6.0, moderate: 9.8, fast: 10.5, sprint: 11.5 },
   CYCLING: { slow: 4.0, moderate: 6.0, fast: 8.0, sprint: 10.0 },
   SWIMMING: { casual: 6.0, moderate: 8.0, vigorous: 10.0 },
+  ROWING: { slow: 4.0, moderate: 7.0, fast: 10.0, sprint: 12.0 },
   WEIGHTLIFTING: { moderate: 3.5, vigorous: 6.0 },
   CALISTHENICS: { moderate: 3.5, vigorous: 6.0 },
   HIIT: { default: 8.0 }
@@ -32,6 +33,7 @@ const EXERCISE_CATEGORIES: Record<string, string[]> = {
   WALKING: ["Walking", "Power Walking", "Hiking"],
   CYCLING: ["Cycling", "Spin Class", "Mountain Biking"],
   SWIMMING: ["Freestyle", "Backstroke", "Butterfly", "Breaststroke", "Swimming"],
+  ROWING: ["Rowing", "Indoor Rowing", "Rowing Machine", "Sprint Intervals"],
   WEIGHTLIFTING: [
     "Bench Press", "Squat", "Deadlift", "Overhead Press", "Barbell Row",
     "Pull-ups", "Dumbbell Curl", "Tricep Extension", "Lateral Raise",
@@ -73,6 +75,12 @@ function resolveMet(category: string, distance?: number, durationSeconds?: numbe
       if (speed > 14) return table.sprint;
       if (speed > 12) return table.fast;
       if (speed > 10) return table.moderate;
+      return table.slow;
+    }
+    if (category === "ROWING") {
+      if (speed > 8) return table.sprint;
+      if (speed > 6) return table.fast;
+      if (speed > 4) return table.moderate;
       return table.slow;
     }
     return table[speedKeys[1]] ?? table[speedKeys[0]];
@@ -126,6 +134,7 @@ export function calculateExerciseCalories(exercise: ExerciseCalorieInput, weight
     case "WALKING":
     case "CYCLING":
     case "SWIMMING":
+    case "ROWING":
       return calculateCardioCalories(exercise, weightKg);
     case "WEIGHTLIFTING":
     case "CALISTHENICS":
