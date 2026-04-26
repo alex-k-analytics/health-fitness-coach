@@ -65,6 +65,41 @@ npx prisma db push
 
 The frontend expects the API at `http://localhost:4000/api` by default.
 
+## iPhone app development
+
+The iOS app is a Capacitor wrapper around the React/Vite frontend. The native project lives in:
+
+- [frontend/ios](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/frontend/ios)
+
+Build the web app and sync it into Xcode:
+
+```bash
+cd frontend
+npm run ios:sync
+```
+
+Open the native project:
+
+```bash
+cd frontend
+npm run ios:open
+```
+
+For simulator development against the local backend, keep `frontend/.env` pointed at:
+
+```bash
+VITE_API_BASE_URL=http://localhost:4000/api
+```
+
+For a physical iPhone or App Store/TestFlight build, use an HTTPS API URL instead:
+
+```bash
+cd frontend
+VITE_API_BASE_URL=https://your-service.example.com/api npm run ios:sync
+```
+
+The backend allows Capacitor origins by default through `NATIVE_APP_ORIGINS=capacitor://localhost,ionic://localhost`. Login also returns a Bearer token so the iOS WebView can authenticate cross-origin API calls.
+
 ## Auth and data flow
 
 - `POST /api/auth/login`: sign in.

@@ -1,4 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const AUTH_TOKEN_STORAGE_KEY = "health_fitness_auth_token";
+
+export function setAuthToken(token: string | null | undefined) {
+  if (!token) {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+}
+
+export function getAuthToken() {
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
 
 export class ApiError extends Error {
   status: number;
@@ -22,6 +36,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (!isFormDataBody && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
+  }
+
+  const authToken = getAuthToken();
+  if (authToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${authToken}`);
   }
 
   const response = await fetch(`${API_BASE}${path}`, {

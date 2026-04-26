@@ -20,7 +20,11 @@ app.use(
         return callback(null, true);
       }
 
-      const allowedOrigins = [config.frontendOrigin, config.appBaseUrl].filter(Boolean);
+      const allowedOrigins = [
+        config.frontendOrigin,
+        config.appBaseUrl,
+        ...config.nativeAppOrigins
+      ].filter(Boolean);
       if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }

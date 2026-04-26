@@ -57,7 +57,7 @@ img {
 .app-shell {
   max-width: 1320px;
   margin: 0 auto;
-  padding: 14px 18px 42px;
+  padding: calc(14px + env(safe-area-inset-top)) 18px calc(42px + env(safe-area-inset-bottom));
   width: 100%;
 }
 
@@ -1471,7 +1471,7 @@ img {
   }
 
   .app-shell {
-    padding: 14px 12px calc(112px + env(safe-area-inset-bottom));
+    padding: calc(16px + env(safe-area-inset-top)) 14px calc(92px + env(safe-area-inset-bottom));
   }
 
   .card,
@@ -1487,21 +1487,21 @@ img {
 
   .auth-shell {
     align-content: start;
-    gap: 14px;
+    gap: 16px;
   }
 
   .auth-hero {
-    padding-top: 12px;
+    padding-top: 0;
   }
 
   .hero {
-    gap: 12px;
+    gap: 10px;
   }
 
   .hero h1 {
     max-width: 100%;
-    font-size: clamp(2rem, 12vw, 2.9rem);
-    line-height: 1;
+    font-size: clamp(2.05rem, 9.4vw, 2.45rem);
+    line-height: 1.04;
   }
 
   .dashboard-header h1 {
@@ -1514,19 +1514,20 @@ img {
   }
 
   .subtitle {
-    font-size: 0.95rem;
+    font-size: 0.96rem;
+    line-height: 1.38;
   }
 
   .auth-feature-grid {
-    gap: 10px;
+    display: none;
   }
 
-  .auth-feature-card {
-    padding: 14px;
+  .auth-login-card {
+    padding: 18px;
   }
 
-  .auth-feature-card h2 {
-    font-size: 1rem;
+  .auth-card-subtitle {
+    max-width: none;
   }
 
   .dashboard-header {

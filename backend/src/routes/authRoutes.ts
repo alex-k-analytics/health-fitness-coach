@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
-import { clearAuthCookie, readAuthPayload, setAuthCookie } from "../middleware/auth.js";
+import { clearAuthCookie, readAuthPayload, setAuthCookie, signAuthToken } from "../middleware/auth.js";
 import { prisma } from "../lib/prisma.js";
 
 export const authRoutes = Router();
@@ -17,22 +17,30 @@ const serializeSession = (account: {
   proteinGoalGrams: number | null;
   carbGoalGrams: number | null;
   fatGoalGrams: number | null;
-}) => ({
-  authenticated: true,
-  account: {
-    id: account.id,
+}) => {
+  const authPayload = {
+    accountId: account.id,
     email: account.email
-  },
-  member: {
-    id: account.id,
-    displayName: account.displayName,
-    goalSummary: account.goalSummary,
-    calorieGoal: account.calorieGoal,
-    proteinGoalGrams: account.proteinGoalGrams,
-    carbGoalGrams: account.carbGoalGrams,
-    fatGoalGrams: account.fatGoalGrams
-  }
-});
+  };
+
+  return {
+    authenticated: true,
+    token: signAuthToken(authPayload),
+    account: {
+      id: account.id,
+      email: account.email
+    },
+    member: {
+      id: account.id,
+      displayName: account.displayName,
+      goalSummary: account.goalSummary,
+      calorieGoal: account.calorieGoal,
+      proteinGoalGrams: account.proteinGoalGrams,
+      carbGoalGrams: account.carbGoalGrams,
+      fatGoalGrams: account.fatGoalGrams
+    }
+  };
+};
 
 const loginSchema = z.object({
   email: z.string().email(),

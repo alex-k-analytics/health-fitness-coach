@@ -9,7 +9,7 @@ import {
   useRef,
   useState
 } from "react";
-import { ApiError, apiFetch } from "./api";
+import { ApiError, apiFetch, setAuthToken } from "./api";
 import { Card } from "./components/Card";
 import type {
   HealthMetric,
@@ -382,8 +382,10 @@ export function App() {
   async function loadSession() {
     try {
       const nextSession = await apiFetch<SessionData>("/auth/session");
+      setAuthToken(nextSession.token);
       setSession(nextSession);
     } catch (error) {
+      setAuthToken(null);
       setGlobalError(getApiErrorMessage(error));
       setSession({ authenticated: false });
     }
@@ -416,6 +418,7 @@ export function App() {
       });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        setAuthToken(null);
         setSession({ authenticated: false });
         return;
       }
@@ -437,6 +440,7 @@ export function App() {
         method: "POST",
         body: JSON.stringify(loginForm)
       });
+      setAuthToken(nextSession.token);
       setSession(nextSession);
       window.history.replaceState(null, "", DASHBOARD_PATH);
       setGlobalNotice("Signed in.");
@@ -450,6 +454,7 @@ export function App() {
   async function handleLogout() {
     try {
       await apiFetch<void>("/auth/logout", { method: "POST" });
+      setAuthToken(null);
       setSession({ authenticated: false });
       window.history.replaceState(null, "", LOGIN_PATH);
       setGlobalNotice("Signed out.");

@@ -1,5 +1,6 @@
 export interface SessionData {
   authenticated: boolean;
+  token?: string;
   account?: {
     id: string;
     email: string;

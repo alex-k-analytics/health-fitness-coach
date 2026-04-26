@@ -5,6 +5,12 @@ const parseNumber = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const parseCsv = (value: string | undefined) =>
+  value
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean) ?? [];
+
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   isProduction: (process.env.NODE_ENV ?? "development") === "production",
@@ -13,6 +19,7 @@ export const config = {
     process.env.FRONTEND_ORIGIN ??
     process.env.APP_BASE_URL ??
     ((process.env.NODE_ENV ?? "development") === "production" ? "" : "http://localhost:5173"),
+  nativeAppOrigins: parseCsv(process.env.NATIVE_APP_ORIGINS ?? "capacitor://localhost,ionic://localhost"),
   appBaseUrl:
     process.env.APP_BASE_URL ??
     process.env.FRONTEND_ORIGIN ??
