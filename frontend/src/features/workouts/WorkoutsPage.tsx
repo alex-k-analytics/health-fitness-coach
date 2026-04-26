@@ -1,12 +1,13 @@
-import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
+import { WorkoutCard } from "@/components/shared/WorkoutCard";
 import { useWorkoutsQuery } from "@/features/workouts/hooks";
 import { useWorkoutSessionsQuery } from "@/features/workouts/hooks";
 import { formatDate, formatDuration } from "@/lib/mealUtils";
+import { Dumbbell } from "lucide-react";
 
 export function WorkoutsPage() {
   const { data: workouts, isLoading: loadingWorkouts } = useWorkoutsQuery();
@@ -38,29 +39,14 @@ export function WorkoutsPage() {
             </div>
           ) : sessions?.sessions?.length === 0 ? (
             <div className="text-center py-10">
+              <Dumbbell className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
               <p className="text-muted-foreground">No workouts logged yet.</p>
               <WorkoutSessionModal trigger={<Button className="mt-4">Log your first workout</Button>} />
             </div>
           ) : (
             <div className="space-y-2">
               {(sessions?.sessions ?? []).map((s) => (
-                <Card key={s.id}>
-                  <CardContent className="flex items-start justify-between gap-3 pt-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">{s.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.activityType} · {formatDate(s.performedAt)}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-1.5">
-                        <Badge variant="secondary">{s.totalCalories ?? 0} cal</Badge>
-                        {s.durationSeconds != null && (
-                          <Badge variant="outline">{formatDuration(s.durationSeconds)}</Badge>
-                        )}
-                        <Badge variant="outline">{s.exercises?.length ?? 0} exercise{s.exercises?.length !== 1 ? "s" : ""}</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <WorkoutCard key={s.id} session={s} />
               ))}
             </div>
           )}
@@ -70,7 +56,7 @@ export function WorkoutsPage() {
       {workouts?.workouts && workouts.workouts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Workout entries</CardTitle>
+            <CardTitle>Quick entries</CardTitle>
             <CardDescription>
               {workouts.workouts.length} quick workout{workouts.workouts.length !== 1 ? "s" : ""}
             </CardDescription>

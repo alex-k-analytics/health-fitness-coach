@@ -1,11 +1,15 @@
 import { Outlet } from "@tanstack/react-router";
 import { DashboardHeader } from "./DashboardHeader";
+import { BottomNav } from "./BottomNav";
 
 export function ShellLayout() {
   return (
-    <main className="app-shell min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <DashboardHeader />
-      <Outlet />
-    </main>
+      <main className="flex-1 overflow-y-auto pb-20">
+        <Outlet />
+      </main>
+      <BottomNav />
+    </div>
   );
 }

@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
 import { getInitials } from "@/lib/mealUtils";
 import { ProfileDrawer } from "./ProfileDrawer";
-import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { WeightModal } from "./WeightModal";
+import { BottomNav } from "./BottomNav";
 
 export function DashboardHeader() {
   const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
@@ -12,26 +12,18 @@ export function DashboardHeader() {
   const memberInitials = getInitials(memberName);
 
   return (
-    <header className="max-w-6xl mx-auto w-full grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 items-end mb-3">
-      <div className="grid gap-0.5">
-        <p className="text-xs font-extrabold uppercase tracking-widest text-primary/80">Private account</p>
-        <Link to="/" className="hover:opacity-80">
-          <h1 className="text-2xl lg:text-3xl font-bold leading-tight tracking-tight">Dashboard</h1>
-        </Link>
-      </div>
-      <div className="flex items-center flex-wrap gap-2.5 self-end">
-        <Link to="/meals">
-          <Button size="sm">Log food</Button>
-        </Link>
-        <WeightModal trigger={<Button size="sm">Log weight</Button>} />
-        <WorkoutSessionModal trigger={<Button size="sm">Log workout</Button>} />
+    <header className="flex items-center justify-between px-4 py-3">
+      <Link to="/" className="hover:opacity-80">
+        <h1 className="text-xl font-bold tracking-tight">Health Coach</h1>
+      </Link>
+      <div className="flex items-center gap-2">
+        <WeightModal trigger={<Button variant="ghost" size="icon">
+          <span className="text-sm">⚖</span>
+        </Button>} />
         <ProfileDrawer>
-          <Button variant="outline" className="gap-2">
-            <span className="inline-flex items-center justify-center rounded-full w-7 h-7 text-xs font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <span className="inline-flex items-center justify-center rounded-full w-8 h-8 text-xs font-bold text-primary bg-primary/10">
               {memberInitials}
-            </span>
-            <span className="text-left hidden sm:grid">
-              <strong className="text-sm">{memberName}</strong>
             </span>
           </Button>
         </ProfileDrawer>

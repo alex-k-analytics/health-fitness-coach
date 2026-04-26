@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,16 @@ import { useExerciseListQuery, useCreateSessionMutation } from "@/features/worko
 import { computeSessionCalories, fuzzyMatch } from "@/calorieEngine";
 import { formatTimer } from "@/lib/mealUtils";
 
-const ACTIVITY_TYPES: WorkoutActivityType[] = [
-  "RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING",
-  "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"
+const ACTIVITY_TYPES: { value: WorkoutActivityType; label: string }[] = [
+  { value: "RUNNING", label: "Running" },
+  { value: "WALKING", label: "Walking" },
+  { value: "CYCLING", label: "Cycling" },
+  { value: "SWIMMING", label: "Swimming" },
+  { value: "ROWING", label: "Rowing" },
+  { value: "WEIGHTLIFTING", label: "Weights" },
+  { value: "CALISTHENICS", label: "Calisthenics" },
+  { value: "HIIT", label: "HIIT" },
+  { value: "OTHER", label: "Other" }
 ];
 const CARDIO_TYPES = new Set<WorkoutActivityType>([
   "RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "HIIT"
@@ -95,7 +102,8 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
 
   const onActivityTypeChange = (type: WorkoutActivityType) => {
     setActivityType(type);
-    setTitle(type.charAt(0) + type.slice(1).toLowerCase());
+    const label = ACTIVITY_TYPES.find((t) => t.value === type)?.label ?? type;
+    setTitle(label);
     setExercises([]); setElapsedSeconds(0); setTimerRunning(false);
   };
 
@@ -145,16 +153,16 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       <div className="grid gap-2">
         <Label>Activity type</Label>
         <div className="flex flex-wrap gap-2">
-          {ACTIVITY_TYPES.map((type) => (
-            <Button
-              key={type}
-              variant={activityType === type ? "default" : "outline"}
-              size="sm"
-              onClick={() => onActivityTypeChange(type)}
-            >
-              {type}
-            </Button>
-          ))}
+           {ACTIVITY_TYPES.map(({ value, label }) => (
+             <Button
+               key={value}
+               variant={activityType === value ? "default" : "outline"}
+               size="sm"
+               onClick={() => onActivityTypeChange(value)}
+             >
+               {label}
+             </Button>
+           ))}
         </div>
       </div>
       <div className="grid gap-2">
@@ -318,7 +326,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1">
             <span className="text-xs text-muted-foreground uppercase">Activity</span>
-            <Badge>{activityType}</Badge>
+            <Badge>{ACTIVITY_TYPES.find((t) => t.value === activityType)?.label ?? activityType}</Badge>
           </div>
           <div className="grid gap-1">
             <span className="text-xs text-muted-foreground uppercase">Duration</span>
@@ -392,11 +400,13 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         {step === "plan" && renderPlan()}
         {step === "active" && renderActive()}
         {step === "review" && renderReview()}
-        <DialogFooter>
-          <div className="flex gap-2">
-            <Badge variant="outline">Step {step === "plan" ? 1 : step === "active" ? 2 : 3}/3</Badge>
-          </div>
-        </DialogFooter>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className={step === "plan" ? "text-primary font-semibold" : ""}>Plan</span>
+          <span>→</span>
+          <span className={step === "active" ? "text-primary font-semibold" : ""}>Active</span>
+          <span>→</span>
+          <span className={step === "review" ? "text-primary font-semibold" : ""}>Review</span>
+        </div>
       </DialogContent>
     </Dialog>
   );

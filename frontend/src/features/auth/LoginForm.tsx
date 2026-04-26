@@ -23,10 +23,9 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Card className="w-full max-w-md mx-auto bg-white/97 backdrop-blur shadow-xl border-border">
       <CardContent className="pt-6">
-        <p className="text-xs font-extrabold uppercase tracking-widest text-primary/80">Private Access</p>
-        <h2 className="text-3xl font-bold mt-1.5 tracking-tight">Sign in</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Sign in</h2>
         <p className="text-sm text-muted-foreground mt-1.5 max-w-[34ch]">
-          Use the email and password you already created to enter your dashboard.
+          Use your email and password to enter your dashboard.
         </p>
 
         {loginMutation.error && (

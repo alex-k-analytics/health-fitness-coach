@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMealsQuery } from "@/features/meals/hooks";
-import { formatDateTime, formatMacroValue } from "@/lib/mealUtils";
 import { MealComposer } from "@/features/meals/MealComposer";
+import { MealCard } from "@/components/shared/MealCard";
+import { UtensilsCrossed } from "lucide-react";
 import type { Meal } from "@/types";
 
 export function MealsPage() {
@@ -36,39 +36,14 @@ export function MealsPage() {
             </div>
           ) : meals?.meals?.length === 0 ? (
             <div className="text-center py-10">
+              <UtensilsCrossed className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
               <p className="text-muted-foreground">No meals logged yet.</p>
               <MealComposer trigger={<Button className="mt-4">Log your first meal</Button>} />
             </div>
           ) : (
             <div className="space-y-2">
               {(meals?.meals ?? []).map((meal: Meal) => (
-                <Card key={meal.id}>
-                  <CardContent className="flex items-start justify-between gap-3 pt-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">{meal.title}</p>
-                      <p className="text-xs text-muted-foreground">{formatDateTime(meal.eatenAt)}</p>
-                      <div className="flex flex-wrap gap-2 mt-1.5">
-                        <Badge variant="secondary">{meal.estimatedCalories ?? 0} cal</Badge>
-                        <Badge variant="outline">P {formatMacroValue(meal.proteinGrams)}</Badge>
-                        <Badge variant="outline">C {formatMacroValue(meal.carbsGrams)}</Badge>
-                        <Badge variant="outline">F {formatMacroValue(meal.fatGrams)}</Badge>
-                      </div>
-                      <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                        {meal.servingDescription && <span>{meal.servingDescription}</span>}
-                        {meal.images && meal.images.length > 0 && (
-                          <span>{meal.images.length} photo{meal.images.length !== 1 ? "s" : ""}</span>
-                        )}
-                        {meal.analysisStatus && meal.analysisStatus !== "COMPLETED" && (
-                          <Badge variant="warning">{meal.analysisStatus}</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <MealComposer
-                      initialMeal={meal}
-                      trigger={<Button size="sm" variant="ghost" className="shrink-0">Edit</Button>}
-                    />
-                  </CardContent>
-                </Card>
+                <MealCard key={meal.id} meal={meal} />
               ))}
             </div>
           )}

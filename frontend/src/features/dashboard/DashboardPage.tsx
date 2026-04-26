@@ -1,5 +1,4 @@
-import { Link } from "@tanstack/react-router";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -11,6 +10,10 @@ import { useWorkoutSessionsQuery } from "@/features/workouts/hooks";
 import { formatDateTime, formatDate, formatWeight, formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
+import { MealCard } from "@/components/shared/MealCard";
+import { WorkoutCard } from "@/components/shared/WorkoutCard";
+import { UtensilsCrossed, Dumbbell, Flame, Scale } from "lucide-react";
+import type { Meal } from "@/types";
 
 export function DashboardPage() {
   const { data: nutritionSummary, isLoading: loadingNutrition } = useNutritionSummaryQuery();
@@ -26,8 +29,8 @@ export function DashboardPage() {
     !calorieGoal
       ? "Goal not set"
       : (todaySummary?.calories ?? 0) <= calorieGoal
-        ? `${calorieGoal - (todaySummary?.calories ?? 0)} kcal left`
-        : `${(todaySummary?.calories ?? 0) - calorieGoal} kcal over`;
+        ? `${calorieGoal - (todaySummary?.calories ?? 0)} cal left`
+        : `${(todaySummary?.calories ?? 0) - calorieGoal} cal over`;
   const calorieTrend = nutritionSummary?.dailyCalories ?? [];
   const weeklyAverage =
     calorieTrend.length > 0
@@ -51,97 +54,66 @@ export function DashboardPage() {
   const weightRange = maxWeight - minWeight;
 
   return (
-    <div className="px-4 py-4 max-w-6xl mx-auto space-y-4">
+    <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
 
-      {/* ── Daily Snapshot ── */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-widest text-primary/80">Today</p>
-              <h2 className="text-lg font-semibold leading-tight">Daily snapshot</h2>
+      {/* ── Stats Row ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          icon={Flame}
+          label="Consumed"
+          value={loadingNutrition ? "—" : `${todaySummary?.calories ?? 0}`}
+          unit="cal"
+          sub={calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}
+        />
+        <StatCard
+          icon={Dumbbell}
+          label="Workout burn"
+          value={loadingNutrition ? "—" : `${todaySummary?.caloriesBurned ?? 0}`}
+          unit="cal"
+          sub={baseCalorieGoal ? `${baseCalorieGoal} base goal` : "Log workouts to adjust"}
+        />
+        <StatCard
+          icon={UtensilsCrossed}
+          label="Remaining"
+          value={loadingNutrition ? "—" : (calorieGoal ? String(Math.max(0, calorieGoal - (todaySummary?.calories ?? 0))) : "—")}
+          unit="cal"
+          sub={calorieBalance}
+        />
+        <StatCard
+          icon={Scale}
+          label="Weight"
+          value={loadingMetrics ? "—" : (latestWeight ? formatWeight(latestWeight.weightKg) : "—")}
+          sub={latestWeight ? `${formatDate(latestWeight.recordedAt)}${weightDelta != null ? ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb` : ""}` : "Log to start"}
+        />
+      </div>
+
+      {/* ── Calorie Progress Bar ── */}
+      {!loadingNutrition && (
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">{calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}</span>
+              <span className="text-xs text-muted-foreground">{calorieBalance}</span>
             </div>
-            <Badge variant="outline">
-              {loadingNutrition
-                ? "Refreshing"
-                : `${todaySummary?.mealCount ?? 0} logged item${(todaySummary?.mealCount ?? 0) === 1 ? "" : "s"}`}
-            </Badge>
-          </div>
-
-          {loadingNutrition ? (
-            <div className="space-y-3">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <span className="text-xs text-muted-foreground">Calories consumed</span>
-                    <p className="text-xl font-bold">{todaySummary?.calories ?? 0}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {calorieGoal ? `${calorieProgress}% of goal` : "Goal not set"}
-                    </span>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <span className="text-xs text-muted-foreground">Workout burn</span>
-                    <p className="text-xl font-bold">{todaySummary?.caloriesBurned ?? 0}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {baseCalorieGoal && calorieGoal
-                        ? `${baseCalorieGoal} base + ${todaySummary?.caloriesBurned ?? 0} burned`
-                        : "Log workouts to adjust your goal"}
-                    </span>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <span className="text-xs text-muted-foreground">Remaining</span>
-                    <p className="text-xl font-bold">{calorieGoal ? Math.max(0, calorieGoal - (todaySummary?.calories ?? 0)) : "—"}</p>
-                    <span className="text-xs text-muted-foreground">{calorieBalance}</span>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <span className="text-xs text-muted-foreground">Latest weight</span>
-                    <p className="text-xl font-bold">{latestWeight ? formatWeight(latestWeight.weightKg) : "—"}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {latestWeight
-                        ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
-                        : "Log weight to start tracking"}
-                    </span>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="mt-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">
-                    {calorieGoal ? `${calorieProgress}% of adjusted goal` : "Goal not set"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{calorieBalance}</span>
-                </div>
-                <Progress value={calorieProgress} max={100} />
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            <Progress value={calorieProgress} max={100} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Trend Row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>7-day calorie trend</CardTitle>
-            <CardDescription>{weeklyAverage} cal per day average</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold">Calorie Trend</h3>
+                <p className="text-xs text-muted-foreground">{weeklyAverage} cal avg</p>
+              </div>
+            </div>
             {calorieTrend.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No data yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">No data yet.</p>
             ) : (
-              <div className="flex items-end gap-2 h-40">
+              <div className="flex items-end gap-2 h-32">
                 {calorieTrend.map((d) => {
                   const heightPercent = maxCalories > 0 ? (d.calories / maxCalories) * 100 : 0;
                   return (
@@ -162,15 +134,17 @@ export function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Weight trend</CardTitle>
-            <CardDescription>{latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries yet"}</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold">Weight Trend</h3>
+                <p className="text-xs text-muted-foreground">{latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries"}</p>
+              </div>
+            </div>
             {weightTrendPoints.length < 2 ? (
-              <p className="text-sm text-muted-foreground">Need at least 2 weight entries to show trend.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Need 2+ entries for trend.</p>
             ) : (
-              <svg viewBox={`0 0 ${weightTrendPoints.length * 60} 200`} className="w-full h-40">
+              <svg viewBox={`0 0 ${weightTrendPoints.length * 60} 200`} className="w-full h-32">
                 {(() => {
                   const points = weightTrendPoints.map((m, i) => ({
                     x: i * 60 + 30,
@@ -200,128 +174,95 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── Last 3 Logs ── */}
+      {/* ── Recent Meals ── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <div>
-            <CardTitle>Last 3 logs</CardTitle>
-            <CardDescription>Recent food, drink, and nutrition entries</CardDescription>
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold">Recent Meals</h3>
+              <p className="text-xs text-muted-foreground">
+                {loadingNutrition ? "..." : `${todaySummary?.mealCount ?? 0} today`}
+              </p>
+            </div>
+            <MealComposer trigger={<Button size="sm">+ Log</Button>} />
           </div>
-          <MealComposer trigger={<Button size="sm">+ Log food</Button>} />
-        </CardHeader>
-        <CardContent>
           {loadingMeals ? (
             <div className="space-y-3">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
           ) : meals?.meals?.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground mb-3">No logs yet.</p>
-              <MealComposer trigger={<Button>Log your first item</Button>} />
-            </div>
+            <EmptyState icon={UtensilsCrossed} message="No meals logged yet." action={<MealComposer trigger={<Button size="sm">Log your first meal</Button>} />} />
           ) : (
             <div className="space-y-2">
-              {(meals?.meals ?? []).map((meal) => (
-                <Card key={meal.id}>
-                  <CardContent className="flex items-start justify-between gap-3 pt-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-sm font-semibold truncate">{meal.title}</p>
-                        <span className="text-xs text-muted-foreground shrink-0">{formatDateTime(meal.eatenAt)}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs">
-                        <span className="font-medium">{meal.estimatedCalories ?? 0} cal</span>
-                        <span className="text-muted-foreground">
-                          P {formatMacroValue(meal.proteinGrams)} · C {formatMacroValue(meal.carbsGrams)} · F {formatMacroValue(meal.fatGrams)}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-1.5">
-                        <Badge variant="outline">P {formatMacroValue(meal.proteinGrams)}</Badge>
-                        <Badge variant="outline">C {formatMacroValue(meal.carbsGrams)}</Badge>
-                        <Badge variant="outline">F {formatMacroValue(meal.fatGrams)}</Badge>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        {meal.servingDescription && <span>{meal.servingDescription}</span>}
-                        {meal.images && meal.images.length > 0 && (
-                          <span>{meal.images.length} photo{meal.images.length !== 1 ? "s" : ""}</span>
-                        )}
-                        {meal.analysisStatus && meal.analysisStatus !== "COMPLETED" && (
-                          <Badge variant="warning">{meal.analysisStatus}</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <MealComposer
-                      initialMeal={meal}
-                      trigger={<Button size="sm" variant="ghost" className="shrink-0">Edit</Button>}
-                    />
-                  </CardContent>
-                </Card>
+              {(meals?.meals ?? []).map((meal: Meal) => (
+                <MealCard key={meal.id} meal={meal} />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* ── Last 3 Workouts ── */}
+      {/* ── Recent Workouts ── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <div>
-            <CardTitle>Last 3 workouts</CardTitle>
-            <CardDescription>Recent workout sessions</CardDescription>
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold">Recent Workouts</h3>
+            </div>
+            <WorkoutSessionModal trigger={<Button size="sm">+ Log</Button>} />
           </div>
-          <WorkoutSessionModal trigger={<Button size="sm">+ Log workout</Button>} />
-        </CardHeader>
-        <CardContent>
           {loadingSessions ? (
             <div className="space-y-3">
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
           ) : sessions?.sessions?.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground mb-3">No workouts logged yet.</p>
-              <WorkoutSessionModal trigger={<Button>Log your first workout</Button>} />
-            </div>
+            <EmptyState icon={Dumbbell} message="No workouts logged yet." action={<WorkoutSessionModal trigger={<Button size="sm">Log your first workout</Button>} />} />
           ) : (
             <div className="space-y-2">
               {(sessions?.sessions ?? []).map((session) => (
-                <Card key={session.id}>
-                  <CardContent className="flex items-start justify-between gap-3 pt-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-sm font-semibold truncate">{session.title}</p>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(session.performedAt))}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs">
-                        <span className="font-medium">{session.totalCalories ?? 0} cal</span>
-                        {session.exercises && session.exercises.length > 0 && (
-                          <span className="text-muted-foreground">
-                            {session.exercises
-                              .map((ex) => {
-                                if (ex.kind === "LIFT" && ex.sets) {
-                                  return `${ex.name} ${ex.sets.length}×${ex.sets[0]?.reps ?? "?"}`;
-                                }
-                                if (ex.durationSeconds) {
-                                  const mins = Math.round(ex.durationSeconds / 60);
-                                  return `${ex.name} ${mins} min`;
-                                }
-                                return ex.name;
-                              })
-                              .join(" · ")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <WorkoutCard key={session.id} session={session} />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, unit, sub }: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  unit?: string;
+  sub?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-4 flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Icon className="h-3.5 w-3.5" />
+          <span className="text-xs">{label}</span>
+        </div>
+        <p className="text-xl font-bold">{value}{unit ? ` ${unit}` : ""}</p>
+        {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: React.ElementType;
+  message: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="text-center py-8">
+      <Icon className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+      <p className="text-sm text-muted-foreground mb-3">{message}</p>
+      {action}
     </div>
   );
 }
