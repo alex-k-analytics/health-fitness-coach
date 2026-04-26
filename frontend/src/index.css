@@ -114,4 +114,70 @@
     padding: calc(14px + env(safe-area-inset-top)) 18px calc(42px + env(safe-area-inset-bottom));
     width: 100%;
   }
+
+  /* ── Global shadcn overrides ── */
+
+  /* Force all shadcn-bordered elements to use 1px border with our theme color */
+  [data-slot="card"] {
+    border-width: 1px !important;
+    border-color: hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.05) !important;
+  }
+
+  /* Drawer panel: thin border, our radius, no extra shadow */
+  [data-slot="drawer"] [data-slot="drawer-content"] {
+    border-width: 1px !important;
+    border-color: hsl(var(--border)) !important;
+    border-radius: 0 !important;
+    box-shadow: -4px 0 24px hsl(var(--foreground) / 0.1) !important;
+  }
+
+  /* Dialog panel: thin border, our radius */
+  [data-slot="dialog"] [data-slot="dialog-content"] {
+    border-width: 1px !important;
+    border-color: hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 4px 24px hsl(var(--foreground) / 0.1) !important;
+  }
+
+  /* Dialog/Drawer overlay: consistent backdrop */
+  [data-slot="dialog-overlay"],
+  [data-slot="drawer-overlay"] {
+    background-color: hsl(var(--foreground) / 0.4) !important;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Input fields: thin border, our radius */
+  [data-slot="input"] {
+    border-width: 1px !important;
+    border-color: hsl(var(--input)) !important;
+    border-radius: calc(var(--radius) - 2px) !important;
+  }
+
+  /* Buttons: our radius */
+  [data-slot="button"] {
+    border-radius: calc(var(--radius) - 2px) !important;
+  }
+
+  /* Badge: our radius */
+  [data-slot="badge"] {
+    border-width: 1px !important;
+  }
+
+  /* Alert: thin border, our radius */
+  [data-slot="alert"] {
+    border-width: 1px !important;
+    border-radius: var(--radius) !important;
+  }
+
+  /* Separator: our color */
+  [data-slot="separator"] {
+    background-color: hsl(var(--border)) !important;
+  }
+
+  /* Drawer grab handle: match theme */
+  [data-slot="drawer-content"] > div[data-vaul-drawer-direction] {
+    background-color: hsl(var(--muted) / 0.4) !important;
+  }
 }
