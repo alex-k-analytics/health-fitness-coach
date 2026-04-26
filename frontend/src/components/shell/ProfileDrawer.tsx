@@ -19,7 +19,7 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
-            <span className="inline-flex items-center justify-center rounded-full w-[52px] h-[52px] text-sm font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
+            <span className="inline-flex items-center justify-center rounded-full w-[52px] h-[52px] text-sm font-extrabold text-primary bg-primary/10">
               {memberInitials}
             </span>
             <div>

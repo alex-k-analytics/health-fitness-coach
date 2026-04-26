@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -170,23 +169,23 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
             {/* Title & basic info */}
             <div className="grid gap-2">
-              <Label>Title *</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Grilled chicken salad" />
+              <Label>What did you eat?</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Grilled chicken salad" required />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>When</Label>
+                <Label>Date & Time</Label>
                 <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label>Quantity</Label>
+                <Label>Servings</Label>
                 <Input type="number" min="0.1" step="0.1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label>Serving description</Label>
+              <Label>Serving Details</Label>
               <Input value={servingDescription} onChange={(e) => setServingDescription(e.target.value)} placeholder="e.g. 1 bowl, 2 slices" />
             </div>
 
@@ -204,7 +203,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
             <div className="flex items-center gap-2">
               <Checkbox id="saveAsReusable" checked={saveAsReusableFood} onCheckedChange={(v) => setSaveAsReusableFood(v === true)} />
-              <Label htmlFor="saveAsReusable" className="text-sm font-normal">Save as reusable food</Label>
+              <Label htmlFor="saveAsReusable" className="text-sm font-normal">Save as reusable food for next time</Label>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -220,21 +219,21 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
           <div className="grid gap-5">
             {/* Editable fields */}
             <div className="grid gap-2">
-              <Label>Title</Label>
+              <Label>What did you eat?</Label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>When</Label>
+                <Label>Date & Time</Label>
                 <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label>Quantity</Label>
+                <Label>Servings</Label>
                 <Input type="number" min="0.1" step="0.1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Serving description</Label>
+              <Label>Serving Details</Label>
               <Input value={servingDescription} onChange={(e) => setServingDescription(e.target.value)} placeholder="e.g. 1 bowl" />
             </div>
 
@@ -245,7 +244,9 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
               <CardContent className="pt-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold">Estimated Nutrition</span>
-                  <Badge variant={displayedEstimate.status === "COMPLETED" ? "success" : "warning"}>{displayedEstimate.status}</Badge>
+                  <Badge variant={displayedEstimate.status === "COMPLETED" ? "success" : "warning"}>
+                    {displayedEstimate.status === "COMPLETED" ? "Complete" : displayedEstimate.status === "PENDING" ? "Pending" : displayedEstimate.status}
+                  </Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="text-center p-3 bg-secondary/50 rounded-lg">

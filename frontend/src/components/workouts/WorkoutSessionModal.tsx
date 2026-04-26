@@ -151,7 +151,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
   const renderPlan = () => (
     <div className="grid gap-4">
       <div className="grid gap-2">
-        <Label>Activity type</Label>
+        <Label>Activity Type</Label>
         <div className="flex flex-wrap gap-2">
            {ACTIVITY_TYPES.map(({ value, label }) => (
              <Button
@@ -171,7 +171,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       </div>
 
       <div className="grid gap-2">
-        <Label>Add exercise</Label>
+        <Label>Add Exercise</Label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -208,7 +208,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
                 <div className="flex items-center justify-between">
                   <div>
                     <strong className="text-sm">{ex.name}</strong>
-                    <Badge variant="outline" className="ml-2">{ex.kind}</Badge>
+                    <Badge variant="outline" className="ml-2">{ex.kind === "LIFT" ? "Strength" : ex.kind === "CARDIO" ? "Cardio" : ex.kind}</Badge>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => removeExercise(ex.id ?? "")} disabled={!ex.id}>
                     <Trash2 className="h-4 w-4" />
@@ -282,7 +282,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" id="manualTime" checked={useManualTime} onChange={(e) => setUseManualTime(e.target.checked)} />
-        <Label htmlFor="manualTime" className="text-sm font-normal">Use manual time</Label>
+        <Label htmlFor="manualTime" className="text-sm font-normal">Use Manual Time</Label>
       </div>
       {useManualTime && (
         <div className="flex gap-3">
@@ -298,7 +298,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       )}
       <Separator />
       <div className="grid gap-2">
-        <Label>Exercises</Label>
+        <Label>Planned Exercises</Label>
         {exercises.map((ex) => (
           <div key={ex.id} className="flex items-center gap-2 text-sm">
             <Check className="h-4 w-4 text-muted-foreground" />
@@ -325,21 +325,21 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       <div className="grid gap-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground uppercase">Activity</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activity</span>
             <Badge>{ACTIVITY_TYPES.find((t) => t.value === activityType)?.label ?? activityType}</Badge>
           </div>
           <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground uppercase">Duration</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duration</span>
             <span className="text-sm font-semibold">{durationDisplay}</span>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground uppercase">Total calories</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Calories</span>
             <span className="text-lg font-bold">{result.total} cal</span>
           </div>
           <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground uppercase">Exercises</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exercises</span>
             <span className="text-sm font-semibold">{exercises.length} exercise{exercises.length !== 1 ? "s" : ""}</span>
           </div>
         </div>
@@ -351,7 +351,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         ))}
         <Separator />
         <div className="grid gap-2">
-          <Label>Exercise details</Label>
+          <Label>Exercise Details</Label>
           {exercises.map((ex) => {
             const exCals = computeSessionCalories([ex], 70).total;
             return (

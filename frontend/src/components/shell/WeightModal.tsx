@@ -28,11 +28,11 @@ export function WeightModal({ trigger }: { trigger?: React.ReactNode }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger || <Button>Log weight</Button>}
+          {trigger || <Button>Log Weight</Button>}
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Log weight</DialogTitle>
+          <DialogTitle>Log Weight</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">

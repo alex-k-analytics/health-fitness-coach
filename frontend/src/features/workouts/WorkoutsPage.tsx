@@ -25,7 +25,7 @@ export function WorkoutsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Workout sessions</CardTitle>
+          <CardTitle>Workout Sessions</CardTitle>
           <CardDescription>
             {sessions?.sessions?.length ?? 0} completed session{sessions?.sessions?.length !== 1 ? "s" : ""}
           </CardDescription>
@@ -56,10 +56,10 @@ export function WorkoutsPage() {
       {workouts?.workouts && workouts.workouts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Quick entries</CardTitle>
-            <CardDescription>
-              {workouts.workouts.length} quick workout{workouts.workouts.length !== 1 ? "s" : ""}
-            </CardDescription>
+          <CardTitle>Quick Entries</CardTitle>
+          <CardDescription>
+            {workouts.workouts.length} quick workout{workouts.workouts.length !== 1 ? "s" : ""}
+          </CardDescription>
           </CardHeader>
           <CardContent>
             {loadingWorkouts ? (

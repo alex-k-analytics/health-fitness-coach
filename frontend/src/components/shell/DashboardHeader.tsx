@@ -4,7 +4,8 @@ import { useShellStore } from "@/stores/shellStore";
 import { getInitials } from "@/lib/mealUtils";
 import { ProfileDrawer } from "./ProfileDrawer";
 import { WeightModal } from "./WeightModal";
-import { BottomNav } from "./BottomNav";
+import { Scale } from "lucide-react";
+
 
 export function DashboardHeader() {
   const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
@@ -18,7 +19,7 @@ export function DashboardHeader() {
       </Link>
       <div className="flex items-center gap-2">
         <WeightModal trigger={<Button variant="ghost" size="icon">
-          <span className="text-sm">⚖</span>
+          <Scale className="h-4 w-4" />
         </Button>} />
         <ProfileDrawer>
           <Button variant="ghost" size="icon" className="rounded-full">

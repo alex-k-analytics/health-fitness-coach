@@ -14,7 +14,7 @@ export function MealsPage() {
     <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Meal Log</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Meals</h1>
           <p className="text-sm text-muted-foreground">Your recent meals and nutrition entries.</p>
         </div>
         <MealComposer />
@@ -22,7 +22,7 @@ export function MealsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent meals</CardTitle>
+          <CardTitle>Recent Meals</CardTitle>
           <CardDescription>
             {meals?.meals?.length ?? 0} meal{meals?.meals?.length !== 1 ? "s" : ""}
           </CardDescription>
