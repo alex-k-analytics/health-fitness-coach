@@ -383,7 +383,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       <DialogTrigger asChild>
         {trigger || <Button>Log Workout</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
             {step === "plan" ? "Plan Workout" : step === "active" ? "Active Workout" : "Review Workout"}
