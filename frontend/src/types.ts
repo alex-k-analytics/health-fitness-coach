@@ -108,6 +108,67 @@ export interface Workout {
   updatedAt: string;
 }
 
+export type WorkoutActivityType =
+  | "RUNNING"
+  | "WALKING"
+  | "CYCLING"
+  | "SWIMMING"
+  | "ROWING"
+  | "WEIGHTLIFTING"
+  | "CALISTHENICS"
+  | "HIIT"
+  | "OTHER";
+
+export type WorkoutSessionStatus = "PLANNING" | "RUNNING" | "COMPLETED";
+
+export type WorkoutExerciseKind = "LIFT" | "CARDIO";
+
+export interface WorkoutSet {
+  reps: number;
+  weightLbs: number;
+}
+
+export interface WorkoutExercise {
+  id?: string;
+  name: string;
+  kind: WorkoutExerciseKind;
+  category: WorkoutActivityType;
+  sets?: WorkoutSet[];
+  distance?: number;
+  distanceUnit?: string;
+  durationSeconds?: number;
+  caloriesBurned?: number;
+  order?: number;
+}
+
+export interface WorkoutSession {
+  id: string;
+  title: string;
+  activityType: WorkoutActivityType;
+  status: WorkoutSessionStatus;
+  startTime?: string;
+  endTime?: string;
+  durationSeconds?: number;
+  totalCalories?: number;
+  categoryCalories?: Record<string, number>;
+  performedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  exercises: WorkoutExercise[];
+}
+
+export interface WorkoutSessionDraft {
+  activityType: WorkoutActivityType;
+  title: string;
+  exercises: WorkoutExercise[];
+  elapsedSeconds: number;
+  status: WorkoutSessionStatus;
+  manualMinutes?: string;
+  manualSeconds?: string;
+  hasUsedTimer: boolean;
+  step: "plan" | "active" | "review";
+}
+
 export interface SavedFood {
   id: string;
   name: string;

@@ -1,6 +1,21 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react()]
+  plugins: [react(), TanStackRouterVite(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": "/src"
+    }
+  },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true
+      }
+    }
+  }
 });

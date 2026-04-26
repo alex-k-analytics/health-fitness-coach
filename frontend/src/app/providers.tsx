@@ -1,9 +1,6 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { createRouter } from "./app/router";
-import "./index.css";
+import { createRouter } from "./router";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,10 +14,12 @@ const queryClient = new QueryClient({
 
 const router = createRouter();
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+export function AppProviders({ children }: { children?: React.ReactNode }) {
+  return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      {children}
     </QueryClientProvider>
-  </React.StrictMode>
-);
+  );
+}
+
+export { queryClient, router, RouterProvider };

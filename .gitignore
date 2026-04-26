@@ -8,3 +8,5 @@ backend/uploads/
 *.tfstate
 *.tfstate.*
 gha-creds-*.json
+.opencode/
+
