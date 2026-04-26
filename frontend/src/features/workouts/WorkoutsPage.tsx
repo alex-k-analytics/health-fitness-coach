@@ -42,25 +42,24 @@ export function WorkoutsPage() {
               <WorkoutSessionModal trigger={<Button className="mt-4">Log your first workout</Button>} />
             </div>
           ) : (
-            <div className="space-y-3">
-              {(sessions?.sessions ?? []).map((s) => (
-                <div key={s.id} className="flex items-start justify-between gap-3 py-3 border-b last:border-0">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.activityType} · {formatDate(s.performedAt)}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-1.5">
-                      <Badge variant="secondary">{s.totalCalories ?? 0} cal</Badge>
-                      {s.durationSeconds != null && (
-                        <Badge variant="outline">{formatDuration(s.durationSeconds)}</Badge>
-                      )}
-                      <Badge variant="outline">{s.exercises?.length ?? 0} exercise{s.exercises?.length !== 1 ? "s" : ""}</Badge>
+            <div className="space-y-2">
+                {(sessions?.sessions ?? []).map((s) => (
+                  <div key={s.id} className="rounded-lg border border-border bg-card p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold truncate">{s.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.activityType} · {formatDate(s.performedAt)}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        <Badge variant="secondary">{s.totalCalories ?? 0} cal</Badge>
+                        {s.durationSeconds != null && (
+                          <Badge variant="outline">{formatDuration(s.durationSeconds)}</Badge>
+                        )}
+                        <Badge variant="outline">{s.exercises?.length ?? 0} exercise{s.exercises?.length !== 1 ? "s" : ""}</Badge>
+                      </div>
                     </div>
                   </div>
-                   <Button size="sm" variant="ghost" disabled className="shrink-0">View</Button>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>

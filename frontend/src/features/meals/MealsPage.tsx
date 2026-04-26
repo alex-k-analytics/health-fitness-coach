@@ -40,9 +40,9 @@ export function MealsPage() {
               <MealComposer trigger={<Button className="mt-4">Log your first meal</Button>} />
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {(meals?.meals ?? []).map((meal: Meal) => (
-                <div key={meal.id} className="flex items-start justify-between gap-3 py-3 border-b last:border-0">
+                <div key={meal.id} className="rounded-lg border border-border bg-card p-3 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold truncate">{meal.title}</p>
                     <p className="text-xs text-muted-foreground">{formatDateTime(meal.eatenAt)}</p>
