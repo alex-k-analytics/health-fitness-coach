@@ -34,8 +34,8 @@ export function DashboardHeader() {
         </Link>
         <DropdownMenu open={profileDrawerOpen} onOpenChange={setProfileDrawerOpen}>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2 px-2 min-h-[42px]">
-              <span className="inline-flex items-center justify-center rounded-full w-9 h-9 text-xs font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
+            <Button variant="outline" className="gap-2">
+              <span className="inline-flex items-center justify-center rounded-full w-7 h-7 text-xs font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
                 {memberInitials}
               </span>
               <span className="text-left hidden sm:grid">

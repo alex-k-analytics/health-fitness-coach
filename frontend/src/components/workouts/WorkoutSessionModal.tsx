@@ -146,14 +146,14 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <Label>Activity type</Label>
         <div className="flex flex-wrap gap-2">
           {ACTIVITY_TYPES.map((type) => (
-            <Badge
+            <Button
               key={type}
               variant={activityType === type ? "default" : "outline"}
-              className="cursor-pointer px-3 py-1 text-xs font-semibold"
+              size="sm"
               onClick={() => onActivityTypeChange(type)}
             >
               {type}
-            </Badge>
+            </Button>
           ))}
         </div>
       </div>
@@ -178,13 +178,15 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         {searchResults.length > 0 && (
           <div className="max-h-40 overflow-y-auto border rounded-md bg-background">
             {searchResults.map((name) => (
-              <button
+              <Button
                 key={name}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start"
                 onClick={() => addExercise(name)}
               >
                 {name}
-              </button>
+              </Button>
             ))}
           </div>
         )}

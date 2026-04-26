@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
 import { getInitials } from "@/lib/mealUtils";
 import { ProfileForm } from "@/features/settings/ProfileForm";
@@ -26,13 +27,14 @@ export function ProfileDrawer() {
         </DialogHeader>
         <ProfileForm />
         <div className="mt-4 pt-4 border-t">
-          <button
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={() => logout.mutate()}
-            className="text-sm text-destructive font-semibold hover:underline"
             disabled={logout.isPending}
           >
             {logout.isPending ? "Signing out..." : "Sign out"}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
