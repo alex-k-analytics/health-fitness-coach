@@ -184,7 +184,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
           </div>
         </div>
         {searchResults.length > 0 && (
-          <div className="max-h-40 overflow-y-auto border rounded-md bg-background">
+          <Card className="max-h-40 overflow-y-auto">
             {searchResults.map((name) => (
               <Button
                 key={name}
@@ -196,7 +196,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
                 {name}
               </Button>
             ))}
-          </div>
+          </Card>
         )}
       </div>
 
@@ -355,8 +355,9 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
           {exercises.map((ex) => {
             const exCals = computeSessionCalories([ex], 70).total;
             return (
-              <div key={ex.id} className="border rounded-md p-3 grid gap-2">
-                <div className="flex justify-between">
+              <Card key={ex.id} className="p-3">
+                <CardContent className="p-0 grid gap-2">
+                  <div className="flex justify-between">
                   <strong className="text-sm">{ex.name}</strong>
                   <span className="text-xs text-muted-foreground">{exCals} cal</span>
                 </div>
@@ -371,9 +372,10 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
                     {(ex.durationSeconds ?? 0) / 60} min, {ex.distance ?? 0} mi
                   </div>
                 )}
-              </div>
-            );
-          })}
+              </CardContent>
+            </Card>
+          );
+        })}
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={handleEdit}>Edit</Button>

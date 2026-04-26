@@ -13,7 +13,7 @@ export function BottomNav() {
   const { pathname } = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t z-50">
       <div className="max-w-6xl mx-auto flex">
         {TABS.map(({ path, label, icon: Icon }) => {
           const isActive = path === "/" ? (pathname === "/" || pathname === "") : pathname === path;

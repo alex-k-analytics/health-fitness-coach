@@ -115,17 +115,53 @@
     width: 100%;
   }
 
-  /* ── Global shadcn overrides ── */
+  /* ── Global shadcn theme overrides ──
+     Every shadcn component with a data-slot inherits these.
+     New components from `shadcn add` will auto-inherit these
+     as long as they carry a data-slot attribute. ── */
 
-  /* Force all shadcn-bordered elements to use 1px border with our theme color */
-  [data-slot="card"] {
+  /* All bordered shadcn components: 1px, our border color, our radius */
+  [data-slot="card"],
+  [data-slot="alert"],
+  [data-slot="badge"],
+  [data-slot="dialog-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="checkbox"] {
     border-width: 1px !important;
     border-color: hsl(var(--border)) !important;
+    border-radius: calc(var(--radius) - 2px) !important;
+  }
+
+  /* Card & alert keep the full radius (not reduced) */
+  [data-slot="card"],
+  [data-slot="alert"] {
     border-radius: var(--radius) !important;
+  }
+
+  /* Subtle shadow on elevated surfaces */
+  [data-slot="card"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"] {
     box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.05) !important;
   }
 
-  /* Drawer panel: thin border, our radius, no extra shadow */
+  /* Dialog panel: deeper shadow */
+  [data-slot="dialog-content"] {
+    border-radius: var(--radius) !important;
+    box-shadow: 0 4px 24px hsl(var(--foreground) / 0.1) !important;
+  }
+
+  /* Dialog/Drawer overlay: consistent backdrop blur */
+  [data-slot="dialog-overlay"],
+  [data-slot="drawer-overlay"] {
+    background-color: hsl(var(--foreground) / 0.35) !important;
+    backdrop-filter: blur(3px);
+  }
+
+  /* Drawer panel: no radius on open edge, subtle shadow */
   [data-slot="drawer"] [data-slot="drawer-content"] {
     border-width: 1px !important;
     border-color: hsl(var(--border)) !important;
@@ -133,42 +169,9 @@
     box-shadow: -4px 0 24px hsl(var(--foreground) / 0.1) !important;
   }
 
-  /* Dialog panel: thin border, our radius */
-  [data-slot="dialog"] [data-slot="dialog-content"] {
-    border-width: 1px !important;
-    border-color: hsl(var(--border)) !important;
-    border-radius: var(--radius) !important;
-    box-shadow: 0 4px 24px hsl(var(--foreground) / 0.1) !important;
-  }
-
-  /* Dialog/Drawer overlay: consistent backdrop */
-  [data-slot="dialog-overlay"],
-  [data-slot="drawer-overlay"] {
-    background-color: hsl(var(--foreground) / 0.4) !important;
-    backdrop-filter: blur(2px);
-  }
-
-  /* Input fields: thin border, our radius */
-  [data-slot="input"] {
-    border-width: 1px !important;
-    border-color: hsl(var(--input)) !important;
-    border-radius: calc(var(--radius) - 2px) !important;
-  }
-
-  /* Buttons: our radius */
+  /* Button: our radius */
   [data-slot="button"] {
     border-radius: calc(var(--radius) - 2px) !important;
-  }
-
-  /* Badge: our radius */
-  [data-slot="badge"] {
-    border-width: 1px !important;
-  }
-
-  /* Alert: thin border, our radius */
-  [data-slot="alert"] {
-    border-width: 1px !important;
-    border-radius: var(--radius) !important;
   }
 
   /* Separator: our color */
@@ -176,8 +179,15 @@
     background-color: hsl(var(--border)) !important;
   }
 
-  /* Drawer grab handle: match theme */
+  /* Drawer grab handle: match theme muted */
   [data-slot="drawer-content"] > div[data-vaul-drawer-direction] {
     background-color: hsl(var(--muted) / 0.4) !important;
+  }
+
+  /* Raw HTML select (used in ProfileForm) */
+  select {
+    border-width: 1px !important;
+    border-color: hsl(var(--input)) !important;
+    border-radius: calc(var(--radius) - 2px) !important;
   }
 }

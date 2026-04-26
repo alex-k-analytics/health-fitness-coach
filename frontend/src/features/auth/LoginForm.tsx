@@ -21,7 +21,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-white/97 backdrop-blur shadow-xl border-border">
+    <Card className="w-full max-w-md mx-auto">
       <CardContent className="pt-6">
         <h2 className="text-3xl font-bold tracking-tight">Sign in</h2>
         <p className="text-sm text-muted-foreground mt-1.5 max-w-[34ch]">
