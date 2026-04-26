@@ -1471,7 +1471,7 @@ img {
   }
 
   .app-shell {
-    padding: calc(16px + env(safe-area-inset-top)) 14px calc(92px + env(safe-area-inset-bottom));
+    padding: calc(28px + env(safe-area-inset-top)) 14px calc(92px + env(safe-area-inset-bottom));
   }
 
   .card,
@@ -1619,7 +1619,9 @@ img {
   }
 
   .meal-log-row {
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: start;
   }
 
   .meal-log-title strong {
@@ -1627,12 +1629,31 @@ img {
   }
 
   .meal-calories {
+    grid-column: 2;
+    grid-row: 1;
     justify-self: end;
+    align-self: start;
+  }
+
+  .meal-log-title,
+  .meal-log-macros,
+  .meal-log-meta {
+    grid-column: 1;
+  }
+
+  .meal-log-macros {
+    margin-top: 8px;
+  }
+
+  .meal-log-actions {
+    grid-column: 2;
+    grid-row: 3 / 5;
+    align-self: end;
   }
 
   .inline-action-button {
-    min-height: 36px;
-    padding: 6px 10px;
+    min-height: 34px;
+    padding: 6px 12px;
     border-radius: 8px;
     background: #eef4ff;
   }
