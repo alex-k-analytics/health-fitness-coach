@@ -4,14 +4,7 @@ import { useShellStore } from "@/stores/shellStore";
 import { getInitials } from "@/lib/mealUtils";
 import { ProfileDrawer } from "./ProfileDrawer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+import { WeightModal } from "./WeightModal";
 
 export function DashboardHeader() {
   const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
@@ -30,29 +23,18 @@ export function DashboardHeader() {
         <Link to="/meals">
           <Button size="sm">Log food</Button>
         </Link>
+        <WeightModal trigger={<Button size="sm">Log weight</Button>} />
         <WorkoutSessionModal trigger={<Button size="sm">Log workout</Button>} />
-        <Link to="/settings">
-          <Button variant="secondary" size="sm">Profile</Button>
-        </Link>
-        <DropdownMenu open={profileDrawerOpen} onOpenChange={setProfileDrawerOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <span className="inline-flex items-center justify-center rounded-full w-7 h-7 text-xs font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
-                {memberInitials}
-              </span>
-              <span className="text-left hidden sm:grid">
-                <strong className="text-sm">{memberName}</strong>
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{memberName}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/settings">Settings</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProfileDrawer>
+          <Button variant="outline" className="gap-2">
+            <span className="inline-flex items-center justify-center rounded-full w-7 h-7 text-xs font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
+              {memberInitials}
+            </span>
+            <span className="text-left hidden sm:grid">
+              <strong className="text-sm">{memberName}</strong>
+            </span>
+          </Button>
+        </ProfileDrawer>
       </div>
     </header>
   );

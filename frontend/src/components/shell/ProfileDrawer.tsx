@@ -5,7 +5,7 @@ import { getInitials } from "@/lib/mealUtils";
 import { ProfileForm } from "@/features/settings/ProfileForm";
 import { useLogoutMutation } from "@/features/auth/hooks";
 
-export function ProfileDrawer() {
+export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
   const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
   const logout = useLogoutMutation();
   const memberName = session?.member?.displayName ?? "User";
@@ -13,7 +13,9 @@ export function ProfileDrawer() {
 
   return (
     <Dialog open={profileDrawerOpen} onOpenChange={setProfileDrawerOpen}>
-      <DialogTrigger asChild />
+      <DialogTrigger asChild>
+        {children}
+      </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
