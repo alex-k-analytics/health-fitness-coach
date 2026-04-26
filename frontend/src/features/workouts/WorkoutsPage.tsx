@@ -43,8 +43,9 @@ export function WorkoutsPage() {
             </div>
           ) : (
             <div className="space-y-2">
-                {(sessions?.sessions ?? []).map((s) => (
-                  <div key={s.id} className="rounded-lg border border-border bg-card p-3 flex items-start justify-between gap-3">
+              {(sessions?.sessions ?? []).map((s) => (
+                <Card key={s.id}>
+                  <CardContent className="flex items-start justify-between gap-3 pt-4">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold truncate">{s.title}</p>
                       <p className="text-xs text-muted-foreground">
@@ -58,8 +59,9 @@ export function WorkoutsPage() {
                         <Badge variant="outline">{s.exercises?.length ?? 0} exercise{s.exercises?.length !== 1 ? "s" : ""}</Badge>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
@@ -80,17 +82,19 @@ export function WorkoutsPage() {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : (
-              <div className="space-y-3">
-                {workouts.workouts.map((w) => (
-                  <div key={w.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div>
-                      <p className="text-sm font-semibold">{w.title}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(w.performedAt)}</p>
-                    </div>
-                    <Badge variant="secondary">{w.caloriesBurned} cal</Badge>
-                  </div>
-                ))}
-              </div>
+                <div className="space-y-2">
+                  {workouts.workouts.map((w) => (
+                    <Card key={w.id}>
+                      <CardContent className="flex items-center justify-between py-3">
+                        <div>
+                          <p className="text-sm font-semibold">{w.title}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(w.performedAt)}</p>
+                        </div>
+                        <Badge variant="secondary">{w.caloriesBurned} cal</Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
             )}
           </CardContent>
         </Card>

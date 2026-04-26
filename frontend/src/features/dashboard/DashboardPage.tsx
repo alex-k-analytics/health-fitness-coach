@@ -76,36 +76,44 @@ export function DashboardPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="rounded-lg border border-border p-4">
-                  <span className="text-xs text-muted-foreground">Calories consumed</span>
-                  <p className="text-xl font-bold">{todaySummary?.calories ?? 0}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {calorieGoal ? `${calorieProgress}% of goal` : "Goal not set"}
-                  </span>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <span className="text-xs text-muted-foreground">Workout burn</span>
-                  <p className="text-xl font-bold">{todaySummary?.caloriesBurned ?? 0}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {baseCalorieGoal && calorieGoal
-                      ? `${baseCalorieGoal} base + ${todaySummary?.caloriesBurned ?? 0} burned`
-                      : "Log workouts to adjust your goal"}
-                  </span>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <span className="text-xs text-muted-foreground">Remaining</span>
-                  <p className="text-xl font-bold">{calorieGoal ? Math.max(0, calorieGoal - (todaySummary?.calories ?? 0)) : "—"}</p>
-                  <span className="text-xs text-muted-foreground">{calorieBalance}</span>
-                </div>
-                <div className="rounded-lg border border-border p-4">
-                  <span className="text-xs text-muted-foreground">Latest weight</span>
-                  <p className="text-xl font-bold">{latestWeight ? formatWeight(latestWeight.weightKg) : "—"}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {latestWeight
-                      ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
-                      : "Log weight to start tracking"}
-                  </span>
-                </div>
+                <Card>
+                  <CardContent className="pt-4">
+                    <span className="text-xs text-muted-foreground">Calories consumed</span>
+                    <p className="text-xl font-bold">{todaySummary?.calories ?? 0}</p>
+                    <span className="text-xs text-muted-foreground">
+                      {calorieGoal ? `${calorieProgress}% of goal` : "Goal not set"}
+                    </span>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <span className="text-xs text-muted-foreground">Workout burn</span>
+                    <p className="text-xl font-bold">{todaySummary?.caloriesBurned ?? 0}</p>
+                    <span className="text-xs text-muted-foreground">
+                      {baseCalorieGoal && calorieGoal
+                        ? `${baseCalorieGoal} base + ${todaySummary?.caloriesBurned ?? 0} burned`
+                        : "Log workouts to adjust your goal"}
+                    </span>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <span className="text-xs text-muted-foreground">Remaining</span>
+                    <p className="text-xl font-bold">{calorieGoal ? Math.max(0, calorieGoal - (todaySummary?.calories ?? 0)) : "—"}</p>
+                    <span className="text-xs text-muted-foreground">{calorieBalance}</span>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <span className="text-xs text-muted-foreground">Latest weight</span>
+                    <p className="text-xl font-bold">{latestWeight ? formatWeight(latestWeight.weightKg) : "—"}</p>
+                    <span className="text-xs text-muted-foreground">
+                      {latestWeight
+                        ? `${formatDate(latestWeight.recordedAt)}${weightDelta === null ? "" : ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb vs prior`}`
+                        : "Log weight to start tracking"}
+                    </span>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className="mt-5">
@@ -215,8 +223,8 @@ export function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {(meals?.meals ?? []).map((meal) => (
-                <article key={meal.id} className="rounded-lg border border-border bg-card p-3">
-                  <div className="flex items-start justify-between gap-3">
+                <Card key={meal.id}>
+                  <CardContent className="flex items-start justify-between gap-3 pt-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
                         <p className="text-sm font-semibold truncate">{meal.title}</p>
@@ -247,8 +255,8 @@ export function DashboardPage() {
                       initialMeal={meal}
                       trigger={<Button size="sm" variant="ghost" className="shrink-0">Edit</Button>}
                     />
-                  </div>
-                </article>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
@@ -278,8 +286,8 @@ export function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {(sessions?.sessions ?? []).map((session) => (
-                <article key={session.id} className="rounded-lg border border-border bg-card p-3">
-                  <div className="flex items-start justify-between gap-3">
+                <Card key={session.id}>
+                  <CardContent className="flex items-start justify-between gap-3 pt-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
                         <p className="text-sm font-semibold truncate">{session.title}</p>
@@ -307,8 +315,8 @@ export function DashboardPage() {
                         )}
                       </div>
                     </div>
-                  </div>
-                </article>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}

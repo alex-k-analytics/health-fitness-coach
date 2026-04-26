@@ -42,31 +42,33 @@ export function MealsPage() {
           ) : (
             <div className="space-y-2">
               {(meals?.meals ?? []).map((meal: Meal) => (
-                <div key={meal.id} className="rounded-lg border border-border bg-card p-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{meal.title}</p>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(meal.eatenAt)}</p>
-                    <div className="flex flex-wrap gap-2 mt-1.5">
-                      <Badge variant="secondary">{meal.estimatedCalories ?? 0} cal</Badge>
-                      <Badge variant="outline">P {formatMacroValue(meal.proteinGrams)}</Badge>
-                      <Badge variant="outline">C {formatMacroValue(meal.carbsGrams)}</Badge>
-                      <Badge variant="outline">F {formatMacroValue(meal.fatGrams)}</Badge>
+                <Card key={meal.id}>
+                  <CardContent className="flex items-start justify-between gap-3 pt-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold truncate">{meal.title}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateTime(meal.eatenAt)}</p>
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        <Badge variant="secondary">{meal.estimatedCalories ?? 0} cal</Badge>
+                        <Badge variant="outline">P {formatMacroValue(meal.proteinGrams)}</Badge>
+                        <Badge variant="outline">C {formatMacroValue(meal.carbsGrams)}</Badge>
+                        <Badge variant="outline">F {formatMacroValue(meal.fatGrams)}</Badge>
+                      </div>
+                      <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                        {meal.servingDescription && <span>{meal.servingDescription}</span>}
+                        {meal.images && meal.images.length > 0 && (
+                          <span>{meal.images.length} photo{meal.images.length !== 1 ? "s" : ""}</span>
+                        )}
+                        {meal.analysisStatus && meal.analysisStatus !== "COMPLETED" && (
+                          <Badge variant="warning">{meal.analysisStatus}</Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                      {meal.servingDescription && <span>{meal.servingDescription}</span>}
-                      {meal.images && meal.images.length > 0 && (
-                        <span>{meal.images.length} photo{meal.images.length !== 1 ? "s" : ""}</span>
-                      )}
-                      {meal.analysisStatus && meal.analysisStatus !== "COMPLETED" && (
-                        <Badge variant="warning">{meal.analysisStatus}</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <MealComposer
-                    initialMeal={meal}
-                    trigger={<Button size="sm" variant="ghost" className="shrink-0">Edit</Button>}
-                  />
-                </div>
+                    <MealComposer
+                      initialMeal={meal}
+                      trigger={<Button size="sm" variant="ghost" className="shrink-0">Edit</Button>}
+                    />
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
