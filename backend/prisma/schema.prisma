@@ -21,8 +21,8 @@ enum MealImageKind {
 }
 
 model Account {
-  id               String         @id @default(cuid())
-  email            String         @unique
+  id               String            @id @default(cuid())
+  email            String            @unique
   passwordHash     String
   displayName      String
   goalSummary      String?
@@ -37,8 +37,10 @@ model Account {
   savedFoods       SavedFood[]
   meals            MealEntry[]
   workouts         WorkoutEntry[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  workoutSessions  WorkoutSession[]
+  workoutExercises WorkoutExercise[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model HealthMetric {
@@ -142,4 +144,68 @@ model WorkoutEntry {
   updatedAt      DateTime @updatedAt
 
   @@index([accountId, performedAt(sort: Desc)])
+}
+
+enum WorkoutActivityType {
+  RUNNING
+  WALKING
+  CYCLING
+  SWIMMING
+  WEIGHTLIFTING
+  CALISTHENICS
+  HIIT
+  OTHER
+}
+
+enum WorkoutSessionStatus {
+  PLANNING
+  RUNNING
+  COMPLETED
+}
+
+enum WorkoutExerciseKind {
+  LIFT
+  CARDIO
+}
+
+model WorkoutSession {
+  id               String               @id @default(cuid())
+  accountId        String
+  activityType     WorkoutActivityType
+  title            String
+  status           WorkoutSessionStatus @default(PLANNING)
+  startTime        DateTime?
+  endTime          DateTime?
+  durationSeconds  Int?
+  totalCalories    Int?
+  categoryCalories Json?
+  performedAt      DateTime             @default(now())
+  account          Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  exercises        WorkoutExercise[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([accountId, performedAt(sort: Desc)])
+  @@index([accountId, status, updatedAt(sort: Desc)])
+}
+
+model WorkoutExercise {
+  id               String              @id @default(cuid())
+  workoutSessionId String
+  accountId        String
+  name             String
+  kind             WorkoutExerciseKind
+  category         WorkoutActivityType
+  sets             Json?
+  distance         Float?
+  distanceUnit     String?
+  durationSeconds  Int?
+  caloriesBurned   Int?
+  order            Int                 @default(0)
+  workoutSession   WorkoutSession      @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  account          Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now())
+
+  @@index([workoutSessionId, order])
+  @@index([accountId, createdAt(sort: Desc)])
 }

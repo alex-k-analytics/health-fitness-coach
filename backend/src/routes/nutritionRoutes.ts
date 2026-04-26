@@ -449,7 +449,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const startOfTrendWindow = new Date();
   startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
-  const [recentMeals, recentWorkouts, member] = await Promise.all([
+  const [recentMeals, recentWorkoutSessions, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
         accountId: auth.accountId,
@@ -465,16 +465,17 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         fatGrams: true
       }
     }),
-    prisma.workoutEntry.findMany({
+    prisma.workoutSession.findMany({
       where: {
         accountId: auth.accountId,
+        status: "COMPLETED",
         performedAt: {
           gte: startOfTrendWindow
         }
       },
       select: {
         performedAt: true,
-        caloriesBurned: true
+        totalCalories: true
       }
     }),
     prisma.account.findUnique({
@@ -499,8 +500,8 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     caloriesBurned: 0
   }));
 
-  const caloriesBurnedToday = recentWorkouts.reduce((total, workout) => {
-    return total + (getDateKeyInTimeZone(workout.performedAt, timeZone) === todayKey ? workout.caloriesBurned : 0);
+  const caloriesBurnedToday = recentWorkoutSessions.reduce((total, session) => {
+    return total + (getDateKeyInTimeZone(session.performedAt, timeZone) === todayKey ? (session.totalCalories ?? 0) : 0);
   }, 0);
 
   const totals = recentMeals.reduce(
@@ -528,12 +529,12 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     }
   });
 
-  recentWorkouts.forEach((workout) => {
-    const dateKey = getDateKeyInTimeZone(workout.performedAt, timeZone);
+  recentWorkoutSessions.forEach((session) => {
+    const dateKey = getDateKeyInTimeZone(session.performedAt, timeZone);
     const matchingDay = dailyCalories.find((day) => day.date === dateKey);
 
     if (matchingDay) {
-      matchingDay.caloriesBurned += workout.caloriesBurned;
+      matchingDay.caloriesBurned += session.totalCalories ?? 0;
     }
   });
 

@@ -4,13 +4,16 @@ import {
   type FormEvent,
   type ReactNode,
   type RefObject,
-  startTransition,
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
-  useState
+  useState,
+  startTransition
 } from "react";
 import { ApiError, apiFetch, setAuthToken } from "./api";
 import { Card } from "./components/Card";
+import { computeSessionCalories, fuzzyMatch } from "./calorieEngine";
 import type {
   HealthMetric,
   Meal,
@@ -19,7 +22,13 @@ import type {
   ProfileData,
   SavedFood,
   SessionData,
-  Workout
+  Workout,
+  WorkoutActivityType,
+  WorkoutExercise,
+  WorkoutExerciseKind,
+  WorkoutSet,
+  WorkoutSession,
+  WorkoutSessionDraft
 } from "./types";
 
 type MealTemplateResult =
@@ -356,6 +365,30 @@ export function App() {
   const [workoutForm, setWorkoutForm] = useState(defaultWorkoutForm);
   const [workoutSaving, setWorkoutSaving] = useState(false);
 
+  // Full workout session modal state
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [sessionStep, setSessionStep] = useState<"plan" | "active" | "review">("plan");
+  const [sessionActivityType, setSessionActivityType] = useState<WorkoutActivityType>("WEIGHTLIFTING");
+  const [sessionTitle, setSessionTitle] = useState("");
+  const [sessionExercises, setSessionExercises] = useState<WorkoutExercise[]>([]);
+  const [sessionCalories, setSessionCalories] = useState({ total: 0, byCategory: {} as Record<string, number> });
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [manualMinutes, setManualMinutes] = useState("");
+  const [manualSeconds, setManualSeconds] = useState("");
+  const [hasUsedTimer, setHasUsedTimer] = useState(false);
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [comparisonSession, setComparisonSession] = useState<WorkoutSession | null>(null);
+  const [comparisonCollapsed, setComparisonCollapsed] = useState(true);
+  const [sessionSaving, setSessionSaving] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState("");
+  const [exerciseList, setExerciseList] = useState<Record<string, string[]>>({});
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<string[]>([]);
+  const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
+
+  // Workout sessions for dashboard history
+  const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
+
   const [mealForm, setMealForm] = useState(defaultMealForm);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [mealSearchQuery, setMealSearchQuery] = useState("");
@@ -398,6 +431,7 @@ export function App() {
     }
 
     void loadDashboard();
+    void loadExerciseList();
   }, [session?.authenticated]);
 
   useEffect(() => {
@@ -461,7 +495,7 @@ export function App() {
     setGlobalError("");
 
     try {
-      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse, workoutsResponse] =
+      const [profileResponse, metricsResponse, summaryResponse, foodsResponse, mealsResponse, workoutsResponse, sessionsResponse] =
         await Promise.all([
           apiFetch<ProfileData>("/profile/me"),
           apiFetch<{ metrics: HealthMetric[] }>("/profile/me/health-metrics?limit=12"),
@@ -470,7 +504,8 @@ export function App() {
           ),
           apiFetch<{ foods: SavedFood[] }>("/nutrition/saved-foods"),
           apiFetch<{ meals: Meal[] }>("/nutrition/meals?limit=24"),
-          apiFetch<{ workouts: Workout[] }>("/workouts?limit=24")
+          apiFetch<{ workouts: Workout[] }>("/workouts?limit=24"),
+          apiFetch<{ sessions: WorkoutSession[] }>("/workouts/sessions?limit=3&status=COMPLETED")
         ]);
 
       startTransition(() => {
@@ -480,6 +515,7 @@ export function App() {
         setSavedFoods(foodsResponse.foods);
         setMeals(mealsResponse.meals);
         setWorkouts(workoutsResponse.workouts);
+        setWorkoutSessions(sessionsResponse.sessions);
       });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -492,6 +528,13 @@ export function App() {
     } finally {
       setDashboardLoading(false);
     }
+  }
+
+  async function loadExerciseList() {
+    try {
+      const result = await apiFetch<{ exercises: Record<string, string[]> }>("/workouts/exercises");
+      setExerciseList(result.exercises);
+    } catch {}
   }
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
@@ -870,6 +913,261 @@ export function App() {
   const latestWeight = healthMetrics.find((metric) => metric.weightKg !== null) ?? null;
   const weightDelta = getWeightDelta(healthMetrics);
 
+  // Session calorie weight
+  const sessionWeightKg = latestWeight?.weightKg ?? null;
+  const sessionWeightKgForCalc = sessionWeightKg ?? 70;
+
+  // Session calorie recalculation
+  const recalcSessionCalories = useCallback(() => {
+    const result = computeSessionCalories(sessionExercises, sessionWeightKgForCalc);
+    setSessionCalories(result);
+  }, [sessionExercises, sessionWeightKgForCalc]);
+
+  // Draft management
+  const DRAFT_KEY = "workout-draft";
+
+  const saveDraft = useCallback(() => {
+    const draft: WorkoutSessionDraft = {
+      activityType: sessionActivityType,
+      title: sessionTitle,
+      exercises: sessionExercises,
+      elapsedSeconds,
+      status: sessionStep === "plan" ? "PLANNING" : "RUNNING",
+      manualMinutes,
+      manualSeconds,
+      hasUsedTimer,
+      step: sessionStep
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [sessionActivityType, sessionTitle, sessionExercises, elapsedSeconds, manualMinutes, manualSeconds, hasUsedTimer, sessionStep]);
+
+  const loadDraft = useCallback((): WorkoutSessionDraft | null => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const clearDraft = useCallback(() => {
+    localStorage.removeItem(DRAFT_KEY);
+  }, []);
+
+  // Session modal open/close
+  const openSessionModal = useCallback((withComparison?: WorkoutSession) => {
+    const draft = loadDraft();
+    if (draft && !withComparison) {
+      setSessionActivityType(draft.activityType);
+      setSessionTitle(draft.title);
+      setSessionExercises(draft.exercises);
+      setElapsedSeconds(draft.elapsedSeconds);
+      setManualMinutes(draft.manualMinutes ?? "");
+      setManualSeconds(draft.manualSeconds ?? "");
+      setHasUsedTimer(draft.hasUsedTimer);
+      setSessionStep(draft.step);
+      setComparisonMode(false);
+      setComparisonSession(null);
+      setComparisonCollapsed(true);
+    } else {
+      setSessionStep(withComparison ? "plan" : "plan");
+      setSessionActivityType(withComparison ? withComparison.activityType : "WEIGHTLIFTING");
+      setSessionTitle(withComparison ? "Copy of " + withComparison.title : "");
+      setSessionExercises(withComparison ? withComparison.exercises.map((e) => ({ ...e })) : []);
+      setElapsedSeconds(0);
+      setManualMinutes("");
+      setManualSeconds("");
+      setHasUsedTimer(false);
+      if (withComparison) {
+        setComparisonMode(true);
+        setComparisonSession(withComparison);
+        setComparisonCollapsed(true);
+      } else {
+        setComparisonMode(false);
+        setComparisonSession(null);
+        setComparisonCollapsed(true);
+      }
+    }
+    setIsSessionModalOpen(true);
+  }, [loadDraft]);
+
+  const logSameWorkout = useCallback((session: WorkoutSession) => {
+    openSessionModal(session);
+  }, [openSessionModal]);
+
+  const closeSessionModal = useCallback(() => {
+    saveDraft();
+    setIsSessionModalOpen(false);
+  }, [saveDraft]);
+
+  // Exercise management
+  const addExercise = useCallback((name: string) => {
+    const kind: WorkoutExerciseKind =
+      ["WEIGHTLIFTING", "CALISTHENICS"].includes(sessionActivityType) ? "LIFT" : "CARDIO";
+    const newExercise: WorkoutExercise = {
+      name,
+      kind,
+      category: sessionActivityType,
+      sets: kind === "LIFT" ? [{ reps: 0, weightLbs: 0 }] : undefined,
+      durationSeconds: kind === "CARDIO" ? 0 : undefined,
+      distance: kind === "CARDIO" ? undefined : undefined
+    };
+    setSessionExercises((prev) => [...prev, newExercise]);
+    setExerciseSearch("");
+    setExerciseSuggestions([]);
+    setEditingExerciseIndex(null);
+  }, [sessionActivityType]);
+
+  const removeExercise = useCallback((index: number) => {
+    setSessionExercises((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const updateExercise = useCallback((index: number, patch: Partial<WorkoutExercise>) => {
+    setSessionExercises((prev) =>
+      prev.map((ex, i) => (i === index ? { ...ex, ...patch } : ex))
+    );
+  }, []);
+
+  const addSet = useCallback((exerciseIndex: number) => {
+    setSessionExercises((prev) =>
+      prev.map((ex, i) =>
+        i === exerciseIndex
+          ? { ...ex, sets: [...(ex.sets ?? []), { reps: 0, weightLbs: 0 }] }
+          : ex
+      )
+    );
+  }, []);
+
+  const removeSet = useCallback((exerciseIndex: number, setIndex: number) => {
+    setSessionExercises((prev) =>
+      prev.map((ex, i) =>
+        i === exerciseIndex
+          ? { ...ex, sets: ex.sets?.filter((_, si) => si !== setIndex) }
+          : ex
+      )
+    );
+  }, []);
+
+  const updateSet = useCallback((exerciseIndex: number, setIndex: number, patch: Partial<WorkoutSet>) => {
+    setSessionExercises((prev) =>
+      prev.map((ex, i) =>
+        i === exerciseIndex && ex.sets
+          ? {
+              ...ex,
+              sets: ex.sets.map((s, si) => (si === setIndex ? { ...s, ...patch } : s))
+            }
+          : ex
+      )
+    );
+  }, []);
+
+  // Exercise search suggestions
+  useEffect(() => {
+    if (!exerciseSearch.trim()) {
+      setExerciseSuggestions([]);
+      return;
+    }
+    const allExercises = Object.values(exerciseList).flat();
+    const results = fuzzyMatch(exerciseSearch, allExercises);
+    setExerciseSuggestions(results);
+  }, [exerciseSearch, exerciseList]);
+
+  // Timer
+  useEffect(() => {
+    if (!isTimerRunning) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
+  // Auto-save draft on changes
+  useEffect(() => {
+    if (isSessionModalOpen) {
+      saveDraft();
+    }
+  }, [sessionTitle, sessionActivityType, sessionExercises, sessionStep, isSessionModalOpen, saveDraft]);
+
+  // Recalculate calories when exercises change
+  useEffect(() => {
+    recalcSessionCalories();
+  }, [recalcSessionCalories]);
+
+  // Timer handling
+  const startTimer = () => { setIsTimerRunning(true); setHasUsedTimer(true); };
+  const pauseTimer = () => { setIsTimerRunning(false); };
+  const stopTimer = () => { setIsTimerRunning(false); setElapsedSeconds(0); };
+
+  const getTotalDuration = () => {
+    if (hasUsedTimer) return Math.max(elapsedSeconds, (parseInt(manualMinutes) || 0) * 60 + (parseInt(manualSeconds) || 0));
+    const manual = (parseInt(manualMinutes) || 0) * 60 + (parseInt(manualSeconds) || 0);
+    if (manual > 0) return manual;
+    return sessionExercises.reduce((sum, ex) => sum + (ex.durationSeconds ?? 0), 0);
+  };
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    return `${m} min`;
+  };
+
+  // Save session
+  const handleSessionSave = useCallback(async () => {
+    setSessionSaving(true);
+    setGlobalError("");
+    setGlobalNotice("");
+    try {
+      const duration = getTotalDuration();
+      const body = {
+        activityType: sessionActivityType,
+        title: sessionTitle || "Workout",
+        startTime: null,
+        endTime: new Date().toISOString(),
+        durationSeconds: duration > 0 ? duration : undefined,
+        totalCalories: sessionCalories.total,
+        categoryCalories: sessionCalories.byCategory,
+        exercises: sessionExercises
+      };
+      await apiFetch("/workouts/sessions", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      clearDraft();
+      setIsSessionModalOpen(false);
+      resetSessionState();
+      await loadDashboard();
+      setGlobalNotice("Workout saved.");
+    } catch (error) {
+      setGlobalError(getApiErrorMessage(error));
+    } finally {
+      setSessionSaving(false);
+    }
+  }, [sessionActivityType, sessionTitle, sessionExercises, sessionCalories, getTotalDuration, clearDraft, loadDashboard]);
+
+  const resetSessionState = () => {
+    setSessionStep("plan");
+    setSessionActivityType("WEIGHTLIFTING");
+    setSessionTitle("");
+    setSessionExercises([]);
+    setSessionCalories({ total: 0, byCategory: {} });
+    setIsTimerRunning(false);
+    setElapsedSeconds(0);
+    setManualMinutes("");
+    setManualSeconds("");
+    setHasUsedTimer(false);
+    setComparisonMode(false);
+    setComparisonSession(null);
+    setComparisonCollapsed(true);
+    setExerciseSearch("");
+    setExerciseSuggestions([]);
+    setEditingExerciseIndex(null);
+  };
+
   if (!session) {
     return (
       <main className="app-shell loading-shell">
@@ -969,12 +1267,19 @@ export function App() {
             Log weight
           </button>
           <button
-            className="primary-button"
-            onClick={() => setIsWorkoutModalOpen(true)}
-            type="button"
-          >
-            Log workout
-          </button>
+             className="primary-button"
+             onClick={() => openSessionModal()}
+             type="button"
+           >
+             Log workout
+           </button>
+           <button
+             className="secondary-button"
+             onClick={() => setIsWorkoutModalOpen(true)}
+             type="button"
+           >
+             Log simple workout
+           </button>
           <button
             aria-label="Open profile"
             className="avatar-trigger"
@@ -1143,6 +1448,76 @@ export function App() {
             </div>
           )}
         </Card>
+
+        <Card className="compact-card workout-history-card">
+          <div className="section-heading-row">
+            <SectionHeading title="Last 3 Workouts" description="Recent workout sessions" />
+            <button
+              aria-label="Add workout"
+              className="icon-button workout-add-button"
+              onClick={() => openSessionModal()}
+              type="button"
+            >
+              +
+            </button>
+          </div>
+          {dashboardLoading ? (
+            <p className="empty-state">Refreshing workouts…</p>
+          ) : workoutSessions.length === 0 ? (
+            <div className="empty-panel">
+              <p className="empty-state">No workouts logged yet.</p>
+              <button className="secondary-button" onClick={() => openSessionModal()} type="button">
+                Log your first workout
+              </button>
+            </div>
+          ) : (
+            <div className="workout-history-list">
+              {workoutSessions.map((session) => (
+                <article className="workout-history-item" key={session.id}>
+                  <div className="workout-history-row">
+                    <div className="workout-history-title">
+                      <strong>{session.title}</strong>
+                      <span>
+                        {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+                          new Date(session.performedAt)
+                        )}
+                      </span>
+                    </div>
+                    <strong className="workout-history-calories">
+                      {session.totalCalories ? `${session.totalCalories} kcal` : "—"}
+                    </strong>
+                    <div className="workout-history-exercises">
+                      <span>
+                        {session.exercises
+                          .map((ex) => {
+                            if (ex.kind === "LIFT" && ex.sets) {
+                              return `${ex.name} ${ex.sets.length}×${ex.sets[0]?.reps ?? "?"}`;
+                            }
+                            if (ex.durationSeconds) {
+                              const mins = Math.round(ex.durationSeconds / 60);
+                              return `${ex.name} ${mins} min`;
+                            }
+                            return ex.name;
+                          })
+                          .join(" | ")}
+                      </span>
+                    </div>
+                    <div className="workout-history-actions">
+                      <button
+                        className="inline-action-button"
+                        onClick={() => logSameWorkout(session)}
+                        type="button"
+                      >
+                        Log same
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </Card>
+
       </div>
 
       <OverlayPanel
@@ -1462,7 +1837,7 @@ export function App() {
           setWorkoutForm(defaultWorkoutForm());
         }}
         open={isWorkoutModalOpen}
-        title="Log workout"
+        title="Log simple workout"
         variant="dialog"
       >
         <form className="form-stack" onSubmit={handleWorkoutSave}>
@@ -1521,6 +1896,461 @@ export function App() {
         </form>
       </OverlayPanel>
 
+      {/* Full workout session modal */}
+      <OverlayPanel
+        description="Plan, track, and save your workout with detailed exercises and calorie estimates."
+        onClose={closeSessionModal}
+        open={isSessionModalOpen}
+        title={sessionStep === "plan" ? "Plan workout" : sessionStep === "active" ? "Active workout" : "Review workout"}
+        variant="dialog"
+      >
+        <div className="workout-session-modal">
+          {/* Activity type pills */}
+          <div className="activity-type-pills">
+            {["RUNNING", "WALKING", "CYCLING", "SWIMMING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"].map(
+              (type) => (
+                <button
+                  key={type}
+                  className={`activity-type-pill ${sessionActivityType === type ? "active" : ""}`}
+                  onClick={() => {
+                    setSessionActivityType(type as WorkoutActivityType);
+                    setSessionExercises((prev) =>
+                      prev.map((ex) => ({ ...ex, category: type as WorkoutActivityType }))
+                    );
+                  }}
+                  type="button"
+                >
+                  {type === "WEIGHTLIFTING"
+                    ? "Weightlifting"
+                    : type.charAt(0) + type.slice(1).toLowerCase()}
+                </button>
+              )
+            )}
+          </div>
+
+          {/* Title */}
+          <Field label="Title">
+            <input
+              placeholder="Morning routine, leg day, 5K run..."
+              value={sessionTitle}
+              onChange={(event) => setSessionTitle(event.target.value)}
+            />
+          </Field>
+
+          {/* Comparison table */}
+          {comparisonMode && comparisonSession && (
+            <div className="workout-comparison">
+              <div
+                className="workout-comparison-header"
+                onClick={() => setComparisonCollapsed(!comparisonCollapsed)}
+              >
+                <strong>Compare with: {comparisonSession.title}</strong>
+                <span className="workout-comparison-summary">
+                  Prev: {comparisonSession.totalCalories ?? "—"} kcal |{" "}
+                  {comparisonSession.durationSeconds ? formatDuration(comparisonSession.durationSeconds) : "—"} |{" "}
+                  Current: {sessionCalories.total} kcal | {formatDuration(getTotalDuration())}
+                </span>
+                <span className="collapse-icon">{comparisonCollapsed ? "▾" : "▴"}</span>
+                <button
+                  className="ghost-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setComparisonMode(false);
+                    setComparisonSession(null);
+                  }}
+                  type="button"
+                >
+                  Clear
+                </button>
+              </div>
+              {!comparisonCollapsed && (
+                <div className="workout-comparison-table">
+                  <div className="comparison-table-header">
+                    <span>Exercise</span>
+                    <span>Previous</span>
+                    <span>Current</span>
+                    <span>Δ</span>
+                  </div>
+                  {comparisonSession.exercises.map((prevEx) => {
+                    const currEx = sessionExercises.find((ex) => ex.name === prevEx.name);
+                    const prevWeight =
+                      prevEx.sets?.reduce((s, set) => s + set.weightLbs * set.reps, 0) ?? 0;
+                    const currWeight =
+                      currEx?.sets?.reduce((s, set) => s + set.weightLbs * set.reps, 0) ?? 0;
+                    const indicator =
+                      !currEx
+                        ? "missing"
+                        : currWeight >= prevWeight && prevWeight > 0
+                          ? "up"
+                          : currWeight < prevWeight
+                            ? "warn"
+                            : "neutral";
+                    return (
+                      <div key={prevEx.name} className={`comparison-row ${indicator}`}>
+                        <span>{prevEx.name}</span>
+                        <span>{prevWeight > 0 ? `${prevWeight} vol` : prevEx.durationSeconds ? formatDuration(prevEx.durationSeconds) : "—"}</span>
+                        <span>
+                          {currEx
+                            ? currWeight > 0
+                              ? `${currWeight} vol`
+                              : currEx.durationSeconds
+                                ? formatDuration(currEx.durationSeconds)
+                                : "—"
+                            : "missing"}
+                        </span>
+                        <span className={`tag ${indicator}`}>
+                          {indicator === "up"
+                            ? "stronger"
+                            : indicator === "warn"
+                              ? "lighter"
+                              : indicator === "missing"
+                                ? "missing"
+                                : "same"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Load previous workout (when not in comparison mode) */}
+          {!comparisonMode && workoutSessions.length > 0 && (
+            <div className="load-previous-section">
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  const prev = workoutSessions[0];
+                  setSessionTitle("Copy of " + prev.title);
+                  setSessionActivityType(prev.activityType);
+                  setSessionExercises(prev.exercises.map((e) => ({ ...e })));
+                  setComparisonMode(true);
+                  setComparisonSession(prev);
+                  setComparisonCollapsed(true);
+                }}
+                type="button"
+              >
+                Load last workout: {workoutSessions[0].title}
+              </button>
+            </div>
+          )}
+
+          {/* Exercise builder */}
+          <div className="exercise-builder">
+            <div className="exercise-builder-header">
+              <strong>Exercises</strong>
+            </div>
+
+            <div className="exercise-search-row">
+              <input
+                className="exercise-search-input"
+                placeholder="Search exercises (type to add)..."
+                value={exerciseSearch}
+                onChange={(event) => setExerciseSearch(event.target.value)}
+                onFocus={() => {
+                  if (exerciseSearch.trim()) {
+                    const allExercises = Object.values(exerciseList).flat();
+                    setExerciseSuggestions(fuzzyMatch(exerciseSearch, allExercises));
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && exerciseSearch.trim()) {
+                    event.preventDefault();
+                    addExercise(exerciseSearch.trim());
+                  }
+                }}
+              />
+              {exerciseSearch.trim() && (
+                <button
+                  className="ghost-button add-exercise-btn"
+                  onClick={() => addExercise(exerciseSearch.trim())}
+                  type="button"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
+
+            {/* Suggestions dropdown */}
+            {exerciseSuggestions.length > 0 && (
+              <div className="exercise-suggestions">
+                {exerciseSuggestions.map((name) => (
+                  <button
+                    key={name}
+                    className="suggestion-item"
+                    onClick={() => addExercise(name)}
+                    type="button"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Exercise list */}
+            {sessionExercises.map((exercise, index) => {
+              const exerciseCals = computeSessionCalories([exercise], sessionWeightKgForCalc).total;
+              return (
+                <div key={index} className="exercise-card">
+                  <div className="exercise-card-header">
+                    <strong>{exercise.name}</strong>
+                    <button
+                      className="inline-action-button"
+                      onClick={() => removeExercise(index)}
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {exercise.kind === "LIFT" ||
+                  (["WEIGHTLIFTING", "CALISTHENICS"].includes(exercise.category) && exercise.kind !== "CARDIO") ? (
+                    <div className="set-rows">
+                      {exercise.sets?.map((set, setIndex) => (
+                        <div key={setIndex} className="set-row">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="lbs"
+                            value={set.weightLbs || ""}
+                            onChange={(event) =>
+                              updateSet(index, setIndex, {
+                                weightLbs: parseFloat(event.target.value) || 0
+                              })
+                            }
+                          />
+                          <span>×</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="reps"
+                            value={set.reps || ""}
+                            onChange={(event) =>
+                              updateSet(index, setIndex, {
+                                reps: parseInt(event.target.value) || 0
+                              })
+                            }
+                          />
+                          <button
+                            className="inline-action-button"
+                            onClick={() => removeSet(index, setIndex)}
+                            type="button"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        className="ghost-button add-set-btn"
+                        onClick={() => addSet(index)}
+                        type="button"
+                      >
+                        + Set
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="cardio-inputs">
+                      <div className="two-column-grid">
+                        <Field label="Duration (min)">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="minutes"
+                            value={(exercise.durationSeconds && exercise.durationSeconds / 60) || ""}
+                            onChange={(event) =>
+                              updateExercise(index, {
+                                durationSeconds: (parseInt(event.target.value) || 0) * 60
+                              })
+                            }
+                          />
+                        </Field>
+                        <Field label="Distance">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="distance"
+                            value={exercise.distance || ""}
+                            onChange={(event) =>
+                              updateExercise(index, {
+                                distance: parseFloat(event.target.value) || undefined
+                              })
+                            }
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="exercise-calories-estimate">
+                    Est. {exerciseCals} kcal
+                  </div>
+                </div>
+              );
+            })}
+
+            {sessionExercises.length === 0 && (
+              <p className="empty-state">
+                Search above to add exercises. Press Enter or click "Add" to include.
+              </p>
+            )}
+          </div>
+
+          {/* Timing section */}
+          <div className="timing-section">
+            <div className="timing-toggle">
+              <label className="checkbox-row">
+                <input
+                  checked={hasUsedTimer}
+                  type="checkbox"
+                  onChange={() => {
+                    setHasUsedTimer(!hasUsedTimer);
+                    if (hasUsedTimer) {
+                      setIsTimerRunning(false);
+                      setElapsedSeconds(0);
+                    }
+                  }}
+                />
+                <span>Use timer</span>
+              </label>
+            </div>
+
+            {hasUsedTimer && (
+              <div className="workout-timer">
+                <div className="workout-timer-value" aria-label={`Timer: ${formatTimer(elapsedSeconds)}`}>
+                  {formatTimer(elapsedSeconds)}
+                </div>
+                <div className="timer-controls">
+                  {!isTimerRunning ? (
+                    <button className="primary-button" onClick={startTimer} type="button">
+                      {elapsedSeconds > 0 ? "Resume" : "Start"}
+                    </button>
+                  ) : (
+                    <button className="secondary-button" onClick={pauseTimer} type="button">
+                      Pause
+                    </button>
+                  )}
+                  <button className="ghost-button" onClick={stopTimer} type="button">
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="manual-time-entry">
+              <TwoColumnFields>
+                <Field label="Manual minutes">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="min"
+                    value={manualMinutes}
+                    onChange={(event) => setManualMinutes(event.target.value)}
+                  />
+                </Field>
+                <Field label="Manual seconds">
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="sec"
+                    value={manualSeconds}
+                    onChange={(event) => setManualSeconds(event.target.value)}
+                  />
+                </Field>
+              </TwoColumnFields>
+            </div>
+          </div>
+
+          {/* Category breakdown & summary */}
+          <div className="category-breakdown">
+            <strong>Calorie breakdown</strong>
+            {Object.entries(sessionCalories.byCategory).length > 0 ? (
+              Object.entries(sessionCalories.byCategory).map(([category, cals]) => (
+                <div key={category} className="category-breakdown-item">
+                  <span>
+                    {category === "WEIGHTLIFTING"
+                      ? "Strength"
+                      : category === "CALISTHENICS"
+                        ? "Calisthenics"
+                        : category.charAt(0) + category.slice(1).toLowerCase()}
+                  </span>
+                  <strong>{cals} kcal</strong>
+                </div>
+              ))
+            ) : (
+              <p className="empty-state">Add exercises to see calorie estimates.</p>
+            )}
+            <div className="category-breakdown-total">
+              <strong>Total</strong>
+              <strong>{sessionCalories.total} kcal</strong>
+              <span>Duration: {formatDuration(getTotalDuration())}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="panel-actions">
+            <button className="ghost-button" onClick={closeSessionModal} type="button">
+              Cancel
+            </button>
+            {sessionStep === "plan" && sessionExercises.length > 0 && (
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setSessionStep("active");
+                  setHasUsedTimer(true);
+                }}
+                type="button"
+              >
+                Start workout
+              </button>
+            )}
+            {sessionStep === "active" && (
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  pauseTimer();
+                  setSessionStep("review");
+                }}
+                type="button"
+              >
+                End workout
+              </button>
+            )}
+            {sessionStep === "review" && (
+              <>
+                <button
+                  className="secondary-button"
+                  onClick={() => setSessionStep("plan")}
+                  type="button"
+                >
+                  Edit
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={sessionSaving || sessionExercises.length === 0}
+                  onClick={handleSessionSave}
+                  type="button"
+                >
+                  {sessionSaving ? "Saving..." : "Save workout"}
+                </button>
+              </>
+            )}
+            {sessionStep === "plan" && sessionExercises.length === 0 && (
+              <button
+                className="primary-button"
+                disabled
+                type="button"
+              >
+                Add exercises first
+              </button>
+            )}
+          </div>
+        </div>
+      </OverlayPanel>
+
+      {/* Profile drawer */}
       <OverlayPanel
         description="Update your profile settings and sign out of your private account."
         onClose={() => setIsProfileDrawerOpen(false)}
