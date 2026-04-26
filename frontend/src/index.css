@@ -166,7 +166,7 @@
     border-width: 1px !important;
     border-color: hsl(var(--border)) !important;
     border-radius: 0 !important;
-    box-shadow: -4px 0 24px hsl(var(--foreground) / 0.1) !important;
+    box-shadow: 0 0 24px hsl(var(--foreground) / 0.05) !important;
   }
 
   /* Button: our radius */

@@ -18,7 +18,7 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
         {children}
       </DrawerTrigger>
       <DrawerContent className="w-80 sm:max-w-md">
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center justify-center rounded-full w-10 h-10 text-xs font-bold text-primary bg-primary/10">
               {memberInitials}
@@ -34,7 +34,7 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
         <div className="overflow-y-auto p-4">
           <ProfileForm />
         </div>
-        <DrawerFooter className="p-4 border-t">
+        <DrawerFooter className="p-4 border-t border-border">
           <Button
             variant="destructive"
             className="w-full"
