@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@layer base {
+  @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+  :root {
+    --background: 214 29% 96%;
+    --foreground: 216 44% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 216 44% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 44% 14%;
+
+    --primary: 215 63% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 56% 93%;
+    --secondary-foreground: 216 50% 25%;
+
+    --muted: 213 26% 58%;
+    --muted-foreground: 213 17% 51%;
+
+    --accent: 215 63% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 354 51% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 39 74% 45%;
+    --warning-foreground: 0 0% 100%;
+
+    --success: 163 52% 33%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 211 37% 88%;
+    --input: 211 37% 88%;
+    --ring: 215 63% 42%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-family: "Manrope", "Segoe UI", sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    overflow-x: hidden;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Space Grotesk", sans-serif;
+  }
+}
+
+@layer components {
+  .app-shell {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: calc(14px + env(safe-area-inset-top)) 18px calc(42px + env(safe-area-inset-bottom));
+    width: 100%;
+  }
+}

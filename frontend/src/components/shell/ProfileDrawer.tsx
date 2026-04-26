@@ -1,0 +1,40 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useShellStore } from "@/stores/shellStore";
+import { getInitials } from "@/lib/mealUtils";
+import { ProfileForm } from "@/features/settings/ProfileForm";
+import { useLogoutMutation } from "@/features/auth/hooks";
+
+export function ProfileDrawer() {
+  const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
+  const logout = useLogoutMutation();
+  const memberName = session?.member?.displayName ?? "User";
+  const memberInitials = getInitials(memberName);
+
+  return (
+    <Dialog open={profileDrawerOpen} onOpenChange={setProfileDrawerOpen}>
+      <DialogTrigger asChild />
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-1">
+            <span className="inline-flex items-center justify-center rounded-full w-[52px] h-[52px] text-sm font-extrabold text-primary bg-gradient-to-br from-blue-100 to-blue-50">
+              {memberInitials}
+            </span>
+            <div>
+              <DialogTitle>{memberName}</DialogTitle>
+            </div>
+          </div>
+        </DialogHeader>
+        <ProfileForm />
+        <div className="mt-4 pt-4 border-t">
+          <button
+            onClick={() => logout.mutate()}
+            className="text-sm text-destructive font-semibold hover:underline"
+            disabled={logout.isPending}
+          >
+            {logout.isPending ? "Signing out..." : "Sign out"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
