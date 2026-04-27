@@ -47,13 +47,9 @@ export function DashboardPage() {
     calorieTrend.length > 0
       ? Math.round(calorieTrend.reduce((sum, d) => sum + d.calories, 0) / calorieTrend.length)
       : 0;
-  const weightTrend = (healthMetrics?.metrics ?? [])
-    .filter((m) => m.weightKg != null)
-    .reverse();
-  const weightTrendPoints = weightTrend.slice(0, 6);
-  const latestWeight = weightTrend[0] ?? null;
-
-  const weightPoints = (healthMetrics?.metrics ?? []).filter((m) => m.weightKg != null).reverse();
+  const weightPoints = (healthMetrics?.metrics ?? []).filter((m) => m.weightKg != null);
+  const latestWeight = weightPoints[0] ?? null;
+  const weightTrendPoints = weightPoints.slice(0, 6).reverse();
   const weightDelta =
     weightPoints.length >= 2
       ? Math.round(((weightPoints[0].weightKg ?? 0) - (weightPoints[1].weightKg ?? 0)) / 0.45359237 * 10) / 10
