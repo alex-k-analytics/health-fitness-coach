@@ -7,33 +7,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Minus, Play, Pause, Check, Search, Trash2, Clock, RotateCcw } from "lucide-react";
+import { Plus, Minus, Play, Pause, Check, Search, Trash2, RotateCcw } from "lucide-react";
 import type { WorkoutActivityType, WorkoutExercise, WorkoutExerciseKind, WorkoutSet } from "@/types";
 import { useExerciseListQuery, useCreateSessionMutation } from "@/features/workouts/hooks";
 import { computeSessionCalories, fuzzyMatch } from "@/calorieEngine";
 import { formatTimer } from "@/lib/mealUtils";
 
-const ACTIVITY_TYPES: { value: WorkoutActivityType; label: string }[] = [
-  { value: "RUNNING", label: "Running" },
-  { value: "WALKING", label: "Walking" },
-  { value: "CYCLING", label: "Cycling" },
-  { value: "SWIMMING", label: "Swimming" },
-  { value: "ROWING", label: "Rowing" },
-  { value: "WEIGHTLIFTING", label: "Weights" },
-  { value: "CALISTHENICS", label: "Calisthenics" },
-  { value: "HIIT", label: "HIIT" },
-  { value: "OTHER", label: "Other" }
+type WorkoutMode = "CARDIO" | "STRENGTH" | "HIIT" | "OTHER";
+
+const WORKOUT_TYPES: { value: WorkoutMode; label: string; defaultActivityType: WorkoutActivityType }[] = [
+  { value: "CARDIO", label: "Cardio", defaultActivityType: "RUNNING" },
+  { value: "STRENGTH", label: "Strength", defaultActivityType: "WEIGHTLIFTING" },
+  { value: "HIIT", label: "HIIT", defaultActivityType: "HIIT" },
+  { value: "OTHER", label: "Other", defaultActivityType: "OTHER" }
 ];
+
 const CARDIO_TYPES = new Set<WorkoutActivityType>([
   "RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "HIIT"
 ]);
-const CARDIO_ACTIVITY_LABELS: Partial<Record<WorkoutActivityType, string>> = {
-  RUNNING: "Run",
-  WALKING: "Walk",
-  CYCLING: "Cycling",
-  SWIMMING: "Swim",
-  ROWING: "Rowing",
-  HIIT: "HIIT"
+const MODE_CATEGORY_KEYS: Record<WorkoutMode, WorkoutActivityType[]> = {
+  CARDIO: ["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING"],
+  STRENGTH: ["WEIGHTLIFTING", "CALISTHENICS"],
+  HIIT: ["HIIT"],
+  OTHER: ["OTHER"]
 };
 
 interface WorkoutSessionModalProps {
@@ -44,8 +40,9 @@ interface WorkoutSessionModalProps {
 export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalProps) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"plan" | "active" | "review">("plan");
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>("STRENGTH");
   const [activityType, setActivityType] = useState<WorkoutActivityType>("WEIGHTLIFTING");
-  const [title, setTitle] = useState("Weightlifting");
+  const [title, setTitle] = useState("Strength");
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
@@ -69,14 +66,19 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
 
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) { setSearchResults([]); return; }
-    const all = Object.values(exerciseListData?.exercises ?? {}).flat();
+    const categoryKeys = MODE_CATEGORY_KEYS[workoutMode];
+    const all = categoryKeys.flatMap((key) => exerciseListData?.exercises?.[key] ?? []);
     setSearchResults(fuzzyMatch(searchQuery, all, 3));
-  }, [searchQuery, exerciseListData]);
+  }, [searchQuery, exerciseListData, workoutMode]);
 
   const addExercise = useCallback((name: string) => {
-    const kind: WorkoutExerciseKind = CARDIO_TYPES.has(activityType) ? "CARDIO" : "LIFT";
+    const category = resolveExerciseCategory(name, workoutMode, exerciseListData?.exercises);
+    const kind: WorkoutExerciseKind = CARDIO_TYPES.has(category) ? "CARDIO" : "LIFT";
+    const modeLabel = WORKOUT_TYPES.find((item) => item.value === workoutMode)?.label ?? "Workout";
+    setActivityType(category);
+    setTitle((currentTitle) => currentTitle.trim() === "" || currentTitle === modeLabel ? name : currentTitle);
     setExercises((prev) => [...prev, {
-      id: crypto.randomUUID(), name, kind, category: activityType,
+      id: crypto.randomUUID(), name, kind, category,
       sets: kind === "LIFT" ? [{ reps: 10, weightLbs: 0 }] : undefined,
       durationSeconds: kind === "CARDIO" ? 0 : undefined,
       distance: kind === "CARDIO" ? 0 : undefined,
@@ -84,7 +86,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       order: prev.length
     }]);
     setSearchQuery(""); setSearchResults([]);
-  }, [activityType]);
+  }, [exerciseListData, workoutMode]);
 
   const removeExercise = useCallback((id: string) => {
     setExercises((prev) => prev.filter((e) => e.id !== id));
@@ -109,11 +111,13 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     }));
   }, []);
 
-  const createDefaultExercise = useCallback((type: WorkoutActivityType): WorkoutExercise => {
-    const kind: WorkoutExerciseKind = CARDIO_TYPES.has(type) ? "CARDIO" : "LIFT";
+  const createDefaultExercise = useCallback((mode: WorkoutMode): WorkoutExercise => {
+    const type = WORKOUT_TYPES.find((item) => item.value === mode)?.defaultActivityType ?? "OTHER";
+    const kind: WorkoutExerciseKind = mode === "STRENGTH" ? "LIFT" : "CARDIO";
+    const label = WORKOUT_TYPES.find((item) => item.value === mode)?.label ?? "Workout";
     return {
       id: crypto.randomUUID(),
-      name: kind === "CARDIO" ? (CARDIO_ACTIVITY_LABELS[type] ?? ACTIVITY_TYPES.find((t) => t.value === type)?.label ?? type) : "Exercise",
+      name: label,
       kind,
       category: type,
       sets: kind === "LIFT" ? [{ reps: 10, weightLbs: 0 }] : undefined,
@@ -124,31 +128,32 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     };
   }, []);
 
-  const onActivityTypeChange = (type: WorkoutActivityType) => {
+  const onWorkoutModeChange = (mode: WorkoutMode) => {
+    const type = WORKOUT_TYPES.find((item) => item.value === mode)?.defaultActivityType ?? "OTHER";
+    const label = WORKOUT_TYPES.find((item) => item.value === mode)?.label ?? "Workout";
+    setWorkoutMode(mode);
     setActivityType(type);
-    const label = ACTIVITY_TYPES.find((t) => t.value === type)?.label ?? type;
     setTitle(label);
-    setExercises(CARDIO_TYPES.has(type) ? [createDefaultExercise(type)] : []);
+    setExercises([]);
+    setSearchQuery("");
+    setSearchResults([]);
     setElapsedSeconds(0); setTimerRunning(false);
   };
 
   const handleStart = () => {
     const nextExercises = exercises.length > 0
       ? exercises
-      : CARDIO_TYPES.has(activityType)
-        ? [createDefaultExercise(activityType)]
-        : [];
-    if (nextExercises.length === 0) return;
+      : [createDefaultExercise(workoutMode)];
 
     setExercises(nextExercises);
-    if (CARDIO_TYPES.has(activityType) && manualMinutes === "0" && manualSeconds === "0") {
+    if ((workoutMode === "CARDIO" || workoutMode === "HIIT") && manualMinutes === "0" && manualSeconds === "0") {
       setManualMinutes("30");
     }
     setStep("active");
-    setTimerRunning(!useManualTime);
+    setTimerRunning(workoutMode === "STRENGTH" && !useManualTime);
   };
   const handleFinish = () => {
-    const duration = CARDIO_TYPES.has(activityType) || useManualTime
+    const duration = workoutMode !== "STRENGTH" || useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
       : elapsedSeconds;
 
@@ -163,12 +168,13 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
   const handleEdit = () => { setStep("plan"); };
 
   const handleSave = () => {
-    const duration = CARDIO_TYPES.has(activityType) || useManualTime
+    const duration = workoutMode !== "STRENGTH" || useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
       : elapsedSeconds;
     const result = computeSessionCalories(exercises, 70);
+    const primaryActivityType = exercises[0]?.category ?? activityType;
     createSession.mutate({
-      activityType,
+      activityType: primaryActivityType,
       title,
       startTime: new Date(Date.now() - duration * 1000).toISOString(),
       endTime: new Date().toISOString(),
@@ -192,24 +198,23 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     onClose?.();
   };
 
-  const durationDisplay = CARDIO_TYPES.has(activityType) || useManualTime
+  const isTimedWorkout = workoutMode !== "STRENGTH";
+  const durationDisplay = isTimedWorkout || useManualTime
     ? `${manualMinutes}:${manualSeconds.padStart(2, "0")}`
     : formatTimer(elapsedSeconds);
-
-  const totalCalories = computeSessionCalories(exercises, 70).total;
 
   // ── Step 1: Plan ──
   const renderPlan = () => (
     <div className="grid gap-4">
       <div className="grid gap-2">
-        <Label>Activity Type</Label>
+        <Label>Workout Type</Label>
         <div className="flex flex-wrap gap-2">
-           {ACTIVITY_TYPES.map(({ value, label }) => (
+           {WORKOUT_TYPES.map(({ value, label }) => (
              <Button
                key={value}
-               variant={activityType === value ? "default" : "outline"}
+               variant={workoutMode === value ? "default" : "outline"}
                size="sm"
-               onClick={() => onActivityTypeChange(value)}
+               onClick={() => onWorkoutModeChange(value)}
              >
                {label}
              </Button>
@@ -221,7 +226,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning run" />
       </div>
 
-      {!CARDIO_TYPES.has(activityType) && (
+      {workoutMode !== "OTHER" && (
       <div className="grid gap-2">
         <Label>Add Exercise</Label>
         <div className="flex gap-2">
@@ -263,9 +268,11 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       </div>
       )}
 
-      {CARDIO_TYPES.has(activityType) && exercises.length === 0 && (
+      {exercises.length === 0 && (
         <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-          This workout will track one {title.toLowerCase()} activity. Start the session, then enter the duration and distance before saving.
+          {workoutMode === "OTHER"
+            ? "Start the session to log a simple timed workout."
+            : "Search for a specific exercise, or start now and fill in details later."}
         </div>
       )}
 
@@ -307,8 +314,11 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
                   <div className="flex gap-3">
                     <div className="grid gap-1 flex-1">
                       <Label>Duration (min)</Label>
-                      <Input type="number" min="0" value={(ex.durationSeconds ?? 0) / 60}
-                        onChange={(e) => updateExercise(ex.id!, { durationSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) * 60 })} />
+                      <Input
+                        inputMode="numeric"
+                        value={String(Math.round((ex.durationSeconds ?? 0) / 60))}
+                        onChange={(e) => updateExercise(ex.id!, { durationSeconds: (parseInt(cleanDurationPart(e.target.value), 10) || 0) * 60 })}
+                      />
                     </div>
                     <div className="grid gap-1 flex-1">
                       <Label>Distance (mi)</Label>
@@ -328,7 +338,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleStart} disabled={!CARDIO_TYPES.has(activityType) && exercises.length === 0}>
+        <Button onClick={handleStart}>
           <Play className="h-4 w-4 mr-1" /> Start Session
         </Button>
       </div>
@@ -349,25 +359,25 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
           </Button>
         </div>
       </div>
-      {!CARDIO_TYPES.has(activityType) && (
+      {!isTimedWorkout && (
       <div className="flex items-center gap-2">
         <input type="checkbox" id="manualTime" checked={useManualTime} onChange={(e) => setUseManualTime(e.target.checked)} />
         <Label htmlFor="manualTime" className="text-sm font-normal">Use Manual Time</Label>
       </div>
       )}
-      {(useManualTime || CARDIO_TYPES.has(activityType)) && (
+      {(useManualTime || isTimedWorkout) && (
         <div className="flex gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
-            <Input type="number" min="0" value={manualMinutes} onChange={(e) => setManualMinutes(e.target.value)} />
+            <Input inputMode="numeric" value={manualMinutes} onChange={(e) => setManualMinutes(cleanDurationPart(e.target.value))} />
           </div>
           <div className="grid gap-1 flex-1">
             <Label>Seconds</Label>
-            <Input type="number" min="0" max="59" value={manualSeconds} onChange={(e) => setManualSeconds(e.target.value)} />
+            <Input inputMode="numeric" value={manualSeconds} onChange={(e) => setManualSeconds(cleanDurationPart(e.target.value, 59))} />
           </div>
         </div>
       )}
-      {CARDIO_TYPES.has(activityType) && exercises[0] && (
+      {isTimedWorkout && exercises[0] && workoutMode !== "OTHER" && (
         <div className="grid gap-1">
           <Label>Distance (mi)</Label>
           <Input
@@ -409,7 +419,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activity</span>
-            <Badge>{ACTIVITY_TYPES.find((t) => t.value === activityType)?.label ?? activityType}</Badge>
+            <Badge>{WORKOUT_TYPES.find((t) => t.value === workoutMode)?.label ?? workoutMode}</Badge>
           </div>
           <div className="grid gap-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duration</span>
@@ -495,4 +505,32 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       </DialogContent>
     </Dialog>
   );
+}
+
+function resolveExerciseCategory(
+  name: string,
+  mode: WorkoutMode,
+  exercisesByCategory?: Record<string, string[]>
+): WorkoutActivityType {
+  const allowedCategories = MODE_CATEGORY_KEYS[mode];
+  const normalizedName = name.toLowerCase();
+
+  for (const category of allowedCategories) {
+    const exercises = exercisesByCategory?.[category] ?? [];
+    if (exercises.some((candidate) => candidate.toLowerCase() === normalizedName)) {
+      return category;
+    }
+  }
+
+  return WORKOUT_TYPES.find((item) => item.value === mode)?.defaultActivityType ?? "OTHER";
+}
+
+function cleanDurationPart(value: string, max?: number): string {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "0";
+
+  const parsed = Number(digits);
+  if (!Number.isFinite(parsed)) return "0";
+
+  return String(max === undefined ? parsed : Math.min(parsed, max));
 }

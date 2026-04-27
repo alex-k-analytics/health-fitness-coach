@@ -35,7 +35,7 @@ const exerciseSetSchema = z.object({
 const exerciseDataSchema = z.object({
   name: z.string().min(1).max(200),
   kind: z.enum(["LIFT", "CARDIO"]),
-  category: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]),
+  category: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]),
   sets: z.array(exerciseSetSchema).optional(),
   distance: z.number().nonnegative().optional(),
   distanceUnit: z.string().max(20).optional(),
@@ -44,7 +44,7 @@ const exerciseDataSchema = z.object({
 });
 
 const createSessionSchema = z.object({
-  activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]),
+  activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]),
   title: z.string().min(1).max(200),
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
@@ -55,7 +55,7 @@ const createSessionSchema = z.object({
 });
 
 const updateSessionSchema = z.object({
-  activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]).optional(),
+  activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]).optional(),
   title: z.string().min(1).max(200).optional(),
   status: z.enum(["PLANNING", "RUNNING", "COMPLETED"]).optional(),
   startTime: z.string().datetime().optional(),
