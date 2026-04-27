@@ -449,7 +449,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const startOfTrendWindow = new Date();
   startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
-  const [recentMeals, recentWorkoutSessions, recentWorkoutEntries, member] = await Promise.all([
+  const [recentMeals, recentWorkoutSessions, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
         accountId: auth.accountId,
@@ -479,19 +479,6 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         totalCalories: true
       }
     }),
-    prisma.workoutEntry.findMany({
-      where: {
-        accountId: auth.accountId,
-        performedAt: {
-          gte: startOfTrendWindow
-        }
-      },
-      select: {
-        id: true,
-        performedAt: true,
-        caloriesBurned: true
-      }
-    }),
     prisma.account.findUnique({
       where: {
         id: auth.accountId
@@ -514,12 +501,8 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     caloriesBurned: 0
   }));
 
-  const sessionIds = new Set(recentWorkoutSessions.map((s) => s.id));
-  const unbackfilledEntries = recentWorkoutEntries.filter((e) => !sessionIds.has(e.id));
   const caloriesBurnedToday = recentWorkoutSessions.reduce((total, session) => {
     return total + (getDateKeyInTimeZone(session.performedAt, timeZone) === todayKey ? (session.totalCalories ?? 0) : 0);
-  }, 0) + unbackfilledEntries.reduce((total, entry) => {
-    return total + (getDateKeyInTimeZone(entry.performedAt, timeZone) === todayKey ? entry.caloriesBurned : 0);
   }, 0);
 
   const totals = recentMeals.reduce(
@@ -556,14 +539,6 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     }
   });
 
-  // Include un-backfilled WorkoutEntry records in daily totals
-  unbackfilledEntries.forEach((entry) => {
-    const dateKey = getDateKeyInTimeZone(entry.performedAt, timeZone);
-    const matchingDay = dailyCalories.find((day) => day.date === dateKey);
-    if (matchingDay) {
-      matchingDay.caloriesBurned += entry.caloriesBurned;
-    }
-  });
 
   const baseCalorieGoal = member?.calorieGoal ?? null;
   const adjustedCalorieGoal = baseCalorieGoal === null ? null : baseCalorieGoal + caloriesBurnedToday;

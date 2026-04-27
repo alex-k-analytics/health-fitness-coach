@@ -154,15 +154,25 @@ workoutRoutes.get("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const auth = getRequiredAuth(req);
-  const workouts = await prisma.workoutEntry.findMany({
+  const sessions = await prisma.workoutSession.findMany({
     where: {
-      accountId: auth.accountId
+      accountId: auth.accountId,
+      activityType: "OTHER"
     },
     orderBy: {
       performedAt: "desc"
     },
     take: parsed.data.limit
   });
+
+  const workouts = sessions.map((s) => ({
+    id: s.id,
+    title: s.title,
+    caloriesBurned: s.totalCalories ?? 0,
+    performedAt: s.performedAt,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt
+  }));
 
   return res.json({ workouts: workouts.map(serializeWorkout) });
 });
@@ -174,16 +184,22 @@ workoutRoutes.post("/", async (req: AuthenticatedRequest, res) => {
   }
 
   const auth = getRequiredAuth(req);
-  const workout = await prisma.workoutEntry.create({
+  const performedAt = parsed.data.performedAt ? new Date(parsed.data.performedAt) : new Date();
+  const session = await prisma.workoutSession.create({
     data: {
       accountId: auth.accountId,
+      activityType: "OTHER",
       title: parsed.data.title.trim(),
-      caloriesBurned: parsed.data.caloriesBurned,
-      performedAt: parsed.data.performedAt ? new Date(parsed.data.performedAt) : new Date()
-    }
+      status: "COMPLETED",
+      performedAt,
+      endTime: performedAt,
+      totalCalories: parsed.data.caloriesBurned,
+      categoryCalories: { OTHER: parsed.data.caloriesBurned } as any
+    },
+    include: { exercises: { orderBy: { order: "asc" } } }
   });
 
-  return res.status(201).json({ workout: serializeWorkout(workout) });
+  return res.status(201).json({ workout: serializeSession(session) });
 });
 
 // --- Workout Session Endpoints ---

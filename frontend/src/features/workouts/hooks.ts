@@ -1,14 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/api";
 import { useShellStore } from "@/stores/shellStore";
-import type { Workout, WorkoutSession } from "@/types";
-
-export function useWorkoutsQuery(limit = 24) {
-  return useQuery({
-    queryKey: ["workouts", limit],
-    queryFn: () => apiFetch<{ workouts: Workout[] }>(`/workouts?limit=${limit}`)
-  });
-}
+import type { WorkoutSession } from "@/types";
 
 export function useWorkoutSessionsQuery(limit = 3) {
   return useQuery({
@@ -36,7 +29,7 @@ export function useCreateWorkoutMutation() {
         body: JSON.stringify(data)
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["workoutSessions"] });
       queryClient.invalidateQueries({ queryKey: ["nutritionSummary"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setGlobalNotice("Workout logged.");
