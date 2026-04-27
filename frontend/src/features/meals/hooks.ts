@@ -78,11 +78,11 @@ export function useUpdateMealMutation() {
         method: "PATCH",
         body: JSON.stringify(body)
       }),
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meals"] });
       queryClient.invalidateQueries({ queryKey: ["nutritionSummary"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setGlobalNotice(`Updated ${result.meal.title}.`);
+      setGlobalNotice("Meal updated.");
     },
     onError: (error) => {
       setGlobalError(error instanceof Error ? error.message : "Something went wrong.");

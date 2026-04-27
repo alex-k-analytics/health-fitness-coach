@@ -7,15 +7,15 @@ export function GlobalBanner() {
   if (!globalError && !globalNotice) return null;
 
   return (
-    <div className="px-4 pt-2">
+    <div className="px-4 pt-2 max-w-6xl mx-auto">
       {globalError && (
-        <Alert variant="destructive" className="mb-2 cursor-pointer" onClick={clearGlobalState}>
-          {globalError}
+        <Alert variant="destructive" className="mb-2 cursor-pointer py-2.5" onClick={clearGlobalState}>
+          <span className="col-start-2 block whitespace-normal leading-5">{globalError}</span>
         </Alert>
       )}
       {globalNotice && (
-        <Alert variant="success" className="mb-2 cursor-pointer" onClick={clearGlobalState}>
-          {globalNotice}
+        <Alert variant="success" className="mb-2 cursor-pointer py-2.5" onClick={clearGlobalState}>
+          <span className="col-start-2 block whitespace-normal leading-5">{globalNotice}</span>
         </Alert>
       )}
     </div>

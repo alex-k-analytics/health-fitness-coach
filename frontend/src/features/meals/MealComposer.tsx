@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useCallback, useId, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,9 +37,6 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const [otherFiles, setOtherFiles] = useState<File[]>([]);
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(initialEstimate);
   const [estimateBaseServings, setEstimateBaseServings] = useState(getServingCount(valueToInput(initialMeal?.quantity ?? 1)));
-  const plateRef = useRef<HTMLInputElement>(null);
-  const labelRef = useRef<HTMLInputElement>(null);
-  const otherRef = useRef<HTMLInputElement>(null);
 
   const estimateMutation = useMealEstimateMutation();
   const createMutation = useCreateMealMutation();
@@ -100,6 +97,20 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     onClose?.();
   }, [estimate, quantity, estimateBaseServings, isEdit, initialMeal, title, notes, eatenAt, servingDescription, createMutation, updateMutation, onClose]);
 
+  const handleSaveSavedFood = useCallback(() => {
+    if (!selectedSavedFood) return;
+    const savedFoodEstimate = estimateFromSavedFood(selectedSavedFood);
+    if (!savedFoodEstimate) return;
+
+    const formData = buildFormData();
+    const scaledAnalysis = scaleNutritionEstimate(savedFoodEstimate, getServingCount(quantity));
+    formData.append("confirmedAnalysis", JSON.stringify(scaledAnalysis));
+    createMutation.mutate({ formData, confirmedAnalysis: scaledAnalysis, reusableAnalysis: savedFoodEstimate });
+    reset();
+    setOpen(false);
+    onClose?.();
+  }, [selectedSavedFood, quantity, title, notes, eatenAt, servingDescription, savedFoodId, saveAsReusableFood, plateFiles, labelFiles, otherFiles, createMutation, onClose]);
+
   function buildFormData() {
     const formData = new FormData();
     formData.append("title", title);
@@ -138,6 +149,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const hasServingDetailsInput = Boolean(servingDescription.trim());
   const hasInputs = hasPhotoInput || hasReusableFoodInput || hasServingDetailsInput;
   const canEstimate = title.trim() && hasInputs;
+  const canSaveSavedFood = !isEdit && selectedSavedFood?.calories !== null && Boolean(title.trim());
   const displayedEstimate = estimate ? scaleNutritionEstimate(estimate, getServingCount(quantity) / estimateBaseServings) : null;
 
   const errors = [estimateMutation.error, createMutation.error, updateMutation.error].filter(Boolean);
@@ -284,9 +296,9 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             <div className="grid gap-3">
               <Label>Photos (optional)</Label>
               <div className="grid gap-2">
-                <PhotoPicker label="Plate photos" files={plateFiles} onFiles={setPlateFiles} inputRef={plateRef} icon={Camera} />
-                <PhotoPicker label="Nutrition label" files={labelFiles} onFiles={setLabelFiles} inputRef={labelRef} icon={FileText} />
-                <PhotoPicker label="Other photos" files={otherFiles} onFiles={setOtherFiles} inputRef={otherRef} icon={Image} />
+                <PhotoPicker label="Plate photos" files={plateFiles} onFiles={setPlateFiles} icon={Camera} />
+                <PhotoPicker label="Nutrition label" files={labelFiles} onFiles={setLabelFiles} icon={FileText} />
+                <PhotoPicker label="Other photos" files={otherFiles} onFiles={setOtherFiles} icon={Image} />
               </div>
             </div>
 
@@ -297,8 +309,13 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={closeAndReset}>Cancel</Button>
+              {canSaveSavedFood && (
+                <Button type="button" onClick={handleSaveSavedFood} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "Saving..." : "Save meal"}
+                </Button>
+              )}
               <Button onClick={handleEstimate} disabled={!canEstimate || estimateMutation.isPending}>
-                {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> Estimate Nutrition</>}
+                {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> {canSaveSavedFood ? "Re-estimate" : "Estimate Nutrition"}</>}
               </Button>
             </div>
             {!hasInputs && (
@@ -403,25 +420,43 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
   label: string;
   files: File[];
   onFiles: (files: File[]) => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
   icon: React.ElementType;
 }) {
+  const id = useId();
+  const libraryInputId = `${id}-library`;
+  const cameraInputId = `${id}-camera`;
+  const addFiles = (incoming: FileList | null) => {
+    if (!incoming?.length) return;
+    onFiles([...files, ...Array.from(incoming)]);
+  };
   const removeFile = (indexToRemove: number) => {
     onFiles(files.filter((_, index) => index !== indexToRemove));
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
   };
 
   return (
     <div className="rounded-md border bg-background p-3">
-      <Input
-        ref={inputRef as any}
+      <input
+        id={libraryInputId}
         type="file"
         multiple
         accept="image/*"
-        className="hidden"
-        onChange={(e) => onFiles(Array.from(e.target.files ?? []))}
+        className="sr-only"
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.currentTarget.value = "";
+        }}
+      />
+      <input
+        id={cameraInputId}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.currentTarget.value = "";
+        }}
       />
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -429,9 +464,14 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
           <span className="text-sm font-medium">{label}</span>
           {files.length > 0 && <Badge variant="secondary">{files.length}</Badge>}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-          Choose
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Label htmlFor={cameraInputId} className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted">
+            Camera
+          </Label>
+          <Label htmlFor={libraryInputId} className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted">
+            Library
+          </Label>
+        </div>
       </div>
       {files.length > 0 && (
         <div className="mt-3 grid gap-1">
@@ -477,6 +517,41 @@ function estimateFromMeal(meal: Meal | undefined): NutritionEstimate | null {
         proteinGrams: meal.proteinGrams ?? 0,
         carbsGrams: meal.carbsGrams ?? 0,
         fatGrams: meal.fatGrams ?? 0
+      }
+    ],
+    rawAnalysis: {}
+  };
+}
+
+function estimateFromSavedFood(food: SavedFood): NutritionEstimate | null {
+  if (food.calories === null) {
+    return null;
+  }
+
+  const servingDescription = food.servingDescription ?? "1 serving";
+  return {
+    status: "COMPLETED",
+    model: "saved-food",
+    summary: food.notes ?? `Stored nutrition for ${servingDescription}.`,
+    confidenceScore: 1,
+    estimatedCalories: food.calories,
+    proteinGrams: food.proteinGrams ?? 0,
+    carbsGrams: food.carbsGrams ?? 0,
+    fatGrams: food.fatGrams ?? 0,
+    fiberGrams: food.fiberGrams ?? 0,
+    sugarGrams: food.sugarGrams ?? 0,
+    sodiumMg: food.sodiumMg ?? 0,
+    micronutrients: [],
+    vitamins: [],
+    assumptions: ["Used stored reusable food nutrition."],
+    foodBreakdown: [
+      {
+        label: food.name,
+        quantityDescription: servingDescription,
+        calories: food.calories,
+        proteinGrams: food.proteinGrams ?? 0,
+        carbsGrams: food.carbsGrams ?? 0,
+        fatGrams: food.fatGrams ?? 0
       }
     ],
     rawAnalysis: {}

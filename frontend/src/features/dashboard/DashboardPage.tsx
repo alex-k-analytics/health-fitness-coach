@@ -267,7 +267,7 @@ function CalorieTrendChart({
   const padding = { top: 20, right: 18, bottom: 44, left: 54 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const chartMax = roundUpChartMax(Math.max(...points.map((point) => point.calories), goalCalories ?? 0, 1));
+  const chartMax = 3000;
   const ticks = [chartMax, Math.round(chartMax / 2), 0];
 
   if (!points.length || !hasMealData) {
@@ -400,14 +400,6 @@ function WeightTrendChart({ points }: { points: HealthMetric[] }) {
       ))}
     </svg>
   );
-}
-
-function roundUpChartMax(value: number): number {
-  if (value <= 100) return 100;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const normalized = value / magnitude;
-  const rounded = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return rounded * magnitude;
 }
 
 function StatCard({ icon: Icon, label, value, unit, sub }: {
