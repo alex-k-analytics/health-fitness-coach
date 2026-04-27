@@ -315,25 +315,6 @@ workoutRoutes.patch("/sessions/:id", async (req: AuthenticatedRequest, res) => {
   if (data.exercises !== undefined) {
     const weightKg = await getAccountWeightKg(auth.accountId);
     recalculatedCalories = computeSessionCalories(data.exercises, weightKg ?? 70);
-
-    // Update existing exercises and add new ones
-    for (let i = 0; i < data.exercises.length; i++) {
-      const ex = data.exercises[i];
-      const existingEx = existing.exercises.find((e: any) => e.id && ex.name === e.name && !e._deleted);
-      if (existingEx) {
-        await prisma.workoutExercise.update({
-          where: { id: existingEx.id },
-          data: {
-            sets: ex.sets as any,
-            distance: ex.distance ?? null,
-            distanceUnit: ex.distanceUnit ?? null,
-            durationSeconds: ex.durationSeconds ?? null,
-            caloriesBurned: ex.caloriesBurned ?? recalculatedCalories.byCategory[ex.category] ?? null,
-            order: i
-          }
-        });
-      }
-    }
   }
 
   const updateData: any = {};
@@ -354,10 +335,36 @@ workoutRoutes.patch("/sessions/:id", async (req: AuthenticatedRequest, res) => {
     updateData.categoryCalories = data.categoryCalories as any;
   }
 
-  const updated = await prisma.workoutSession.update({
-    where: { id: existing.id },
-    data: updateData,
-    include: { exercises: { orderBy: { order: "asc" } } }
+  const updated = await prisma.$transaction(async (tx) => {
+    if (data.exercises !== undefined) {
+      await tx.workoutExercise.deleteMany({
+        where: { workoutSessionId: existing.id, accountId: auth.accountId }
+      });
+
+      if (data.exercises.length > 0) {
+        await tx.workoutExercise.createMany({
+          data: data.exercises.map((ex, i) => ({
+            workoutSessionId: existing.id,
+            accountId: auth.accountId,
+            name: ex.name,
+            kind: ex.kind,
+            category: ex.category,
+            sets: ex.sets as any,
+            distance: ex.distance ?? null,
+            distanceUnit: ex.distanceUnit ?? null,
+            durationSeconds: ex.durationSeconds ?? null,
+            caloriesBurned: ex.caloriesBurned ?? recalculatedCalories?.byCategory[ex.category] ?? null,
+            order: i
+          }))
+        });
+      }
+    }
+
+    return tx.workoutSession.update({
+      where: { id: existing.id },
+      data: updateData,
+      include: { exercises: { orderBy: { order: "asc" } } }
+    });
   });
 
   return res.json({ session: serializeSession(updated) });

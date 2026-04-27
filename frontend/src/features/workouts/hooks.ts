@@ -71,3 +71,39 @@ export function useCreateSessionMutation() {
     }
   });
 }
+
+export function useUpdateSessionMutation() {
+  const queryClient = useQueryClient();
+  const setGlobalNotice = useShellStore.getState().setGlobalNotice;
+  const setGlobalError = useShellStore.getState().setGlobalError;
+
+  return useMutation({
+    mutationFn: ({ id, data }: {
+      id: string;
+      data: {
+        activityType: string;
+        title: string;
+        startTime?: string | null;
+        endTime?: string | null;
+        durationSeconds?: number;
+        totalCalories: number;
+        categoryCalories: Record<string, number>;
+        performedAt?: string;
+        exercises: unknown[];
+      };
+    }) =>
+      apiFetch(`/workouts/sessions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data)
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workoutSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["nutritionSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setGlobalNotice("Workout updated.");
+    },
+    onError: (error) => {
+      setGlobalError(error instanceof Error ? error.message : "Something went wrong.");
+    }
+  });
+}

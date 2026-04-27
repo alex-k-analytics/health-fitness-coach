@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Minus, Play, Pause, Check, Search, Trash2, RotateCcw } from "lucide-react";
-import type { WorkoutActivityType, WorkoutExercise, WorkoutExerciseKind, WorkoutSet } from "@/types";
-import { useExerciseListQuery, useCreateSessionMutation } from "@/features/workouts/hooks";
+import type { WorkoutActivityType, WorkoutExercise, WorkoutExerciseKind, WorkoutSession, WorkoutSet } from "@/types";
+import { useExerciseListQuery, useCreateSessionMutation, useUpdateSessionMutation } from "@/features/workouts/hooks";
 import { computeSessionCalories, fuzzyMatch } from "@/calorieEngine";
 import { formatTimer } from "@/lib/mealUtils";
 
@@ -34,10 +34,12 @@ const MODE_CATEGORY_KEYS: Record<WorkoutMode, WorkoutActivityType[]> = {
 
 interface WorkoutSessionModalProps {
   trigger?: React.ReactNode;
+  session?: WorkoutSession;
   onClose?: () => void;
 }
 
-export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalProps) {
+export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessionModalProps) {
+  const isEditing = Boolean(session);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"plan" | "active" | "review">("plan");
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>("STRENGTH");
@@ -54,6 +56,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { data: exerciseListData, isLoading: loadingExercises } = useExerciseListQuery();
   const createSession = useCreateSessionMutation();
+  const updateSession = useUpdateSessionMutation();
 
   useEffect(() => {
     if (timerRunning && !useManualTime) {
@@ -70,6 +73,30 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     const all = categoryKeys.flatMap((key) => exerciseListData?.exercises?.[key] ?? []);
     setSearchResults(fuzzyMatch(searchQuery, all, 3));
   }, [searchQuery, exerciseListData, workoutMode]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (session) {
+      const mode = getWorkoutMode(session.activityType);
+      const duration = session.durationSeconds ?? 0;
+      setStep("plan");
+      setWorkoutMode(mode);
+      setActivityType(session.activityType);
+      setTitle(session.title);
+      setExercises(cloneSessionExercises(session.exercises));
+      setElapsedSeconds(mode === "STRENGTH" ? duration : 0);
+      setManualMinutes(String(Math.floor(duration / 60)));
+      setManualSeconds(String(duration % 60));
+      setUseManualTime(true);
+      setTimerRunning(false);
+      setSearchQuery("");
+      setSearchResults([]);
+      return;
+    }
+
+    resetDraft();
+  }, [open, session]);
 
   const addExercise = useCallback((name: string) => {
     const category = resolveExerciseCategory(name, workoutMode, exerciseListData?.exercises);
@@ -152,6 +179,17 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     setStep("active");
     setTimerRunning(workoutMode === "STRENGTH" && !useManualTime);
   };
+  const handleReviewChanges = () => {
+    const duration = (parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0);
+
+    setExercises((prev) => prev.map((ex) => (
+      ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
+        ? { ...ex, durationSeconds: duration }
+        : ex
+    )));
+    setTimerRunning(false);
+    setStep("review");
+  };
   const handleFinish = () => {
     const duration = workoutMode !== "STRENGTH" || useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
@@ -173,29 +211,51 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       : elapsedSeconds;
     const result = computeSessionCalories(exercises, 70);
     const primaryActivityType = exercises[0]?.category ?? activityType;
-    createSession.mutate({
+    const endTime = session?.endTime ?? new Date().toISOString();
+    const payload = {
       activityType: primaryActivityType,
       title,
-      startTime: new Date(Date.now() - duration * 1000).toISOString(),
-      endTime: new Date().toISOString(),
+      startTime: new Date(new Date(endTime).getTime() - duration * 1000).toISOString(),
+      endTime,
       durationSeconds: duration,
       totalCalories: result.total,
       categoryCalories: result.byCategory,
       exercises
-    });
+    };
+
+    if (session) {
+      updateSession.mutate({
+        id: session.id,
+        data: {
+          ...payload,
+          performedAt: session.performedAt
+        }
+      });
+    } else {
+      createSession.mutate(payload);
+    }
     handleClose();
   };
 
   const handleClose = () => {
     setOpen(false);
+    resetDraft();
+    onClose?.();
+  };
+
+  const resetDraft = () => {
     setStep("plan");
+    setWorkoutMode("STRENGTH");
+    setActivityType("WEIGHTLIFTING");
+    setTitle("Strength");
     setElapsedSeconds(0);
     setTimerRunning(false);
     setExercises([]);
     setUseManualTime(false);
     setManualMinutes("0");
     setManualSeconds("0");
-    onClose?.();
+    setSearchQuery("");
+    setSearchResults([]);
   };
 
   const isTimedWorkout = workoutMode !== "STRENGTH";
@@ -225,6 +285,19 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <Label>Title</Label>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning run" />
       </div>
+
+      {isEditing && (
+        <div className="flex gap-3">
+          <div className="grid gap-1 flex-1">
+            <Label>Minutes</Label>
+            <Input inputMode="numeric" value={manualMinutes} onChange={(e) => setManualMinutes(cleanDurationPart(e.target.value))} />
+          </div>
+          <div className="grid gap-1 flex-1">
+            <Label>Seconds</Label>
+            <Input inputMode="numeric" value={manualSeconds} onChange={(e) => setManualSeconds(cleanDurationPart(e.target.value, 59))} />
+          </div>
+        </div>
+      )}
 
       {workoutMode !== "OTHER" && (
       <div className="grid gap-2">
@@ -338,8 +411,9 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleStart}>
-          <Play className="h-4 w-4 mr-1" /> Start Session
+        <Button onClick={isEditing ? handleReviewChanges : handleStart}>
+          {isEditing ? <Check className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+          {isEditing ? "Review Changes" : "Start Session"}
         </Button>
       </div>
     </div>
@@ -472,8 +546,10 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={handleEdit}>Edit</Button>
-          <Button onClick={handleSave} disabled={createSession.isPending}>
-            {createSession.isPending ? "Saving..." : "Save Workout"}
+          <Button onClick={handleSave} disabled={createSession.isPending || updateSession.isPending}>
+            {createSession.isPending || updateSession.isPending
+              ? "Saving..."
+              : isEditing ? "Update Workout" : "Save Workout"}
           </Button>
         </div>
       </div>
@@ -489,7 +565,9 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
       <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
-            {step === "plan" ? "Plan Workout" : step === "active" ? "Active Workout" : "Review Workout"}
+            {isEditing
+              ? "Edit Workout"
+              : step === "plan" ? "Plan Workout" : step === "active" ? "Active Workout" : "Review Workout"}
           </DialogTitle>
         </DialogHeader>
         {step === "plan" && renderPlan()}
@@ -533,4 +611,19 @@ function cleanDurationPart(value: string, max?: number): string {
   if (!Number.isFinite(parsed)) return "0";
 
   return String(max === undefined ? parsed : Math.min(parsed, max));
+}
+
+function getWorkoutMode(activityType: WorkoutActivityType): WorkoutMode {
+  if (activityType === "HIIT") return "HIIT";
+  if (activityType === "WEIGHTLIFTING" || activityType === "CALISTHENICS") return "STRENGTH";
+  if (activityType === "OTHER") return "OTHER";
+  return "CARDIO";
+}
+
+function cloneSessionExercises(exercises: WorkoutExercise[]): WorkoutExercise[] {
+  return exercises.map((exercise, index) => ({
+    ...exercise,
+    sets: exercise.sets?.map((set) => ({ ...set })),
+    order: exercise.order ?? index
+  }));
 }

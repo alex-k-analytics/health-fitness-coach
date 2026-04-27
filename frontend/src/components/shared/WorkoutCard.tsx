@@ -1,5 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { formatDuration } from "@/lib/mealUtils";
 import type { WorkoutSession } from "@/types";
 
@@ -42,14 +44,24 @@ export function WorkoutCard({ session }: { session: WorkoutSession }) {
           )}
         </div>
 
-        {session.exercises?.length ? (
-          <div className="hidden shrink-0 rounded-md border bg-muted/30 px-3 py-2 text-center sm:block">
-            <p className="text-lg font-semibold leading-none">{session.exercises.length}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              exercise{session.exercises.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-3">
+          {session.exercises?.length ? (
+            <div className="hidden rounded-md border bg-muted/30 px-3 py-2 text-center sm:block">
+              <p className="text-lg font-semibold leading-none">{session.exercises.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                exercise{session.exercises.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          ) : null}
+          <WorkoutSessionModal
+            session={session}
+            trigger={
+              <Button variant="outline" size="sm">
+                Edit
+              </Button>
+            }
+          />
+        </div>
       </CardContent>
     </Card>
   );
