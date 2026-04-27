@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { useCreateWeightMutation } from "@/features/settings/hooks";
 import { toOptionalNumber } from "@/lib/mealUtils";
@@ -37,14 +37,12 @@ export function WeightModal({ trigger }: { trigger?: React.ReactNode }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="weight">Weight (lb)</Label>
-            <Input
+            <NumericInput
               id="weight"
-              type="number"
-              step="0.1"
-              min="0"
               placeholder="e.g. 170"
+              mode="decimal"
               value={weightLbs}
-              onChange={(e) => setWeightLbs(e.target.value)}
+              onValueChange={setWeightLbs}
               autoFocus
             />
           </div>

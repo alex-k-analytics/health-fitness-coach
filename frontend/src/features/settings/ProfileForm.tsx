@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -109,21 +110,22 @@ export function ProfileForm() {
       <div className="grid grid-cols-3 gap-3">
         <div className="grid gap-2">
           <Label htmlFor="calorieGoal">Calorie goal</Label>
-          <Input
+          <NumericInput
             id="calorieGoal"
-            type="number"
             value={formData.calorieGoal}
-            onChange={(e) => setFormData((prev) => ({ ...prev, calorieGoal: e.target.value }))}
+            allowEmpty
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, calorieGoal: value }))}
             placeholder="2000"
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="heightCm">Height (cm)</Label>
-          <Input
+          <NumericInput
             id="heightCm"
-            type="number"
+            mode="decimal"
             value={formData.heightCm}
-            onChange={(e) => setFormData((prev) => ({ ...prev, heightCm: e.target.value }))}
+            allowEmpty
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, heightCm: value }))}
             placeholder="175"
           />
         </div>
@@ -145,31 +147,31 @@ export function ProfileForm() {
       <div className="grid grid-cols-3 gap-3">
         <div className="grid gap-2">
           <Label htmlFor="proteinGoal">Protein (g)</Label>
-          <Input
+          <NumericInput
             id="proteinGoal"
-            type="number"
             value={formData.proteinGoalGrams}
-            onChange={(e) => setFormData((prev) => ({ ...prev, proteinGoalGrams: e.target.value }))}
+            allowEmpty
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, proteinGoalGrams: value }))}
             placeholder="150"
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="carbGoal">Carbs (g)</Label>
-          <Input
+          <NumericInput
             id="carbGoal"
-            type="number"
             value={formData.carbGoalGrams}
-            onChange={(e) => setFormData((prev) => ({ ...prev, carbGoalGrams: e.target.value }))}
+            allowEmpty
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, carbGoalGrams: value }))}
             placeholder="200"
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="fatGoal">Fat (g)</Label>
-          <Input
+          <NumericInput
             id="fatGoal"
-            type="number"
             value={formData.fatGoalGrams}
-            onChange={(e) => setFormData((prev) => ({ ...prev, fatGoalGrams: e.target.value }))}
+            allowEmpty
+            onValueChange={(value) => setFormData((prev) => ({ ...prev, fatGoalGrams: value }))}
             placeholder="65"
           />
         </div>

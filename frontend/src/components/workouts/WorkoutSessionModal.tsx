@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput, NumericValueInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -289,11 +290,11 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         <div className="flex gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
-            <Input inputMode="numeric" value={manualMinutes} onChange={(e) => setManualMinutes(cleanDurationPart(e.target.value))} />
+            <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
           </div>
           <div className="grid gap-1 flex-1">
             <Label>Seconds</Label>
-            <Input inputMode="numeric" value={manualSeconds} onChange={(e) => setManualSeconds(cleanDurationPart(e.target.value, 59))} />
+            <NumericInput value={manualSeconds} max={59} onValueChange={setManualSeconds} />
           </div>
         </div>
       )}
@@ -367,10 +368,10 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                     {(ex.sets ?? []).map((s, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground w-8">Set {i + 1}</span>
-                        <Input type="number" min="0" className="w-20" placeholder="reps"
-                          value={s.reps} onChange={(e) => updateSet(ex.id!, i, { reps: parseInt(e.target.value, 10) || 0 })} />
-                        <Input type="number" min="0" className="w-20" placeholder="lbs"
-                          value={s.weightLbs} onChange={(e) => updateSet(ex.id!, i, { weightLbs: parseInt(e.target.value, 10) || 0 })} />
+                        <NumericValueInput className="w-20" placeholder="reps"
+                          value={s.reps} onValueChange={(reps) => updateSet(ex.id!, i, { reps })} />
+                        <NumericValueInput mode="decimal" className="w-20" placeholder="lbs"
+                          value={s.weightLbs} onValueChange={(weightLbs) => updateSet(ex.id!, i, { weightLbs })} />
                         {(ex.sets?.length ?? 0) > 1 && (
                           <Button variant="ghost" size="sm" onClick={() => removeSet(ex.id!, i)}>
                             <Minus className="h-3 w-3" />
@@ -385,9 +386,10 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                 ) : (
                   <div className="grid gap-1">
                       <Label>Distance (mi)</Label>
-                      <DistanceInput
+                      <NumericValueInput
+                        mode="decimal"
                         value={ex.distance}
-                        onChange={(distance) => updateExercise(ex.id!, { distance })}
+                        onValueChange={(distance) => updateExercise(ex.id!, { distance })}
                       />
                   </div>
                 )}
@@ -432,20 +434,21 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         <div className="flex gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
-            <Input inputMode="numeric" value={manualMinutes} onChange={(e) => setManualMinutes(cleanDurationPart(e.target.value))} />
+            <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
           </div>
           <div className="grid gap-1 flex-1">
             <Label>Seconds</Label>
-            <Input inputMode="numeric" value={manualSeconds} onChange={(e) => setManualSeconds(cleanDurationPart(e.target.value, 59))} />
+            <NumericInput value={manualSeconds} max={59} onValueChange={setManualSeconds} />
           </div>
         </div>
       )}
       {isTimedWorkout && exercises[0] && workoutMode !== "OTHER" && (
         <div className="grid gap-1">
           <Label>Distance (mi)</Label>
-          <DistanceInput
+          <NumericValueInput
+            mode="decimal"
             value={exercises[0].distance}
-            onChange={(distance) => updateExercise(exercises[0].id!, { distance })}
+            onValueChange={(distance) => updateExercise(exercises[0].id!, { distance })}
           />
         </div>
       )}
@@ -571,27 +574,6 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
   );
 }
 
-function DistanceInput({ value, onChange }: { value: number | undefined; onChange: (value: number) => void }) {
-  const [draft, setDraft] = useState(formatDistanceInput(value));
-
-  useEffect(() => {
-    setDraft(formatDistanceInput(value));
-  }, [value]);
-
-  return (
-    <Input
-      inputMode="decimal"
-      value={draft}
-      onChange={(event) => {
-        const nextDraft = cleanDistanceDraft(event.target.value);
-        setDraft(nextDraft);
-        onChange(parseDistanceDraft(nextDraft));
-      }}
-      onBlur={() => setDraft(formatDistanceInput(parseDistanceDraft(draft)))}
-    />
-  );
-}
-
 function resolveExerciseCategory(
   name: string,
   mode: WorkoutMode,
@@ -608,43 +590,6 @@ function resolveExerciseCategory(
   }
 
   return WORKOUT_TYPES.find((item) => item.value === mode)?.defaultActivityType ?? "OTHER";
-}
-
-function cleanDurationPart(value: string, max?: number): string {
-  const digits = value.replace(/\D/g, "");
-  if (!digits) return "0";
-
-  const parsed = Number(digits);
-  if (!Number.isFinite(parsed)) return "0";
-
-  return String(max === undefined ? parsed : Math.min(parsed, max));
-}
-
-function formatDistanceInput(value: number | undefined): string {
-  if (!value || !Number.isFinite(value)) return "0";
-  return String(value);
-}
-
-function cleanDistanceDraft(value: string): string {
-  const normalized = value.replace(/[^\d.]/g, "");
-  const firstDecimal = normalized.indexOf(".");
-  if (firstDecimal === -1) {
-    return normalizeWholeDistance(normalized);
-  }
-
-  const whole = normalizeWholeDistance(normalized.slice(0, firstDecimal));
-  const decimal = normalized.slice(firstDecimal + 1).replace(/\./g, "");
-  return `${whole}.${decimal}`;
-}
-
-function normalizeWholeDistance(value: string): string {
-  const stripped = value.replace(/^0+(?=\d)/, "");
-  return stripped || "0";
-}
-
-function parseDistanceDraft(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function getWorkoutMode(activityType: WorkoutActivityType): WorkoutMode {

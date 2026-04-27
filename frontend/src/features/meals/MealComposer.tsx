@@ -2,6 +2,7 @@ import { useState, useCallback, useId, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -288,7 +289,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
               </div>
               <div className="grid gap-2">
                 <Label>Servings</Label>
-                <Input type="number" min="0.1" step="0.1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                <NumericInput mode="decimal" value={quantity} onValueChange={setQuantity} />
               </div>
             </div>
 
@@ -347,7 +348,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
               </div>
               <div className="grid gap-2">
                 <Label>Servings</Label>
-                <Input type="number" min="0.1" step="0.1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                <NumericInput mode="decimal" value={quantity} onValueChange={setQuantity} />
               </div>
             </div>
             <div className="grid gap-2">
