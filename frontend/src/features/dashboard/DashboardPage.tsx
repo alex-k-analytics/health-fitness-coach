@@ -111,7 +111,7 @@ export function DashboardPage() {
       {/* ── Trend Row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardContent className="pt-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold">Calorie Trend</h3>
@@ -123,7 +123,7 @@ export function DashboardPage() {
         </Card>
 
         <Card>
-          <CardContent className="pt-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold">Weight Trend</h3>
@@ -262,99 +262,152 @@ function CalorieTrendChart({
   goalCalories: number | null;
 }) {
   const hasMealData = points.some((point) => point.calories > 0);
-  const chartMax = Math.max(...points.map((point) => point.calories), goalCalories ?? 0, 1);
-  const goalPercent = goalCalories ? Math.min(100, (goalCalories / chartMax) * 100) : null;
+  const width = 720;
+  const height = 260;
+  const padding = { top: 20, right: 18, bottom: 44, left: 54 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const chartMax = roundUpChartMax(Math.max(...points.map((point) => point.calories), goalCalories ?? 0, 1));
+  const ticks = [chartMax, Math.round(chartMax / 2), 0];
 
   if (!points.length || !hasMealData) {
-    return <p className="text-sm text-muted-foreground text-center py-12">No calorie data yet.</p>;
+    return (
+      <div className="flex h-[260px] items-center justify-center rounded-md border border-dashed bg-muted/20">
+        <p className="text-sm text-muted-foreground">No calorie data yet.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="relative h-44 pt-3">
-      {goalPercent !== null && (
-        <div
-          className="absolute left-0 right-0 border-t border-dashed border-primary/50"
-          style={{ bottom: `${goalPercent}%` }}
-          aria-hidden="true"
-        />
-      )}
-      <div className="relative z-10 flex h-full items-end gap-2">
-        {points.map((point) => {
-          const heightPercent = point.calories > 0 ? Math.max(12, (point.calories / chartMax) * 100) : 0;
-          return (
-            <div key={point.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-              <span className="h-4 text-[10px] font-medium text-muted-foreground">{point.calories || ""}</span>
-              <div className="flex h-28 w-full items-end rounded-sm bg-muted/60 px-1">
-                <div
-                  className="w-full rounded-t-sm bg-primary/85 transition-all"
-                  style={{ height: `${heightPercent}%` }}
-                  title={`${point.calories} cal`}
-                />
-              </div>
-              <span className="text-[10px] text-muted-foreground">{formatDateKeyShortDay(point.date)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full overflow-visible" role="img" aria-label="7 day calorie trend">
+      {ticks.map((tick) => {
+        const y = padding.top + (1 - tick / chartMax) * plotHeight;
+        return (
+          <g key={tick}>
+            <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="hsl(var(--border))" strokeWidth="1" />
+            <text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-muted-foreground" fontSize="12">
+              {tick}
+            </text>
+          </g>
+        );
+      })}
+      {goalCalories && goalCalories > 0 && goalCalories <= chartMax ? (
+        <g>
+          <line
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={padding.top + (1 - goalCalories / chartMax) * plotHeight}
+            y2={padding.top + (1 - goalCalories / chartMax) * plotHeight}
+            stroke="hsl(var(--success))"
+            strokeDasharray="6 5"
+            strokeWidth="2"
+          />
+          <text
+            x={width - padding.right}
+            y={Math.max(12, padding.top + (1 - goalCalories / chartMax) * plotHeight - 8)}
+            textAnchor="end"
+            className="fill-muted-foreground"
+            fontSize="12"
+          >
+            goal
+          </text>
+        </g>
+      ) : null}
+      {points.map((point, index) => {
+        const slotWidth = plotWidth / points.length;
+        const barWidth = Math.min(44, slotWidth * 0.54);
+        const x = padding.left + index * slotWidth + (slotWidth - barWidth) / 2;
+        const barHeight = point.calories === 0 ? 0 : Math.max(8, (point.calories / chartMax) * plotHeight);
+        const y = padding.top + plotHeight - barHeight;
+
+        return (
+          <g key={point.date}>
+            <rect x={x} y={y} width={barWidth} height={barHeight} rx="5" fill="hsl(var(--primary))" opacity={point.calories === 0 ? 0.18 : 0.9} />
+            {point.calories === 0 ? (
+              <circle cx={x + barWidth / 2} cy={padding.top + plotHeight} r="3" fill="hsl(var(--muted-foreground))" opacity="0.45" />
+            ) : (
+              <text x={x + barWidth / 2} y={Math.max(12, y - 8)} textAnchor="middle" className="fill-foreground" fontSize="13" fontWeight="700">
+                {point.calories}
+              </text>
+            )}
+            <text x={x + barWidth / 2} y={height - 14} textAnchor="middle" className="fill-muted-foreground" fontSize="13">
+              {formatDateKeyShortDay(point.date)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
 function WeightTrendChart({ points }: { points: HealthMetric[] }) {
   if (points.length < 2) {
-    return <p className="text-sm text-muted-foreground text-center py-12">Need 2+ entries for trend.</p>;
+    return (
+      <div className="flex h-[260px] items-center justify-center rounded-md border border-dashed bg-muted/20">
+        <p className="text-sm text-muted-foreground">Need 2+ entries for trend.</p>
+      </div>
+    );
   }
 
   const weights = points.map((point) => point.weightKg ?? 0);
-  const minWeight = Math.min(...weights);
-  const maxWeight = Math.max(...weights);
-  const width = 560;
-  const height = 190;
-  const paddingX = 42;
-  const paddingY = 28;
-  const usableWidth = width - paddingX * 2;
-  const usableHeight = height - paddingY * 2;
+  const weightsLbs = weights.map(kgToLbs);
+  const rawMin = Math.min(...weightsLbs);
+  const rawMax = Math.max(...weightsLbs);
+  const range = Math.max(rawMax - rawMin, 2);
+  const minWeight = Math.floor((rawMin - range * 0.18) * 2) / 2;
+  const maxWeight = Math.ceil((rawMax + range * 0.18) * 2) / 2;
+  const width = 720;
+  const height = 260;
+  const padding = { top: 22, right: 24, bottom: 44, left: 58 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const ticks = [maxWeight, (maxWeight + minWeight) / 2, minWeight];
   const coordinates = points.map((point, index) => {
-    const weight = point.weightKg ?? minWeight;
-    const x = paddingX + (index / Math.max(points.length - 1, 1)) * usableWidth;
-    const y =
-      maxWeight === minWeight
-        ? height / 2
-        : height - paddingY - ((weight - minWeight) / (maxWeight - minWeight)) * usableHeight;
+    const weight = kgToLbs(point.weightKg ?? 0);
+    const x = padding.left + (index / Math.max(points.length - 1, 1)) * plotWidth;
+    const y = padding.top + (1 - (weight - minWeight) / (maxWeight - minWeight)) * plotHeight;
     return { point, x, y, weight };
   });
   const linePath = coordinates.map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+  const firstPoint = coordinates[0];
+  const lastPoint = coordinates[coordinates.length - 1];
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-44 w-full overflow-visible" role="img" aria-label="Weight trend">
-      {[0, 1, 2].map((lineIndex) => {
-        const y = paddingY + (usableHeight / 2) * lineIndex;
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full overflow-visible" role="img" aria-label="Weight trend">
+      {ticks.map((tick) => {
+        const y = padding.top + (1 - (tick - minWeight) / (maxWeight - minWeight)) * plotHeight;
         return (
-          <line
-            key={lineIndex}
-            x1={paddingX}
-            x2={width - paddingX}
-            y1={y}
-            y2={y}
-            stroke="hsl(var(--border))"
-            strokeWidth="1"
-          />
+          <g key={tick}>
+            <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="hsl(var(--border))" strokeWidth="1" />
+            <text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-muted-foreground" fontSize="12">
+              {tick.toFixed(1)}
+            </text>
+          </g>
         );
       })}
-      <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={`${linePath} L ${lastPoint.x} ${padding.top + plotHeight} L ${firstPoint.x} ${padding.top + plotHeight} Z`} fill="hsl(var(--primary))" opacity="0.08" />
       {coordinates.map(({ point, x, y, weight }) => (
         <g key={point.id}>
-          <circle cx={x} cy={y} r="5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="3" />
-          <text x={x} y={Math.max(12, y - 12)} textAnchor="middle" className="fill-foreground" fontSize="12" fontWeight="600">
-            {kgToLbs(weight).toFixed(1)}
+          <circle cx={x} cy={y} r="6" fill="hsl(var(--card))" stroke="hsl(var(--primary))" strokeWidth="3" />
+          <text x={x} y={Math.max(13, y - 12)} textAnchor="middle" className="fill-foreground" fontSize="13" fontWeight="700">
+            {weight.toFixed(1)}
           </text>
-          <text x={x} y={height - 6} textAnchor="middle" className="fill-muted-foreground" fontSize="11">
+          <text x={x} y={height - 14} textAnchor="middle" className="fill-muted-foreground" fontSize="13">
             {new Date(point.recordedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </text>
         </g>
       ))}
     </svg>
   );
+}
+
+function roundUpChartMax(value: number): number {
+  if (value <= 100) return 100;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const rounded = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return rounded * magnitude;
 }
 
 function StatCard({ icon: Icon, label, value, unit, sub }: {

@@ -21,8 +21,9 @@ interface MealComposerProps {
 }
 
 export function MealComposer({ trigger, initialMeal, initialFood, onClose }: MealComposerProps) {
+  const initialEstimate = useMemo(() => estimateFromMeal(initialMeal), [initialMeal]);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"input" | "estimate" | "confirm">(initialMeal ? "confirm" : "input");
+  const [step, setStep] = useState<"input" | "estimate" | "confirm">(initialEstimate ? "confirm" : "input");
   const [title, setTitle] = useState(initialMeal?.title ?? initialFood?.name ?? "");
   const [notes, setNotes] = useState(initialMeal?.notes ?? "");
   const [eatenAt, setEatenAt] = useState(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : "");
@@ -34,8 +35,8 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
   const [labelFiles, setLabelFiles] = useState<File[]>([]);
   const [otherFiles, setOtherFiles] = useState<File[]>([]);
-  const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
-  const [estimateBaseServings, setEstimateBaseServings] = useState(1);
+  const [estimate, setEstimate] = useState<NutritionEstimate | null>(initialEstimate);
+  const [estimateBaseServings, setEstimateBaseServings] = useState(getServingCount(valueToInput(initialMeal?.quantity ?? 1)));
   const plateRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLInputElement>(null);
   const otherRef = useRef<HTMLInputElement>(null);
@@ -115,20 +116,21 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   }
 
   function reset() {
-    setTitle("");
-    setNotes("");
-    setEatenAt("");
-    setServingDescription("");
-    setQuantity("1");
-    setSavedFoodId("");
+    setTitle(initialMeal?.title ?? initialFood?.name ?? "");
+    setNotes(initialMeal?.notes ?? "");
+    setEatenAt(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : "");
+    setServingDescription(initialMeal?.servingDescription ?? initialFood?.servingDescription ?? "");
+    const initialQuantity = valueToInput(initialMeal?.quantity ?? 1);
+    setQuantity(initialQuantity);
+    setSavedFoodId(initialMeal?.savedFood?.id ?? initialFood?.id ?? "");
     setSavedFoodSearch("");
     setSaveAsReusableFood(false);
     setPlateFiles([]);
     setLabelFiles([]);
     setOtherFiles([]);
-    setEstimate(null);
-    setEstimateBaseServings(1);
-    setStep("input");
+    setEstimate(initialEstimate);
+    setEstimateBaseServings(getServingCount(initialQuantity));
+    setStep(initialEstimate ? "confirm" : "input");
   }
 
   const hasPhotoInput = plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0;
@@ -147,15 +149,21 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     onClose?.();
   };
 
+  const closeAndReset = () => {
+    reset();
+    setOpen(false);
+    onClose?.();
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(o); }}>
       <DialogTrigger asChild>
         {trigger || <Button>Log Food</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === "input" ? "Log Food" : step === "estimate" ? "Estimating..." : "Review & Save"}
+            {isEdit ? "Edit Food" : step === "input" ? "Log Food" : step === "estimate" ? "Estimating..." : "Review & Save"}
           </DialogTitle>
         </DialogHeader>
 
@@ -288,7 +296,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={closeAndReset}>Cancel</Button>
               <Button onClick={handleEstimate} disabled={!canEstimate || estimateMutation.isPending}>
                 {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> Estimate Nutrition</>}
               </Button>
@@ -378,8 +386,8 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             </Card>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep("input")}>Back</Button>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setStep("input")}>{isEdit ? "Edit details" : "Back"}</Button>
+              <Button type="button" variant="outline" onClick={closeAndReset}>Cancel</Button>
               <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
                 {isEdit ? (updateMutation.isPending ? "Updating..." : "Update") : (createMutation.isPending ? "Saving..." : "Save")}
               </Button>
@@ -439,4 +447,38 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
       )}
     </div>
   );
+}
+
+function estimateFromMeal(meal: Meal | undefined): NutritionEstimate | null {
+  if (!meal || meal.estimatedCalories === null) {
+    return null;
+  }
+
+  return {
+    status: meal.analysisStatus,
+    model: meal.aiModel ?? "saved-meal",
+    summary: meal.analysisSummary ?? "",
+    confidenceScore: meal.confidenceScore ?? 1,
+    estimatedCalories: meal.estimatedCalories,
+    proteinGrams: meal.proteinGrams ?? 0,
+    carbsGrams: meal.carbsGrams ?? 0,
+    fatGrams: meal.fatGrams ?? 0,
+    fiberGrams: meal.fiberGrams ?? 0,
+    sugarGrams: meal.sugarGrams ?? 0,
+    sodiumMg: meal.sodiumMg ?? 0,
+    micronutrients: meal.micronutrients ?? [],
+    vitamins: meal.vitamins ?? [],
+    assumptions: meal.assumptions ?? [],
+    foodBreakdown: meal.foodBreakdown ?? [
+      {
+        label: meal.title,
+        quantityDescription: meal.servingDescription ?? "1 serving",
+        calories: meal.estimatedCalories,
+        proteinGrams: meal.proteinGrams ?? 0,
+        carbsGrams: meal.carbsGrams ?? 0,
+        fatGrams: meal.fatGrams ?? 0
+      }
+    ],
+    rawAnalysis: {}
+  };
 }
