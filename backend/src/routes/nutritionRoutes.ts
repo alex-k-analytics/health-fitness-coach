@@ -449,7 +449,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const startOfTrendWindow = new Date();
   startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
-  const [recentMeals, recentWorkouts, recentWorkoutSessions, member] = await Promise.all([
+  const [recentMeals, recentWorkoutSessions, recentWorkoutEntries, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
         accountId: auth.accountId,
@@ -465,18 +465,6 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         fatGrams: true
       }
     }),
-    prisma.workoutEntry.findMany({
-      where: {
-        accountId: auth.accountId,
-        performedAt: {
-          gte: startOfTrendWindow
-        }
-      },
-      select: {
-        performedAt: true,
-        caloriesBurned: true
-      }
-    }),
     prisma.workoutSession.findMany({
       where: {
         accountId: auth.accountId,
@@ -486,8 +474,22 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         }
       },
       select: {
+        id: true,
         performedAt: true,
         totalCalories: true
+      }
+    }),
+    prisma.workoutEntry.findMany({
+      where: {
+        accountId: auth.accountId,
+        performedAt: {
+          gte: startOfTrendWindow
+        }
+      },
+      select: {
+        id: true,
+        performedAt: true,
+        caloriesBurned: true
       }
     }),
     prisma.account.findUnique({
@@ -512,13 +514,13 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     caloriesBurned: 0
   }));
 
-  const caloriesBurnedTodayFromEntries = recentWorkouts.reduce((total, workout) => {
-    return total + (getDateKeyInTimeZone(workout.performedAt, timeZone) === todayKey ? workout.caloriesBurned : 0);
-  }, 0);
-  const caloriesBurnedTodayFromSessions = recentWorkoutSessions.reduce((total, session) => {
+  const sessionIds = new Set(recentWorkoutSessions.map((s) => s.id));
+  const unbackfilledEntries = recentWorkoutEntries.filter((e) => !sessionIds.has(e.id));
+  const caloriesBurnedToday = recentWorkoutSessions.reduce((total, session) => {
     return total + (getDateKeyInTimeZone(session.performedAt, timeZone) === todayKey ? (session.totalCalories ?? 0) : 0);
+  }, 0) + unbackfilledEntries.reduce((total, entry) => {
+    return total + (getDateKeyInTimeZone(entry.performedAt, timeZone) === todayKey ? entry.caloriesBurned : 0);
   }, 0);
-  const caloriesBurnedToday = caloriesBurnedTodayFromEntries + caloriesBurnedTodayFromSessions;
 
   const totals = recentMeals.reduce(
     (accumulator, meal) => {
@@ -545,21 +547,21 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     }
   });
 
-  recentWorkouts.forEach((workout) => {
-    const dateKey = getDateKeyInTimeZone(workout.performedAt, timeZone);
-    const matchingDay = dailyCalories.find((day) => day.date === dateKey);
-
-    if (matchingDay) {
-      matchingDay.caloriesBurned += workout.caloriesBurned;
-    }
-  });
-
   recentWorkoutSessions.forEach((session) => {
     const dateKey = getDateKeyInTimeZone(session.performedAt, timeZone);
     const matchingDay = dailyCalories.find((day) => day.date === dateKey);
 
     if (matchingDay) {
       matchingDay.caloriesBurned += session.totalCalories ?? 0;
+    }
+  });
+
+  // Include un-backfilled WorkoutEntry records in daily totals
+  unbackfilledEntries.forEach((entry) => {
+    const dateKey = getDateKeyInTimeZone(entry.performedAt, timeZone);
+    const matchingDay = dailyCalories.find((day) => day.date === dateKey);
+    if (matchingDay) {
+      matchingDay.caloriesBurned += entry.caloriesBurned;
     }
   });
 
