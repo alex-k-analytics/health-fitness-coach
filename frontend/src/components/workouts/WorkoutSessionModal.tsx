@@ -27,6 +27,14 @@ const ACTIVITY_TYPES: { value: WorkoutActivityType; label: string }[] = [
 const CARDIO_TYPES = new Set<WorkoutActivityType>([
   "RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "HIIT"
 ]);
+const CARDIO_ACTIVITY_LABELS: Partial<Record<WorkoutActivityType, string>> = {
+  RUNNING: "Run",
+  WALKING: "Walk",
+  CYCLING: "Cycling",
+  SWIMMING: "Swim",
+  ROWING: "Rowing",
+  HIIT: "HIIT"
+};
 
 interface WorkoutSessionModalProps {
   trigger?: React.ReactNode;
@@ -101,19 +109,61 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     }));
   }, []);
 
+  const createDefaultExercise = useCallback((type: WorkoutActivityType): WorkoutExercise => {
+    const kind: WorkoutExerciseKind = CARDIO_TYPES.has(type) ? "CARDIO" : "LIFT";
+    return {
+      id: crypto.randomUUID(),
+      name: kind === "CARDIO" ? (CARDIO_ACTIVITY_LABELS[type] ?? ACTIVITY_TYPES.find((t) => t.value === type)?.label ?? type) : "Exercise",
+      kind,
+      category: type,
+      sets: kind === "LIFT" ? [{ reps: 10, weightLbs: 0 }] : undefined,
+      durationSeconds: kind === "CARDIO" ? 0 : undefined,
+      distance: kind === "CARDIO" ? 0 : undefined,
+      distanceUnit: kind === "CARDIO" ? "mi" : undefined,
+      order: 0
+    };
+  }, []);
+
   const onActivityTypeChange = (type: WorkoutActivityType) => {
     setActivityType(type);
     const label = ACTIVITY_TYPES.find((t) => t.value === type)?.label ?? type;
     setTitle(label);
-    setExercises([]); setElapsedSeconds(0); setTimerRunning(false);
+    setExercises(CARDIO_TYPES.has(type) ? [createDefaultExercise(type)] : []);
+    setElapsedSeconds(0); setTimerRunning(false);
   };
 
-  const handleStart = () => { setStep("active"); setTimerRunning(true); };
-  const handleFinish = () => { setTimerRunning(false); setStep("review"); };
+  const handleStart = () => {
+    const nextExercises = exercises.length > 0
+      ? exercises
+      : CARDIO_TYPES.has(activityType)
+        ? [createDefaultExercise(activityType)]
+        : [];
+    if (nextExercises.length === 0) return;
+
+    setExercises(nextExercises);
+    if (CARDIO_TYPES.has(activityType) && manualMinutes === "0" && manualSeconds === "0") {
+      setManualMinutes("30");
+    }
+    setStep("active");
+    setTimerRunning(!useManualTime);
+  };
+  const handleFinish = () => {
+    const duration = CARDIO_TYPES.has(activityType) || useManualTime
+      ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
+      : elapsedSeconds;
+
+    setExercises((prev) => prev.map((ex) => (
+      ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
+        ? { ...ex, durationSeconds: duration }
+        : ex
+    )));
+    setTimerRunning(false);
+    setStep("review");
+  };
   const handleEdit = () => { setStep("plan"); };
 
   const handleSave = () => {
-    const duration = useManualTime
+    const duration = CARDIO_TYPES.has(activityType) || useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
       : elapsedSeconds;
     const result = computeSessionCalories(exercises, 70);
@@ -142,7 +192,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
     onClose?.();
   };
 
-  const durationDisplay = useManualTime
+  const durationDisplay = CARDIO_TYPES.has(activityType) || useManualTime
     ? `${manualMinutes}:${manualSeconds.padStart(2, "0")}`
     : formatTimer(elapsedSeconds);
 
@@ -171,6 +221,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning run" />
       </div>
 
+      {!CARDIO_TYPES.has(activityType) && (
       <div className="grid gap-2">
         <Label>Add Exercise</Label>
         <div className="flex gap-2">
@@ -210,6 +261,13 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
           </Card>
         )}
       </div>
+      )}
+
+      {CARDIO_TYPES.has(activityType) && exercises.length === 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+          This workout will track one {title.toLowerCase()} activity. Start the session, then enter the duration and distance before saving.
+        </div>
+      )}
 
       {exercises.length > 0 && (
         <div className="grid gap-3">
@@ -270,7 +328,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleStart} disabled={exercises.length === 0}>
+        <Button onClick={handleStart} disabled={!CARDIO_TYPES.has(activityType) && exercises.length === 0}>
           <Play className="h-4 w-4 mr-1" /> Start Session
         </Button>
       </div>
@@ -291,11 +349,13 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
           </Button>
         </div>
       </div>
+      {!CARDIO_TYPES.has(activityType) && (
       <div className="flex items-center gap-2">
         <input type="checkbox" id="manualTime" checked={useManualTime} onChange={(e) => setUseManualTime(e.target.checked)} />
         <Label htmlFor="manualTime" className="text-sm font-normal">Use Manual Time</Label>
       </div>
-      {useManualTime && (
+      )}
+      {(useManualTime || CARDIO_TYPES.has(activityType)) && (
         <div className="flex gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
@@ -305,6 +365,18 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
             <Label>Seconds</Label>
             <Input type="number" min="0" max="59" value={manualSeconds} onChange={(e) => setManualSeconds(e.target.value)} />
           </div>
+        </div>
+      )}
+      {CARDIO_TYPES.has(activityType) && exercises[0] && (
+        <div className="grid gap-1">
+          <Label>Distance (mi)</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.1"
+            value={exercises[0].distance ?? 0}
+            onChange={(e) => updateExercise(exercises[0].id!, { distance: Math.max(0, parseFloat(e.target.value) || 0) })}
+          />
         </div>
       )}
       <Separator />
