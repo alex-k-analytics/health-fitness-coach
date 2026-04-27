@@ -449,7 +449,7 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const startOfTrendWindow = new Date();
   startOfTrendWindow.setDate(startOfTrendWindow.getDate() - 8);
 
-  const [recentMeals, recentWorkoutSessions, member] = await Promise.all([
+  const [recentMeals, recentWorkouts, recentWorkoutSessions, member] = await Promise.all([
     prisma.mealEntry.findMany({
       where: {
         accountId: auth.accountId,
@@ -463,6 +463,18 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
         proteinGrams: true,
         carbsGrams: true,
         fatGrams: true
+      }
+    }),
+    prisma.workoutEntry.findMany({
+      where: {
+        accountId: auth.accountId,
+        performedAt: {
+          gte: startOfTrendWindow
+        }
+      },
+      select: {
+        performedAt: true,
+        caloriesBurned: true
       }
     }),
     prisma.workoutSession.findMany({
@@ -500,9 +512,13 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     caloriesBurned: 0
   }));
 
-  const caloriesBurnedToday = recentWorkoutSessions.reduce((total, session) => {
+  const caloriesBurnedTodayFromEntries = recentWorkouts.reduce((total, workout) => {
+    return total + (getDateKeyInTimeZone(workout.performedAt, timeZone) === todayKey ? workout.caloriesBurned : 0);
+  }, 0);
+  const caloriesBurnedTodayFromSessions = recentWorkoutSessions.reduce((total, session) => {
     return total + (getDateKeyInTimeZone(session.performedAt, timeZone) === todayKey ? (session.totalCalories ?? 0) : 0);
   }, 0);
+  const caloriesBurnedToday = caloriesBurnedTodayFromEntries + caloriesBurnedTodayFromSessions;
 
   const totals = recentMeals.reduce(
     (accumulator, meal) => {
@@ -526,6 +542,15 @@ nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
     if (matchingDay) {
       matchingDay.calories += meal.estimatedCalories ?? 0;
       matchingDay.mealCount += 1;
+    }
+  });
+
+  recentWorkouts.forEach((workout) => {
+    const dateKey = getDateKeyInTimeZone(workout.performedAt, timeZone);
+    const matchingDay = dailyCalories.find((day) => day.date === dateKey);
+
+    if (matchingDay) {
+      matchingDay.caloriesBurned += workout.caloriesBurned;
     }
   });
 

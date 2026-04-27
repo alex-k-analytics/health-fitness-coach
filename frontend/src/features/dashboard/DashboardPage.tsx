@@ -4,26 +4,36 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNutritionSummaryQuery } from "@/features/dashboard/hooks";
-import { useHealthMetricsQuery } from "@/features/settings/hooks";
+import { useHealthMetricsQuery, useProfileQuery } from "@/features/settings/hooks";
 import { useMealsQuery } from "@/features/meals/hooks";
 import { useWorkoutSessionsQuery } from "@/features/workouts/hooks";
-import { formatDateTime, formatDate, formatWeight, formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
+import { formatDate, formatWeight, getProgressPercent, kgToLbs } from "@/lib/mealUtils";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { MealCard } from "@/components/shared/MealCard";
 import { WorkoutCard } from "@/components/shared/WorkoutCard";
 import { UtensilsCrossed, Dumbbell, Flame, Scale } from "lucide-react";
-import type { Meal } from "@/types";
+import type { HealthMetric, Meal, NutritionSummary } from "@/types";
 
 export function DashboardPage() {
   const { data: nutritionSummary, isLoading: loadingNutrition } = useNutritionSummaryQuery();
+  const { data: profile } = useProfileQuery();
   const { data: healthMetrics, isLoading: loadingMetrics } = useHealthMetricsQuery(12);
-  const { data: meals, isLoading: loadingMeals } = useMealsQuery(3);
+  const { data: meals, isLoading: loadingMeals } = useMealsQuery(24);
   const { data: sessions, isLoading: loadingSessions } = useWorkoutSessionsQuery(3);
 
-  const todaySummary = nutritionSummary?.today;
-  const calorieGoal = nutritionSummary?.goals?.adjustedCalorieGoal ?? nutritionSummary?.goals?.calorieGoal ?? null;
-  const baseCalorieGoal = nutritionSummary?.goals?.calorieGoal ?? null;
+  const mealHistory = meals?.meals ?? [];
+  const fallbackToday = buildTodayNutritionSummary(mealHistory);
+  const todaySummary = nutritionSummary?.today ?? fallbackToday;
+  const calorieGoal =
+    nutritionSummary?.goals?.adjustedCalorieGoal ??
+    nutritionSummary?.goals?.calorieGoal ??
+    profile?.profile.calorieGoal ??
+    null;
+  const baseCalorieGoal =
+    nutritionSummary?.goals?.baseCalorieGoal ??
+    profile?.profile.calorieGoal ??
+    null;
   const calorieProgress = calorieGoal && todaySummary ? getProgressPercent(todaySummary.calories, calorieGoal) : 0;
   const calorieBalance =
     !calorieGoal
@@ -31,7 +41,8 @@ export function DashboardPage() {
       : (todaySummary?.calories ?? 0) <= calorieGoal
         ? `${calorieGoal - (todaySummary?.calories ?? 0)} cal left`
         : `${(todaySummary?.calories ?? 0) - calorieGoal} cal over`;
-  const calorieTrend = nutritionSummary?.dailyCalories ?? [];
+  const calorieTrend =
+    nutritionSummary?.dailyCalories?.length ? nutritionSummary.dailyCalories : buildDailyCaloriesFromMeals(mealHistory);
   const weeklyAverage =
     calorieTrend.length > 0
       ? Math.round(calorieTrend.reduce((sum, d) => sum + d.calories, 0) / calorieTrend.length)
@@ -48,10 +59,7 @@ export function DashboardPage() {
       ? Math.round(((weightPoints[0].weightKg ?? 0) - (weightPoints[1].weightKg ?? 0)) / 0.45359237 * 10) / 10
       : null;
 
-  const maxCalories = calorieTrend.length > 0 ? Math.max(...calorieTrend.map((d) => d.calories), calorieGoal ?? 0) : calorieGoal ?? 2000;
-  const maxWeight = weightTrendPoints.length > 0 ? Math.max(...weightTrendPoints.map((m) => m.weightKg!)) : 0;
-  const minWeight = weightTrendPoints.length > 0 ? Math.min(...weightTrendPoints.map((m) => m.weightKg!)) : 0;
-  const weightRange = maxWeight - minWeight;
+  const displayedMeals = mealHistory.slice(0, 3);
 
   return (
     <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
@@ -110,26 +118,7 @@ export function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{weeklyAverage} cal avg</p>
               </div>
             </div>
-            {calorieTrend.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No data yet.</p>
-            ) : (
-              <div className="flex items-end gap-2 h-32">
-                {calorieTrend.map((d) => {
-                  const heightPercent = maxCalories > 0 ? (d.calories / maxCalories) * 100 : 0;
-                  return (
-                    <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground">{d.calories}</span>
-                      <div
-                        className="w-full bg-primary/80 rounded-t transition-all"
-                        style={{ height: `${Math.max(heightPercent, 4)}%` }}
-                        title={`${d.calories} cal`}
-                      />
-                      <span className="text-[10px] text-muted-foreground">{new Date(d.date).toLocaleDateString(undefined, { weekday: "short" })}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <CalorieTrendChart points={calorieTrend} goalCalories={calorieGoal} />
           </CardContent>
         </Card>
 
@@ -141,35 +130,7 @@ export function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries"}</p>
               </div>
             </div>
-            {weightTrendPoints.length < 2 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Need 2+ entries for trend.</p>
-            ) : (
-              <svg viewBox={`0 0 ${weightTrendPoints.length * 60} 200`} className="w-full h-32">
-                {(() => {
-                  const points = weightTrendPoints.map((m, i) => ({
-                    x: i * 60 + 30,
-                    y: 190 - ((m.weightKg! - minWeight) / (weightRange || 1)) * 160
-                  }));
-                  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-                  return (
-                    <>
-                      <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth="2" />
-                      {points.map((p, i) => (
-                        <g key={i}>
-                          <circle cx={p.x} cy={p.y} r="4" fill="hsl(var(--primary))" />
-                          <text x={p.x} y={p.y - 12} textAnchor="middle" className="fill-muted-foreground" fontSize="10">
-                            {formatWeight(weightTrendPoints[i].weightKg)}
-                          </text>
-                          <text x={p.x} y={p.y + 16} textAnchor="middle" className="fill-muted-foreground" fontSize="9">
-                            {new Date(weightTrendPoints[i].recordedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                          </text>
-                        </g>
-                      ))}
-                    </>
-                  );
-                })()}
-              </svg>
-            )}
+            <WeightTrendChart points={weightTrendPoints} />
           </CardContent>
         </Card>
       </div>
@@ -191,11 +152,11 @@ export function DashboardPage() {
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : meals?.meals?.length === 0 ? (
+          ) : displayedMeals.length === 0 ? (
             <EmptyState icon={UtensilsCrossed} message="No meals logged yet." action={<MealComposer trigger={<Button size="sm">Log your first meal</Button>} />} />
           ) : (
             <div className="space-y-2">
-              {(meals?.meals ?? []).map((meal: Meal) => (
+              {displayedMeals.map((meal: Meal) => (
                 <MealCard key={meal.id} meal={meal} />
               ))}
             </div>
@@ -229,6 +190,170 @@ export function DashboardPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function buildTodayNutritionSummary(meals: Meal[]): NutritionSummary["today"] {
+  const todayKey = getLocalDateKey(new Date());
+  return meals.reduce<NutritionSummary["today"]>(
+    (summary, meal) => {
+      if (getLocalDateKey(new Date(meal.eatenAt)) !== todayKey) return summary;
+
+      return {
+        mealCount: summary.mealCount + 1,
+        calories: summary.calories + (meal.estimatedCalories ?? 0),
+        caloriesBurned: 0,
+        netCalories: summary.netCalories + (meal.estimatedCalories ?? 0),
+        proteinGrams: summary.proteinGrams + (meal.proteinGrams ?? 0),
+        carbsGrams: summary.carbsGrams + (meal.carbsGrams ?? 0),
+        fatGrams: summary.fatGrams + (meal.fatGrams ?? 0)
+      };
+    },
+    { mealCount: 0, calories: 0, caloriesBurned: 0, netCalories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 }
+  );
+}
+
+function buildDailyCaloriesFromMeals(meals: Meal[]): NutritionSummary["dailyCalories"] {
+  const today = new Date();
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index - 6);
+    return {
+      date: getLocalDateKey(date),
+      calories: 0,
+      mealCount: 0,
+      caloriesBurned: 0,
+      netCalories: 0
+    };
+  });
+
+  meals.forEach((meal) => {
+    const day = days.find((item) => item.date === getLocalDateKey(new Date(meal.eatenAt)));
+    if (!day) return;
+
+    day.calories += meal.estimatedCalories ?? 0;
+    day.mealCount += 1;
+    day.netCalories = day.calories - day.caloriesBurned;
+  });
+
+  return days.map((day) => ({
+    ...day,
+    calories: Math.round(day.calories),
+    netCalories: Math.round(day.netCalories)
+  }));
+}
+
+function getLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateKeyShortDay(dateKey: string): string {
+  return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${dateKey}T12:00:00`));
+}
+
+function CalorieTrendChart({
+  points,
+  goalCalories
+}: {
+  points: NutritionSummary["dailyCalories"];
+  goalCalories: number | null;
+}) {
+  const hasMealData = points.some((point) => point.calories > 0);
+  const chartMax = Math.max(...points.map((point) => point.calories), goalCalories ?? 0, 1);
+  const goalPercent = goalCalories ? Math.min(100, (goalCalories / chartMax) * 100) : null;
+
+  if (!points.length || !hasMealData) {
+    return <p className="text-sm text-muted-foreground text-center py-12">No calorie data yet.</p>;
+  }
+
+  return (
+    <div className="relative h-44 pt-3">
+      {goalPercent !== null && (
+        <div
+          className="absolute left-0 right-0 border-t border-dashed border-primary/50"
+          style={{ bottom: `${goalPercent}%` }}
+          aria-hidden="true"
+        />
+      )}
+      <div className="relative z-10 flex h-full items-end gap-2">
+        {points.map((point) => {
+          const heightPercent = point.calories > 0 ? Math.max(12, (point.calories / chartMax) * 100) : 0;
+          return (
+            <div key={point.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+              <span className="h-4 text-[10px] font-medium text-muted-foreground">{point.calories || ""}</span>
+              <div className="flex h-28 w-full items-end rounded-sm bg-muted/60 px-1">
+                <div
+                  className="w-full rounded-t-sm bg-primary/85 transition-all"
+                  style={{ height: `${heightPercent}%` }}
+                  title={`${point.calories} cal`}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground">{formatDateKeyShortDay(point.date)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeightTrendChart({ points }: { points: HealthMetric[] }) {
+  if (points.length < 2) {
+    return <p className="text-sm text-muted-foreground text-center py-12">Need 2+ entries for trend.</p>;
+  }
+
+  const weights = points.map((point) => point.weightKg ?? 0);
+  const minWeight = Math.min(...weights);
+  const maxWeight = Math.max(...weights);
+  const width = 560;
+  const height = 190;
+  const paddingX = 42;
+  const paddingY = 28;
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingY * 2;
+  const coordinates = points.map((point, index) => {
+    const weight = point.weightKg ?? minWeight;
+    const x = paddingX + (index / Math.max(points.length - 1, 1)) * usableWidth;
+    const y =
+      maxWeight === minWeight
+        ? height / 2
+        : height - paddingY - ((weight - minWeight) / (maxWeight - minWeight)) * usableHeight;
+    return { point, x, y, weight };
+  });
+  const linePath = coordinates.map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-44 w-full overflow-visible" role="img" aria-label="Weight trend">
+      {[0, 1, 2].map((lineIndex) => {
+        const y = paddingY + (usableHeight / 2) * lineIndex;
+        return (
+          <line
+            key={lineIndex}
+            x1={paddingX}
+            x2={width - paddingX}
+            y1={y}
+            y2={y}
+            stroke="hsl(var(--border))"
+            strokeWidth="1"
+          />
+        );
+      })}
+      <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {coordinates.map(({ point, x, y, weight }) => (
+        <g key={point.id}>
+          <circle cx={x} cy={y} r="5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="3" />
+          <text x={x} y={Math.max(12, y - 12)} textAnchor="middle" className="fill-foreground" fontSize="12" fontWeight="600">
+            {kgToLbs(weight).toFixed(1)}
+          </text>
+          <text x={x} y={height - 6} textAnchor="middle" className="fill-muted-foreground" fontSize="11">
+            {new Date(point.recordedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </text>
+        </g>
+      ))}
+    </svg>
   );
 }
 

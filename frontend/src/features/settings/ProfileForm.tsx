@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProfileQuery, useProfileMutation } from "@/features/settings/hooks";
-import { toOptionalNumber, valueToInput } from "@/lib/mealUtils";
+import { toNullableNumber, valueToInput } from "@/lib/mealUtils";
 
 const ACTIVITY_LEVELS = [
   { value: "sedentary", label: "Sedentary" },
@@ -30,6 +30,23 @@ export function ProfileForm() {
     activityLevel: "",
     notes: ""
   });
+
+  useEffect(() => {
+    const p = profile?.profile;
+    if (!p) return;
+
+    setFormData({
+      displayName: p.displayName,
+      goalSummary: p.goalSummary ?? "",
+      calorieGoal: valueToInput(p.calorieGoal),
+      proteinGoalGrams: valueToInput(p.proteinGoalGrams),
+      carbGoalGrams: valueToInput(p.carbGoalGrams),
+      fatGoalGrams: valueToInput(p.fatGoalGrams),
+      heightCm: valueToInput(p.heightCm),
+      activityLevel: p.activityLevel ?? "",
+      notes: p.notes ?? ""
+    });
+  }, [profile]);
 
   if (isLoading) {
     return (
@@ -59,11 +76,11 @@ export function ProfileForm() {
     updateProfile.mutate({
       displayName: formData.displayName || p?.displayName || "",
       goalSummary: formData.goalSummary || null,
-      calorieGoal: toOptionalNumber(formData.calorieGoal),
-      proteinGoalGrams: toOptionalNumber(formData.proteinGoalGrams),
-      carbGoalGrams: toOptionalNumber(formData.carbGoalGrams),
-      fatGoalGrams: toOptionalNumber(formData.fatGoalGrams),
-      heightCm: toOptionalNumber(formData.heightCm),
+      calorieGoal: toNullableNumber(formData.calorieGoal),
+      proteinGoalGrams: toNullableNumber(formData.proteinGoalGrams),
+      carbGoalGrams: toNullableNumber(formData.carbGoalGrams),
+      fatGoalGrams: toNullableNumber(formData.fatGoalGrams),
+      heightCm: toNullableNumber(formData.heightCm),
       activityLevel: formData.activityLevel || null,
       notes: formData.notes || null
     });

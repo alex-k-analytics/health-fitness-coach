@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert } from "@/components/ui/alert";
-import { Camera, FileText, Image, ChevronRight, Sparkles } from "lucide-react";
+import { Camera, FileText, Image, ChevronRight, Sparkles, Search, X } from "lucide-react";
 import { useMealEstimateMutation, useCreateMealMutation, useUpdateMealMutation, useSavedFoodsQuery } from "@/features/meals/hooks";
 import type { Meal, NutritionEstimate, SavedFood } from "@/types";
 import { getServingCount, scaleNutritionEstimate, toDateTimeLocalInput, valueToInput } from "@/lib/mealUtils";
@@ -29,6 +29,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const [servingDescription, setServingDescription] = useState(initialMeal?.servingDescription ?? initialFood?.servingDescription ?? "");
   const [quantity, setQuantity] = useState(valueToInput(initialMeal?.quantity ?? 1));
   const [savedFoodId, setSavedFoodId] = useState(initialMeal?.savedFood?.id ?? initialFood?.id ?? "");
+  const [savedFoodSearch, setSavedFoodSearch] = useState("");
   const [saveAsReusableFood, setSaveAsReusableFood] = useState(false);
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
   const [labelFiles, setLabelFiles] = useState<File[]>([]);
@@ -46,6 +47,27 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
   const isEdit = !!initialMeal;
   const isFromSavedFood = !!initialFood && !initialMeal;
+  const savedFoodOptions = savedFoods?.foods ?? [];
+  const selectedSavedFood = savedFoodOptions.find((food) => food.id === savedFoodId) ?? initialFood ?? null;
+  const filteredSavedFoods = useMemo(() => {
+    const query = savedFoodSearch.trim().toLowerCase();
+    if (!query) return savedFoodOptions.slice(0, 8);
+
+    return savedFoodOptions
+      .filter((food) => {
+        const text = [
+          food.name,
+          food.brand,
+          food.servingDescription,
+          food.calories === null ? null : `${Math.round(food.calories)} cal`
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return text.includes(query);
+      })
+      .slice(0, 8);
+  }, [savedFoodOptions, savedFoodSearch]);
 
   const handleEstimate = useCallback(() => {
     const formData = buildFormData();
@@ -99,6 +121,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     setServingDescription("");
     setQuantity("1");
     setSavedFoodId("");
+    setSavedFoodSearch("");
     setSaveAsReusableFood(false);
     setPlateFiles([]);
     setLabelFiles([]);
@@ -108,7 +131,10 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     setStep("input");
   }
 
-  const hasInputs = plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0 || savedFoodId || quantity;
+  const hasPhotoInput = plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0;
+  const hasReusableFoodInput = Boolean(savedFoodId);
+  const hasServingDetailsInput = Boolean(servingDescription.trim());
+  const hasInputs = hasPhotoInput || hasReusableFoodInput || hasServingDetailsInput;
   const canEstimate = title.trim() && hasInputs;
   const displayedEstimate = estimate ? scaleNutritionEstimate(estimate, getServingCount(quantity) / estimateBaseServings) : null;
 
@@ -148,25 +174,80 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
         {step === "input" && (
           <div className="grid gap-5">
-            {/* Quick saved foods */}
-            {(savedFoods?.foods ?? []).length > 0 && (
+            {/* Saved foods */}
+            {savedFoodOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Saved foods</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(savedFoods?.foods ?? []).slice(0, 6).map((food: SavedFood) => (
-                    <Button
-                      key={food.id}
-                      variant={savedFoodId === food.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => { setSavedFoodId(food.id); setTitle(food.name); setServingDescription(food.servingDescription ?? ""); }}
-                    >
-                      {food.name}
-                    </Button>
-                  ))}
+                <div className="rounded-md border bg-background">
+                  <div className="flex items-center gap-2 border-b px-3 py-2">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={savedFoodSearch}
+                      onChange={(e) => setSavedFoodSearch(e.target.value)}
+                      placeholder="Search reusable foods"
+                      className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
+                    />
+                    {savedFoodId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSavedFoodId("");
+                          setSavedFoodSearch("");
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-1">
+                    {filteredSavedFoods.length === 0 ? (
+                      <p className="px-3 py-4 text-sm text-muted-foreground">No saved foods match.</p>
+                    ) : (
+                      filteredSavedFoods.map((food: SavedFood) => (
+                        <button
+                          key={food.id}
+                          type="button"
+                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
+                            savedFoodId === food.id ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                          }`}
+                          onClick={() => {
+                            setSavedFoodId(food.id);
+                            setTitle(food.name);
+                            setServingDescription(food.servingDescription ?? "");
+                            setSavedFoodSearch("");
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">{food.name}</span>
+                            <span className="block truncate text-xs opacity-80">
+                              {[food.brand, food.servingDescription].filter(Boolean).join(" · ") || "Reusable food"}
+                            </span>
+                          </span>
+                          {food.calories !== null && <span className="ml-3 shrink-0 text-xs opacity-80">{Math.round(food.calories)} cal</span>}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
+                {selectedSavedFood && (
+                  <p className="text-xs text-muted-foreground">
+                    Selected: {selectedSavedFood.name}
+                    {selectedSavedFood.servingDescription ? ` · ${selectedSavedFood.servingDescription}` : ""}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Search for a reusable food or add photos/details below for a new estimate.
+                </p>
               </div>
             )}
 
+            {savedFoodOptions.length === 0 && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                No saved foods yet. Add a photo or serving details to estimate a new meal.
+              </div>
+            )}
             {/* Title & basic info */}
             <div className="grid gap-2">
               <Label>What did you eat?</Label>
@@ -207,11 +288,16 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button onClick={handleEstimate} disabled={!canEstimate || estimateMutation.isPending}>
                 {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> Estimate Nutrition</>}
               </Button>
             </div>
+            {!hasInputs && (
+              <p className="text-right text-xs text-muted-foreground">
+                Choose a saved food, attach a photo, or add serving details before estimating.
+              </p>
+            )}
           </div>
         )}
 
@@ -292,8 +378,8 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             </Card>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep("input")}>Back</Button>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setStep("input")}>Back</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
                 {isEdit ? (updateMutation.isPending ? "Updating..." : "Update") : (createMutation.isPending ? "Saving..." : "Save")}
               </Button>
@@ -312,14 +398,45 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   icon: React.ElementType;
 }) {
+  const removeFile = (indexToRemove: number) => {
+    onFiles(files.filter((_, index) => index !== indexToRemove));
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2">
-      <Input ref={inputRef as any} type="file" multiple accept="image/*" className="hidden" onChange={(e) => onFiles(Array.from(e.target.files ?? []))} />
-      <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} className="gap-2">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </Button>
-      {files.length > 0 && <span className="text-xs text-muted-foreground">{files.length} selected</span>}
+    <div className="rounded-md border bg-background p-3">
+      <Input
+        ref={inputRef as any}
+        type="file"
+        multiple
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onFiles(Array.from(e.target.files ?? []))}
+      />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">{label}</span>
+          {files.length > 0 && <Badge variant="secondary">{files.length}</Badge>}
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+          Choose
+        </Button>
+      </div>
+      {files.length > 0 && (
+        <div className="mt-3 grid gap-1">
+          {files.map((file, index) => (
+            <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded bg-muted/50 px-2 py-1 text-xs">
+              <span className="truncate">{file.name}</span>
+              <Button type="button" variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => removeFile(index)}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
