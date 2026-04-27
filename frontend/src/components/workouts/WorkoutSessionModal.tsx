@@ -385,10 +385,9 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                 ) : (
                   <div className="grid gap-1">
                       <Label>Distance (mi)</Label>
-                      <Input
-                        inputMode="decimal"
-                        value={formatDistanceInput(ex.distance)}
-                        onChange={(e) => updateExercise(ex.id!, { distance: cleanDistanceValue(e.target.value) })}
+                      <DistanceInput
+                        value={ex.distance}
+                        onChange={(distance) => updateExercise(ex.id!, { distance })}
                       />
                   </div>
                 )}
@@ -444,10 +443,9 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       {isTimedWorkout && exercises[0] && workoutMode !== "OTHER" && (
         <div className="grid gap-1">
           <Label>Distance (mi)</Label>
-          <Input
-            inputMode="decimal"
-            value={formatDistanceInput(exercises[0].distance)}
-            onChange={(e) => updateExercise(exercises[0].id!, { distance: cleanDistanceValue(e.target.value) })}
+          <DistanceInput
+            value={exercises[0].distance}
+            onChange={(distance) => updateExercise(exercises[0].id!, { distance })}
           />
         </div>
       )}
@@ -573,6 +571,27 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
   );
 }
 
+function DistanceInput({ value, onChange }: { value: number | undefined; onChange: (value: number) => void }) {
+  const [draft, setDraft] = useState(formatDistanceInput(value));
+
+  useEffect(() => {
+    setDraft(formatDistanceInput(value));
+  }, [value]);
+
+  return (
+    <Input
+      inputMode="decimal"
+      value={draft}
+      onChange={(event) => {
+        const nextDraft = cleanDistanceDraft(event.target.value);
+        setDraft(nextDraft);
+        onChange(parseDistanceDraft(nextDraft));
+      }}
+      onBlur={() => setDraft(formatDistanceInput(parseDistanceDraft(draft)))}
+    />
+  );
+}
+
 function resolveExerciseCategory(
   name: string,
   mode: WorkoutMode,
@@ -601,20 +620,31 @@ function cleanDurationPart(value: string, max?: number): string {
   return String(max === undefined ? parsed : Math.min(parsed, max));
 }
 
-function cleanDistanceValue(value: string): number {
-  const normalized = value.replace(/[^\d.]/g, "");
-  const firstDecimal = normalized.indexOf(".");
-  const cleaned = firstDecimal === -1
-    ? normalized
-    : `${normalized.slice(0, firstDecimal + 1)}${normalized.slice(firstDecimal + 1).replace(/\./g, "")}`;
-
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function formatDistanceInput(value: number | undefined): string {
   if (!value || !Number.isFinite(value)) return "0";
   return String(value);
+}
+
+function cleanDistanceDraft(value: string): string {
+  const normalized = value.replace(/[^\d.]/g, "");
+  const firstDecimal = normalized.indexOf(".");
+  if (firstDecimal === -1) {
+    return normalizeWholeDistance(normalized);
+  }
+
+  const whole = normalizeWholeDistance(normalized.slice(0, firstDecimal));
+  const decimal = normalized.slice(firstDecimal + 1).replace(/\./g, "");
+  return `${whole}.${decimal}`;
+}
+
+function normalizeWholeDistance(value: string): string {
+  const stripped = value.replace(/^0+(?=\d)/, "");
+  return stripped || "0";
+}
+
+function parseDistanceDraft(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function getWorkoutMode(activityType: WorkoutActivityType): WorkoutMode {
