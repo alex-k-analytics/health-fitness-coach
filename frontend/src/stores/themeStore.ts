@@ -7,6 +7,8 @@ interface ThemeStore {
   colorMode: ColorMode;
   setColorMode: (mode: ColorMode) => void;
   toggleColorMode: () => void;
+  _rehydrated: boolean;
+  setRehydrated: () => void;
 }
 
 function getSystemColorMode(): "light" | "dark" {
@@ -20,6 +22,8 @@ export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
       colorMode: "system",
+      _rehydrated: false,
+      setRehydrated: () => set({ _rehydrated: true }),
       setColorMode: (mode) => set({ colorMode: mode }),
       toggleColorMode: () => {
         const modes: ColorMode[] = ["system", "light", "dark"];
@@ -31,6 +35,12 @@ export const useThemeStore = create<ThemeStore>()(
     {
       name: "hc-theme",
       version: 1,
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          applyTheme(state.colorMode);
+          state.setRehydrated();
+        }
+      },
     }
   )
 );
@@ -47,9 +57,6 @@ export function applyTheme(mode: ColorMode = "system") {
 }
 
 if (typeof window !== "undefined") {
-  const stored = useThemeStore.getState().colorMode;
-  applyTheme(stored);
-
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (useThemeStore.getState().colorMode === "system") {
       applyTheme("system");
@@ -57,6 +64,8 @@ if (typeof window !== "undefined") {
   });
 
   useThemeStore.subscribe((state) => {
-    applyTheme(state.colorMode);
+    if (state._rehydrated) {
+      applyTheme(state.colorMode);
+    }
   });
 }
