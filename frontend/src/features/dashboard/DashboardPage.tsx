@@ -61,52 +61,78 @@ export function DashboardPage() {
 
   const displayedMeals = mealHistory.slice(0, 3);
 
+  const anyLoading = loadingNutrition || loadingMetrics;
+
   return (
     <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
 
       {/* ── Stats Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          icon={Flame}
-          label="Consumed"
-          value={loadingNutrition ? "—" : `${todaySummary?.calories ?? 0}`}
-          unit="cal"
-          sub={calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}
-        />
-        <StatCard
-          icon={Dumbbell}
-          label="Workout burn"
-          value={loadingNutrition ? "—" : `${todaySummary?.caloriesBurned ?? 0}`}
-          unit="cal"
-          sub={baseCalorieGoal ? `${baseCalorieGoal} base goal` : "Log workouts to adjust"}
-        />
-        <StatCard
-          icon={UtensilsCrossed}
-          label="Remaining"
-          value={loadingNutrition ? "—" : (calorieGoal ? String(Math.max(0, calorieGoal - (todaySummary?.calories ?? 0))) : "—")}
-          unit="cal"
-          sub={calorieBalance}
-        />
-        <StatCard
-          icon={Scale}
-          label="Weight"
-          value={loadingMetrics ? "—" : (latestWeight ? formatWeight(latestWeight.weightKg) : "—")}
-          sub={latestWeight ? `${formatDate(latestWeight.recordedAt)}${weightDelta != null ? ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb` : ""}` : "Log to start"}
-        />
+        {loadingNutrition ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              icon={Flame}
+              label="Consumed"
+              value={`${todaySummary?.calories ?? 0}`}
+              unit="cal"
+              sub={calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}
+            />
+            <StatCard
+              icon={Dumbbell}
+              label="Workout burn"
+              value={`${todaySummary?.caloriesBurned ?? 0}`}
+              unit="cal"
+              sub={baseCalorieGoal ? `${baseCalorieGoal} base goal` : "Log workouts to adjust"}
+            />
+            <StatCard
+              icon={UtensilsCrossed}
+              label="Remaining"
+              value={calorieGoal ? String(Math.max(0, calorieGoal - (todaySummary?.calories ?? 0))) : "—"}
+              unit="cal"
+              sub={calorieBalance}
+            />
+          </>
+        )}
+        {loadingMetrics ? (
+          <StatCardSkeleton />
+        ) : (
+          <StatCard
+            icon={Scale}
+            label="Weight"
+            value={latestWeight ? formatWeight(latestWeight.weightKg) : "—"}
+            sub={latestWeight ? `${formatDate(latestWeight.recordedAt)}${weightDelta != null ? ` · ${weightDelta > 0 ? "+" : ""}${weightDelta.toFixed(1)} lb` : ""}` : "Log to start"}
+          />
+        )}
       </div>
 
       {/* ── Calorie Progress Bar ── */}
-      {!loadingNutrition && (
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">{calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}</span>
-              <span className="text-xs text-muted-foreground">{calorieBalance}</span>
+      <Card>
+        <CardContent className="pt-5">
+          {loadingNutrition ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <Skeleton className="h-2 w-full" />
             </div>
-            <Progress value={calorieProgress} max={100} />
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">{calorieGoal ? `${calorieProgress}% of goal` : "No goal set"}</span>
+                <span className="text-xs text-muted-foreground">{calorieBalance}</span>
+              </div>
+              <Progress value={calorieProgress} max={100} />
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Trend Row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -115,10 +141,14 @@ export function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold">Calorie Trend</h3>
-                <p className="text-xs text-muted-foreground">{weeklyAverage} cal avg</p>
+                <p className="text-xs text-muted-foreground">{loadingNutrition ? "Loading..." : `${weeklyAverage} cal avg`}</p>
               </div>
             </div>
-            <CalorieTrendChart points={calorieTrend} goalCalories={calorieGoal} />
+            {loadingNutrition ? (
+              <Skeleton className="h-[260px] w-full" />
+            ) : (
+              <CalorieTrendChart points={calorieTrend} goalCalories={calorieGoal} />
+            )}
           </CardContent>
         </Card>
 
@@ -127,10 +157,14 @@ export function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold">Weight Trend</h3>
-                <p className="text-xs text-muted-foreground">{latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries"}</p>
+                <p className="text-xs text-muted-foreground">{loadingMetrics ? "Loading..." : (latestWeight ? `Updated ${formatDate(latestWeight.recordedAt)}` : "No entries")}</p>
               </div>
             </div>
-            <WeightTrendChart points={weightTrendPoints} />
+            {loadingMetrics ? (
+              <Skeleton className="h-[260px] w-full" />
+            ) : (
+              <WeightTrendChart points={weightTrendPoints} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -434,5 +468,20 @@ function EmptyState({ icon: Icon, message, action }: {
       <p className="text-sm text-muted-foreground mb-3">{message}</p>
       {action}
     </div>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="pt-4 flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Skeleton className="h-3.5 w-3.5" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-3 w-24" />
+      </CardContent>
+    </Card>
   );
 }

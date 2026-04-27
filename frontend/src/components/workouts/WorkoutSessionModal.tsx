@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Minus, Play, Pause, Check, Search, Trash2, Clock, RotateCcw } from "lucide-react";
 import type { WorkoutActivityType, WorkoutExercise, WorkoutExerciseKind, WorkoutSet } from "@/types";
 import { useExerciseListQuery, useCreateSessionMutation } from "@/features/workouts/hooks";
@@ -46,7 +47,7 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
   const [manualSeconds, setManualSeconds] = useState("0");
   const [useManualTime, setUseManualTime] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { data: exerciseListData } = useExerciseListQuery();
+  const { data: exerciseListData, isLoading: loadingExercises } = useExerciseListQuery();
   const createSession = useCreateSessionMutation();
 
   useEffect(() => {
@@ -183,19 +184,29 @@ export function WorkoutSessionModal({ trigger, onClose }: WorkoutSessionModalPro
             />
           </div>
         </div>
-        {searchResults.length > 0 && (
+        {(loadingExercises || searchQuery.length >= 2) && (
           <Card className="max-h-40 overflow-y-auto">
-            {searchResults.map((name) => (
-              <Button
-                key={name}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => addExercise(name)}
-              >
-                {name}
-              </Button>
-            ))}
+            {loadingExercises ? (
+              <div className="space-y-1 p-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : searchResults.length > 0 ? (
+              searchResults.map((name) => (
+                <Button
+                  key={name}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => addExercise(name)}
+                >
+                  {name}
+                </Button>
+              ))
+            ) : (
+              <p className="px-3 py-4 text-sm text-muted-foreground">No exercises found.</p>
+            )}
           </Card>
         )}
       </div>

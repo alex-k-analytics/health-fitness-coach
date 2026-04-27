@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, FileText, Image, ChevronRight, Sparkles, Search, X } from "lucide-react";
 import { useMealEstimateMutation, useCreateMealMutation, useUpdateMealMutation, useSavedFoodsQuery } from "@/features/meals/hooks";
 import type { Meal, NutritionEstimate, SavedFood } from "@/types";
@@ -41,7 +42,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const estimateMutation = useMealEstimateMutation();
   const createMutation = useCreateMealMutation();
   const updateMutation = useUpdateMealMutation();
-  const { data: savedFoods } = useSavedFoodsQuery();
+  const { data: savedFoods, isLoading: loadingSavedFoods } = useSavedFoodsQuery();
 
   const isEdit = !!initialMeal;
   const isFromSavedFood = !!initialFood && !initialMeal;
@@ -222,7 +223,13 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                     )}
                   </div>
                   <div className="max-h-48 overflow-y-auto p-1">
-                    {filteredSavedFoods.length === 0 ? (
+                    {loadingSavedFoods ? (
+                      <div className="space-y-2 py-1">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ) : filteredSavedFoods.length === 0 ? (
                       <p className="px-3 py-4 text-sm text-muted-foreground">No saved foods match.</p>
                     ) : (
                       filteredSavedFoods.map((food: SavedFood) => (
