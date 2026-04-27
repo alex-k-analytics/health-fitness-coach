@@ -173,14 +173,13 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       : [createDefaultExercise(workoutMode)];
 
     setExercises(nextExercises);
-    if ((workoutMode === "CARDIO" || workoutMode === "HIIT") && manualMinutes === "0" && manualSeconds === "0") {
-      setManualMinutes("30");
-    }
     setStep("active");
-    setTimerRunning(workoutMode === "STRENGTH" && !useManualTime);
+    setTimerRunning(!useManualTime);
   };
   const handleReviewChanges = () => {
-    const duration = (parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0);
+    const duration = useManualTime
+      ? (parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0)
+      : elapsedSeconds;
 
     setExercises((prev) => prev.map((ex) => (
       ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
@@ -191,7 +190,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
     setStep("review");
   };
   const handleFinish = () => {
-    const duration = workoutMode !== "STRENGTH" || useManualTime
+    const duration = useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
       : elapsedSeconds;
 
@@ -206,7 +205,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
   const handleEdit = () => { setStep("plan"); };
 
   const handleSave = () => {
-    const duration = workoutMode !== "STRENGTH" || useManualTime
+    const duration = useManualTime
       ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
       : elapsedSeconds;
     const result = computeSessionCalories(exercises, 70);
@@ -259,7 +258,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
   };
 
   const isTimedWorkout = workoutMode !== "STRENGTH";
-  const durationDisplay = isTimedWorkout || useManualTime
+  const durationDisplay = useManualTime
     ? `${manualMinutes}:${manualSeconds.padStart(2, "0")}`
     : formatTimer(elapsedSeconds);
 
@@ -384,20 +383,13 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex gap-3">
-                    <div className="grid gap-1 flex-1">
-                      <Label>Duration (min)</Label>
-                      <Input
-                        inputMode="numeric"
-                        value={String(Math.round((ex.durationSeconds ?? 0) / 60))}
-                        onChange={(e) => updateExercise(ex.id!, { durationSeconds: (parseInt(cleanDurationPart(e.target.value), 10) || 0) * 60 })}
-                      />
-                    </div>
-                    <div className="grid gap-1 flex-1">
+                  <div className="grid gap-1">
                       <Label>Distance (mi)</Label>
-                      <Input type="number" min="0" value={ex.distance ?? 0}
-                        onChange={(e) => updateExercise(ex.id!, { distance: Math.max(0, parseFloat(e.target.value) || 0) })} />
-                    </div>
+                      <Input
+                        inputMode="decimal"
+                        value={formatDistanceInput(ex.distance)}
+                        onChange={(e) => updateExercise(ex.id!, { distance: cleanDistanceValue(e.target.value) })}
+                      />
                   </div>
                 )}
                 <div className="text-xs text-muted-foreground">
@@ -433,13 +425,11 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
           </Button>
         </div>
       </div>
-      {!isTimedWorkout && (
       <div className="flex items-center gap-2">
         <input type="checkbox" id="manualTime" checked={useManualTime} onChange={(e) => setUseManualTime(e.target.checked)} />
-        <Label htmlFor="manualTime" className="text-sm font-normal">Use Manual Time</Label>
+        <Label htmlFor="manualTime" className="text-sm font-normal">Enter time manually</Label>
       </div>
-      )}
-      {(useManualTime || isTimedWorkout) && (
+      {useManualTime && (
         <div className="flex gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
@@ -455,11 +445,9 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         <div className="grid gap-1">
           <Label>Distance (mi)</Label>
           <Input
-            type="number"
-            min="0"
-            step="0.1"
-            value={exercises[0].distance ?? 0}
-            onChange={(e) => updateExercise(exercises[0].id!, { distance: Math.max(0, parseFloat(e.target.value) || 0) })}
+            inputMode="decimal"
+            value={formatDistanceInput(exercises[0].distance)}
+            onChange={(e) => updateExercise(exercises[0].id!, { distance: cleanDistanceValue(e.target.value) })}
           />
         </div>
       )}
@@ -611,6 +599,22 @@ function cleanDurationPart(value: string, max?: number): string {
   if (!Number.isFinite(parsed)) return "0";
 
   return String(max === undefined ? parsed : Math.min(parsed, max));
+}
+
+function cleanDistanceValue(value: string): number {
+  const normalized = value.replace(/[^\d.]/g, "");
+  const firstDecimal = normalized.indexOf(".");
+  const cleaned = firstDecimal === -1
+    ? normalized
+    : `${normalized.slice(0, firstDecimal + 1)}${normalized.slice(firstDecimal + 1).replace(/\./g, "")}`;
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatDistanceInput(value: number | undefined): string {
+  if (!value || !Number.isFinite(value)) return "0";
+  return String(value);
 }
 
 function getWorkoutMode(activityType: WorkoutActivityType): WorkoutMode {
