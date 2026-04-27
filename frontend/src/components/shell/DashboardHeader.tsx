@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { getInitials } from "@/lib/mealUtils";
+import { MealComposer } from "@/features/meals/MealComposer";
+import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { ProfileDrawer } from "./ProfileDrawer";
 import { WeightModal } from "./WeightModal";
-import { Scale, Sun, Moon, Monitor } from "lucide-react";
+import { Dumbbell, Monitor, Moon, Scale, Sun, UtensilsCrossed } from "lucide-react";
 
 
 export function DashboardHeader() {
@@ -29,6 +31,12 @@ export function DashboardHeader() {
         <Button variant="ghost" size="icon" onClick={toggleColorMode}>
           {modeIcons[colorMode]}
         </Button>
+        <MealComposer trigger={<Button variant="ghost" size="icon" aria-label="Log food">
+          <UtensilsCrossed className="h-4 w-4" />
+        </Button>} />
+        <WorkoutSessionModal trigger={<Button variant="ghost" size="icon" aria-label="Log workout">
+          <Dumbbell className="h-4 w-4" />
+        </Button>} />
         <WeightModal trigger={<Button variant="ghost" size="icon">
           <Scale className="h-4 w-4" />
         </Button>} />
