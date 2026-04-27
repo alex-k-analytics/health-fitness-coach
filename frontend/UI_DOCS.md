@@ -63,7 +63,7 @@ frontend/src/
 
 | Route | Description |
 |---|---|
-| `/` | **Dashboard** - 4 stat cards (consumed cal, workout burn, remaining cal, weight), calorie progress bar, calorie trend bar chart, weight trend line chart (SVG), recent meals/workouts lists with log buttons. |
+| `/` | **Dashboard** - 4 stat cards (consumed cal, workout burn, remaining cal, weight), calorie progress bar, calorie trend bar chart (SVG with gridlines, goal line, value labels), weight trend line chart (SVG with filled area, point markers, gridlines), recent meals/workouts lists with log buttons. Fallback rendering from local meal data when nutrition summary is unavailable. |
 | `/meals` | **Meals History** - Lists up to 24 recent meals with title, calories, macros (P/C/F badges), serving details, photo count. "Log Food" button opens MealComposer. |
 | `/workouts` | **Workouts History** - Lists up to 12 workout sessions with title, date, calories, duration, exercise summary. "Quick Entries" section for simplified logs. "Log Workout" button opens WorkoutSessionModal. |
 | `/settings` | **Settings** - Profile editing: display name, goal summary, calorie goal, height, activity level (select), protein/carbs/fat goals, notes. |
@@ -88,16 +88,16 @@ frontend/src/
 | Component | Purpose |
 |---|---|
 | `LoginForm` | Card-wrapped email/password form with error alert and submit button |
-| `DashboardPage` | Stat cards, progress bar, calorie/weight trend charts, recent meals/workouts lists. Inline `StatCard` and `EmptyState` sub-components. |
+| `DashboardPage` | Stat cards, progress bar, calorie/weight trend charts, recent meals/workouts lists. Inline `StatCard`, `EmptyState`, `CalorieTrendChart`, `WeightTrendChart` sub-components. Fallback rendering from local meal data when nutrition summary API is unavailable. |
 | `MealsPage` | Card-wrapped meal history list with skeleton loading and empty state |
 | `WorkoutsPage` | Card-wrapped workout list + quick entry cards with skeleton loading and empty state |
-| `ProfileForm` | Form with inputs and native select for activity level. Dirty-checking for save. |
+| `ProfileForm` | Form with inputs and native select for activity level. Dirty-checking for save. Rehydrates form on profile data change. |
 
 ### Dialog / Modal Components
 
 | Component | Steps |
 |---|---|
-| `MealComposer` | **Step 1 (Input):** food title, date/time, servings, serving details, optional photos, saved foods quick-pick, "save as reusable" checkbox, "Estimate Nutrition" button. **Step 2 (Review):** editable fields, nutrition estimate (cal/protein/carbs/fat/fiber/sugar), food breakdown, status badge, save/update buttons. |
+| `MealComposer` | **Step 1 (Input):** food title, date/time, servings, serving details, optional photos (with file list and remove buttons), saved foods (searchable dropdown with brand/serving/ calorie preview), "save as reusable" checkbox, "Estimate Nutrition" button. Edit mode title says "Edit Food". **Step 2 (Review):** editable fields, nutrition estimate (cal/protein/carbs/fat/fiber/sugar), food breakdown, status badge, save/update buttons. Dialog is scrollable. |
 | `WorkoutSessionModal` | **Step 1 (Plan):** activity type selector (9 types), title input, exercise search (fuzzy match), exercise cards (LIFT: sets/reps/weight, CARDIO: duration/distance), estimated calories per exercise. **Step 2 (Active):** live timer (play/pause/reset), manual time override, planned exercises list. **Step 3 (Review):** summary (activity, duration, total calories, by-category breakdown), exercise detail cards, save button. |
 
 ### Shared Components
@@ -106,6 +106,7 @@ frontend/src/
 |---|---|
 | `MealCard` | Meal title, timestamp, calories, P/C/F macro badges, serving description, photo count, analysis status badge. "Edit" button re-opens MealComposer. |
 | `WorkoutCard` | Workout title, date, calories, duration, exercise summary (reps/sets for LIFT, minutes for CARDIO). |
+| `PhotoPicker` | File picker with "Choose" button, file count badge, expandable file list with per-file remove buttons. |
 
 ### shadcn/ui Primitives (`components/ui/`)
 

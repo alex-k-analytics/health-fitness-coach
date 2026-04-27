@@ -26,7 +26,7 @@ backend/
 ├── tsconfig.json
 ├── prisma/
 │   ├── schema.prisma                 # Database schema (8 models)
-│   └── migrations/                   # 3 migrations
+│   └── migrations/                   # 4 migrations (incl. WorkoutSession/WorkoutExercise)
 ├── src/
 │   ├── server.ts                     # Express app setup, route mounting, static files
 │   ├── config.ts                     # Centralized runtime config from env vars
@@ -39,7 +39,7 @@ backend/
 │   ├── routes/
 │   │   ├── authRoutes.ts             # /api/auth/* (session, login, logout)
 │   │   ├── profileRoutes.ts          # /api/profile/* (profile CRUD, health metrics)
-│   │   ├── nutritionRoutes.ts        # /api/nutrition/* (meals, saved foods, AI analysis, images)
+│   │   ├── nutritionRoutes.ts        # /api/nutrition/* (meals, saved foods, AI analysis, images, summary)
 │   │   └── workoutRoutes.ts          # /api/workouts/* (simple workouts, sessions, exercises)
 │   ├── services/
 │   │   ├── agentService.ts           # Stubbed AI workout planning
@@ -88,7 +88,7 @@ backend/
 | POST | `/api/nutrition/saved-foods` | Creates saved food with full nutrition data (calories, macros, micronutrients). |
 | GET | `/api/nutrition/meals` | Lists recent meals (up to 50, default 20) with images and savedFood references, ordered by eatenAt desc. |
 | PATCH | `/api/nutrition/meals/:id` | Updates meal title, notes, eatenAt, serving, quantity, or confirmed AI analysis results. |
-| GET | `/api/nutrition/summary` | Daily summary: today's totals (calories, macros, meal count, workout burn, net), goals (workout-adjusted calorie goal), latest metric, 7-day trend. Supports `?timezone=...`. |
+| GET | `/api/nutrition/summary` | Daily summary: today's totals (calories, macros, meal count, workout burn from both WorkoutEntry and WorkoutSession, net), goals (workout-adjusted calorie goal), latest metric, 7-day trend. Supports `?timezone=...`. Deduplicates by ID to avoid double-counting backfilled records. |
 | POST | `/api/nutrition/estimate` | **AI estimate only (no persist).** Multipart with images (plate:5, label:3, other:3) + meal details. Calls OpenAI, returns analysis without saving. |
 | POST | `/api/nutrition/meals` | **Primary meal logging.** Multipart with images + details. Pipeline: create meal -> AI analysis (or use confirmedAnalysis) -> save images -> update meal -> optionally create SavedFood if `saveAsReusableFood=true`. |
 | GET | `/api/nutrition/images/:id` | Streams meal image (GCS or local) with Content-Type + cache control. Verifies ownership. |
@@ -236,7 +236,7 @@ Indexes: (workoutSessionId, order), (accountId, createdAt DESC).
 - **Serialize functions** — each route file has `serialize*` functions to control response shape (no raw Prisma output leaked)
 - **Singleton Prisma client** — cached on `globalThis` in dev for hot-reload safety
 - **Timezone-aware** — nutrition summary uses `Intl.DateTimeFormat` for user's timezone
-- **Calorie adjustment** — daily calorie goal increases by workout calories burned
+- **Calorie adjustment** — daily calorie goal increases by workout calories burned; `/nutrition/summary` reads from both `WorkoutSession` (COMPLETED) and `WorkoutEntry`, deduplicating by ID to avoid double-counting backfilled records
 - **AI fallback** — nutrition analysis gracefully degrades through saved food -> heuristic estimates
 - **CORS** — dynamic origin checking supporting frontend, app base URL, and native app schemes
 - **Static file serving** — serves frontend dist in production, SPA fallback for non-`/api` routes
