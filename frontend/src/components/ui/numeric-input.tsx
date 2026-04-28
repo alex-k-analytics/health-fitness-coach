@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 
 type NumericMode = "integer" | "decimal";
 
-type NumericInputProps = Omit<React.ComponentProps<typeof Input>, "type" | "value" | "onChange" | "inputMode"> & {
+type NumericInputProps = Omit<React.ComponentProps<typeof Input>, "type" | "value" | "onChange" | "inputMode" | "pattern" | "step"> & {
   value: string;
   mode?: NumericMode;
   max?: number;
@@ -29,7 +29,10 @@ export function NumericInput({
   return (
     <Input
       {...props}
+      type="number"
       inputMode={mode === "decimal" ? "decimal" : "numeric"}
+      pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
+      step={mode === "decimal" ? "any" : "1"}
       value={value}
       onChange={(event) => onValueChange(cleanNumericDraft(event.target.value, { mode, max, allowEmpty }))}
       onBlur={(event) => {
@@ -61,7 +64,10 @@ export function NumericValueInput({
   return (
     <Input
       {...props}
+      type="number"
       inputMode={mode === "decimal" ? "decimal" : "numeric"}
+      pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
+      step={mode === "decimal" ? "any" : "1"}
       value={draft}
       onFocus={(event) => {
         setIsFocused(true);

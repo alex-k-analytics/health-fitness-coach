@@ -187,7 +187,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
       <DialogTrigger asChild>
         {trigger || <Button>Log Food</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="top-[calc(env(safe-area-inset-top)+1rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] max-w-2xl translate-y-0 overflow-y-auto sm:top-[50%] sm:max-h-[90vh] sm:translate-y-[-50%]">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit Food" : step === "input" ? "Log Food" : step === "estimate" ? "Estimating..." : "Review & Save"}
