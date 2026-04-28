@@ -113,6 +113,19 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     onClose?.();
   }, [selectedSavedFood, quantity, title, notes, eatenAt, servingDescription, savedFoodId, saveAsReusableFood, plateFiles, labelFiles, otherFiles, createMutation, onClose]);
 
+  const selectSavedFood = useCallback((food: SavedFood) => {
+    const savedFoodEstimate = estimateFromSavedFood(food);
+    setSavedFoodId(food.id);
+    setTitle(food.name);
+    setServingDescription(food.servingDescription ?? "");
+    setSavedFoodSearch("");
+    setEstimate(savedFoodEstimate);
+    setEstimateBaseServings(1);
+    if (savedFoodEstimate) {
+      setStep("confirm");
+    }
+  }, []);
+
   function buildFormData() {
     const formData = new FormData();
     formData.append("title", title);
@@ -217,6 +230,8 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                         onClick={() => {
                           setSavedFoodId("");
                           setSavedFoodSearch("");
+                          setEstimate(null);
+                          setEstimateBaseServings(1);
                         }}
                       >
                         Clear
@@ -240,12 +255,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                           className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
                             savedFoodId === food.id ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
                           }`}
-                          onClick={() => {
-                            setSavedFoodId(food.id);
-                            setTitle(food.name);
-                            setServingDescription(food.servingDescription ?? "");
-                            setSavedFoodSearch("");
-                          }}
+                          onClick={() => selectSavedFood(food)}
                         >
                           <span className="min-w-0">
                             <span className="block truncate font-medium">{food.name}</span>
