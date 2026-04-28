@@ -333,7 +333,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                 </Button>
               )}
               <Button onClick={handleEstimate} disabled={!canEstimate || estimateMutation.isPending}>
-                {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> {canSaveSavedFood ? "Re-estimate" : "Estimate Nutrition"}</>}
+                {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> Estimate Nutrition</>}
               </Button>
             </div>
             {!hasInputs && (
