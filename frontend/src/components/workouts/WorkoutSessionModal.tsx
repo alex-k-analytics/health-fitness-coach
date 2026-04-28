@@ -287,7 +287,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       </div>
 
       {isEditing && (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
             <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
@@ -431,7 +431,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         <Label htmlFor="manualTime" className="text-sm font-normal">Enter time manually</Label>
       </div>
       {useManualTime && (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="grid gap-1 flex-1">
             <Label>Minutes</Label>
             <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
