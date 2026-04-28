@@ -30,7 +30,7 @@ export function WeightModal({ trigger }: { trigger?: React.ReactNode }) {
       <DialogTrigger asChild>
           {trigger || <Button>Log Weight</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Log Weight</DialogTitle>
         </DialogHeader>

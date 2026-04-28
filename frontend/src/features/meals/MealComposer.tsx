@@ -187,7 +187,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
       <DialogTrigger asChild>
         {trigger || <Button>Log Food</Button>}
       </DialogTrigger>
-      <DialogContent className="top-[calc(env(safe-area-inset-top)+1rem)] max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] max-w-2xl translate-y-0 overflow-y-auto sm:top-[50%] sm:max-h-[90vh] sm:translate-y-[-50%]">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit Food" : step === "input" ? "Log Food" : step === "estimate" ? "Estimating..." : "Review & Save"}
@@ -292,7 +292,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Grilled chicken salad" required />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Date & Time</Label>
                 <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
@@ -351,7 +351,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
               <Label>What did you eat?</Label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Date & Time</Label>
                 <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
@@ -377,7 +377,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                     {displayedEstimate.status === "COMPLETED" ? "Complete" : displayedEstimate.status === "PENDING" ? "Pending" : displayedEstimate.status}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="text-center p-3 bg-secondary/50 rounded-lg">
                     <p className="text-lg font-bold">{displayedEstimate.estimatedCalories}</p>
                     <p className="text-xs text-muted-foreground">Calories</p>
@@ -391,7 +391,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                     <p className="text-xs text-muted-foreground">Carbs</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                   <div className="text-center p-3 bg-secondary/50 rounded-lg">
                     <p className="text-lg font-bold">{displayedEstimate.fatGrams}g</p>
                     <p className="text-xs text-muted-foreground">Fat</p>

@@ -290,10 +290,16 @@
     box-shadow: 0 2px 8px 0 hsl(var(--foreground) / 0.08), 0 1px 3px -1px hsl(var(--foreground) / 0.06) !important;
   }
 
-   /* Dialog panel: deeper shadow */
+   /* Dialog panel: deeper shadow, full-screen on mobile, rounded on desktop */
    [data-slot="dialog-content"] {
-     border-radius: var(--radius) !important;
+     border-radius: 0 !important;
      box-shadow: 0 4px 24px hsl(var(--foreground) / 0.12) !important;
+   }
+
+   @media (min-width: 640px) {
+     [data-slot="dialog-content"] {
+       border-radius: var(--radius) !important;
+     }
    }
 
    [data-slot="dialog-content"]::-webkit-scrollbar-thumb {

@@ -366,11 +366,11 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                 {ex.kind === "LIFT" ? (
                   <div className="grid gap-2">
                     {(ex.sets ?? []).map((s, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground w-8">Set {i + 1}</span>
-                        <NumericValueInput className="w-20" placeholder="reps"
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-8 sm:w-auto sm:mb-0">Set {i + 1}</span>
+                        <NumericValueInput className="w-20 sm:flex-1" placeholder="reps"
                           value={s.reps} onValueChange={(reps) => updateSet(ex.id!, i, { reps })} />
-                        <NumericValueInput mode="decimal" className="w-20" placeholder="lbs"
+                        <NumericValueInput mode="decimal" className="w-20 sm:flex-1" placeholder="lbs"
                           value={s.weightLbs} onValueChange={(weightLbs) => updateSet(ex.id!, i, { weightLbs })} />
                         {(ex.sets?.length ?? 0) > 1 && (
                           <Button variant="ghost" size="sm" onClick={() => removeSet(ex.id!, i)}>
@@ -479,7 +479,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
     const result = computeSessionCalories(exercises, 70);
     return (
       <div className="grid gap-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activity</span>
             <Badge>{WORKOUT_TYPES.find((t) => t.value === workoutMode)?.label ?? workoutMode}</Badge>
@@ -489,7 +489,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
             <span className="text-sm font-semibold">{durationDisplay}</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Calories</span>
             <span className="text-lg font-bold">{result.total} cal</span>
@@ -551,7 +551,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       <DialogTrigger asChild>
         {trigger || <Button>Log Workout</Button>}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="sm:max-w-2xl sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
             {isEditing
