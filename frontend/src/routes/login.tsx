@@ -30,15 +30,15 @@ function LoginPage() {
             a screenshot of digital nutrition facts.
           </p>
           <div className="grid grid-cols-3 gap-3 mt-2">
-            <div className="rounded-lg border p-4 bg-gradient-to-b from-white to-blue-50/50">
+              <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
               <h2 className="text-base font-semibold mb-1">Photo-first logging</h2>
               <p className="text-sm text-muted-foreground">Upload food photos, packaging, or screenshots before you save.</p>
             </div>
-            <div className="rounded-lg border p-4 bg-gradient-to-b from-white to-blue-50/50">
+            <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
               <h2 className="text-base font-semibold mb-1">AI estimation</h2>
               <p className="text-sm text-muted-foreground">Review calories and macros from the AI estimate, then confirm and save.</p>
             </div>
-            <div className="rounded-lg border p-4 bg-gradient-to-b from-white to-blue-50/50">
+            <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
               <h2 className="text-base font-semibold mb-1">Private & personal</h2>
               <p className="text-sm text-muted-foreground">No public signup. Your data stays in your account.</p>
             </div>
