@@ -356,11 +356,6 @@ resource "google_cloud_run_v2_service" "scraper" {
       ports {
         container_port = 5050
       }
-
-      env {
-        name  = "PORT"
-        value = "5050"
-      }
     }
   }
 
