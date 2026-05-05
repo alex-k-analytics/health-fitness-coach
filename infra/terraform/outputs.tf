@@ -1,6 +1,16 @@
 output "service_url" {
-  description = "Public Cloud Run URL."
+  description = "Public Cloud Run URL for the main application."
   value       = google_cloud_run_v2_service.app.uri
+}
+
+output "app_service_url" {
+  description = "Public Cloud Run URL for the main application."
+  value       = google_cloud_run_v2_service.app.uri
+}
+
+output "scraper_service_url" {
+  description = "Internal Cloud Run URL for the meal-plan scraper service."
+  value       = google_cloud_run_v2_service.scraper.uri
 }
 
 output "artifact_registry_repository" {

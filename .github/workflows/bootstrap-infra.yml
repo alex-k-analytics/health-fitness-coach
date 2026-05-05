@@ -15,6 +15,7 @@ env:
   PROJECT_ID: akalish-software
   REGION: us-central1
   SERVICE_NAME: health-fitness-coach
+  SCRAPER_SERVICE_NAME: health-fitness-coach-scraper
   ARTIFACT_REPOSITORY_ID: health-fitness-coach
   WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
   BOOTSTRAP_SERVICE_ACCOUNT: github-actions-bootstrap@akalish-software.iam.gserviceaccount.com
@@ -29,9 +30,11 @@ jobs:
       TF_VAR_project_id: akalish-software
       TF_VAR_region: us-central1
       TF_VAR_service_name: health-fitness-coach
+      TF_VAR_scraper_service_name: health-fitness-coach-scraper
       TF_VAR_artifact_repository_id: health-fitness-coach
       TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
       TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
+      TF_VAR_scraper_image: us-docker.pkg.dev/cloudrun/container/hello
       TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
@@ -102,9 +105,11 @@ jobs:
           TF_VAR_project_id: akalish-software
           TF_VAR_region: us-central1
           TF_VAR_service_name: health-fitness-coach
+          TF_VAR_scraper_service_name: health-fitness-coach-scraper
           TF_VAR_artifact_repository_id: health-fitness-coach
           TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
           TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
+          TF_VAR_scraper_image: us-docker.pkg.dev/cloudrun/container/hello
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           TF_VAR_app_base_url: ${{ env.SERVICE_URL }}
         run: terraform apply -auto-approve -input=false -lock-timeout=10m

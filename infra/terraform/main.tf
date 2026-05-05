@@ -8,8 +8,9 @@ locals {
     "sqladmin.googleapis.com",
     "storage.googleapis.com"
   ])
-  openai_api_key_enabled     = nonsensitive(var.openai_api_key) != ""
-  openai_api_key_secret_name = var.openai_api_key_secret_name != "" ? var.openai_api_key_secret_name : "${local.sanitized_service_name}-openai-api-key"
+  openai_api_key_enabled                   = nonsensitive(var.openai_api_key) != ""
+  openai_api_key_secret_name               = var.openai_api_key_secret_name != "" ? var.openai_api_key_secret_name : "${local.sanitized_service_name}-openai-api-key"
+  recipe_source_credential_key_secret_name = var.recipe_source_credential_key_secret_name != "" ? var.recipe_source_credential_key_secret_name : "${local.sanitized_service_name}-recipe-source-credential-key"
 }
 
 resource "google_project_service" "required" {
@@ -33,6 +34,11 @@ resource "random_password" "generated_jwt_secret" {
   special = false
 }
 
+resource "random_password" "generated_recipe_source_credential_key" {
+  length  = 48
+  special = false
+}
+
 locals {
   meal_images_bucket_name = var.bucket_name != "" ? var.bucket_name : "${local.sanitized_service_name}-${random_id.bucket_suffix.hex}-meal-images"
 }
@@ -40,7 +46,7 @@ locals {
 resource "google_artifact_registry_repository" "app" {
   location      = var.region
   repository_id = var.artifact_repository_id
-  description   = "Container images for the health fitness coach app."
+  description   = "Container images for the health fitness coach app and scraper."
   format        = "DOCKER"
 
   depends_on = [google_project_service.required]
@@ -98,8 +104,9 @@ resource "google_sql_user" "app" {
 }
 
 locals {
-  database_url     = "postgresql://${var.db_user}:${urlencode(random_password.db_password.result)}@localhost/${var.db_name}?host=/cloudsql/${google_sql_database_instance.main.connection_name}"
-  jwt_secret_value = var.jwt_secret != "" ? var.jwt_secret : random_password.generated_jwt_secret.result
+  database_url                       = "postgresql://${var.db_user}:${urlencode(random_password.db_password.result)}@localhost/${var.db_name}?host=/cloudsql/${google_sql_database_instance.main.connection_name}"
+  jwt_secret_value                   = var.jwt_secret != "" ? var.jwt_secret : random_password.generated_jwt_secret.result
+  recipe_source_credential_key_value = var.recipe_source_credential_key != "" ? var.recipe_source_credential_key : random_password.generated_recipe_source_credential_key.result
 }
 
 resource "google_secret_manager_secret" "database_url" {
@@ -130,6 +137,21 @@ resource "google_secret_manager_secret" "jwt_secret" {
 resource "google_secret_manager_secret_version" "jwt_secret" {
   secret      = google_secret_manager_secret.jwt_secret.id
   secret_data = local.jwt_secret_value
+}
+
+resource "google_secret_manager_secret" "recipe_source_credential_key" {
+  secret_id = local.recipe_source_credential_key_secret_name
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_secret_manager_secret_version" "recipe_source_credential_key" {
+  secret      = google_secret_manager_secret.recipe_source_credential_key.id
+  secret_data = local.recipe_source_credential_key_value
 }
 
 resource "google_secret_manager_secret" "openai_api_key" {
@@ -231,6 +253,16 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
+      env {
+        name = "RECIPE_SOURCE_CREDENTIAL_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.recipe_source_credential_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
       dynamic "env" {
         for_each = var.app_base_url != "" ? { base = var.app_base_url } : {}
         content {
@@ -250,6 +282,16 @@ resource "google_cloud_run_v2_service" "app" {
       env {
         name  = "NATIVE_APP_ORIGINS"
         value = var.native_app_origins
+      }
+
+      env {
+        name  = "MEAL_PLAN_SCRAPER_URL"
+        value = google_cloud_run_v2_service.scraper.uri
+      }
+
+      env {
+        name  = "ATK_LOGIN_URL"
+        value = var.atk_login_url
       }
 
       env {
@@ -278,6 +320,7 @@ resource "google_cloud_run_v2_service" "app" {
     google_artifact_registry_repository.app,
     google_secret_manager_secret_version.database_url,
     google_secret_manager_secret_version.jwt_secret,
+    google_secret_manager_secret_version.recipe_source_credential_key,
     google_secret_manager_secret_version.openai_api_key,
     google_project_iam_member.runtime_cloudsql_client,
     google_project_iam_member.runtime_secret_accessor,
@@ -289,6 +332,48 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.app.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_cloud_run_v2_service" "scraper" {
+  name     = var.scraper_service_name
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  template {
+    service_account = google_service_account.app_runtime.email
+    timeout         = "300s"
+
+    scaling {
+      min_instance_count = var.scraper_min_instances
+      max_instance_count = var.scraper_max_instances
+    }
+
+    containers {
+      image = var.scraper_image
+
+      ports {
+        container_port = 5050
+      }
+
+      env {
+        name  = "PORT"
+        value = "5050"
+      }
+    }
+  }
+
+  depends_on = [
+    google_artifact_registry_repository.app,
+    google_project_iam_member.runtime_secret_accessor
+  ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "scraper_internal_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.scraper.name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }

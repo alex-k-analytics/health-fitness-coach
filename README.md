@@ -130,20 +130,19 @@ Meal planning uses a hybrid backend split:
 
 ## Production deployment
 
-The current Terraform deployment provisions one Cloud Run service that serves:
+Terraform now provisions two Cloud Run services:
 
-- the Express API
-- the built React frontend
-
-The new `scraper-service/` is implemented in-repo, but the production Terraform and GitHub Actions wiring for a second dedicated Cloud Run scraper service is still a follow-up task.
+- the main HFC service, which serves the Express API and built React frontend
+- an internal meal-plan scraper service used only by the HFC backend
 
 Terraform provisions:
 
 - Artifact Registry repository
-- Cloud Run service
+- main Cloud Run service
+- internal scraper Cloud Run service
 - Cloud SQL PostgreSQL instance
 - GCS bucket for meal images
-- Secret Manager secrets for `DATABASE_URL`, `JWT_SECRET`, and optionally `OPENAI_API_KEY`
+- Secret Manager secrets for `DATABASE_URL`, `JWT_SECRET`, `RECIPE_SOURCE_CREDENTIAL_KEY`, and optionally `OPENAI_API_KEY`
 - runtime service account and IAM bindings
 
 The main Terraform entrypoint is:
@@ -180,7 +179,7 @@ Three workflows are included:
 
 - [CI](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/ci.yml): installs dependencies, builds frontend/backend, and validates Terraform
 - [Bootstrap Infra](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/bootstrap-infra.yml): manual first-run Terraform bootstrap that creates Artifact Registry, Cloud Run, Cloud SQL, Secret Manager, and IAM using a placeholder image, applies Prisma migrations, then reruns Terraform with the generated Cloud Run URL as `APP_BASE_URL`
-- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, applies Prisma migrations, builds and pushes the container image, then rolls a new Cloud Run revision
+- [Deploy](/Users/alexkalish/Documents/MyApplications/health-fitness-coach/.github/workflows/deploy.yml): authenticates to your existing `akalish-software` GCP project via Workload Identity Federation, applies Prisma migrations, builds and pushes both the main app image and scraper image, then rolls new Cloud Run revisions for both services
 
 This repo is wired to two GitHub Actions identities:
 
@@ -196,7 +195,7 @@ The intended order is:
 
 All three workflows are manual-only via `workflow_dispatch`.
 
-The deploy workflow checks for the Artifact Registry repository and Cloud Run service up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
+The deploy workflow checks for the Artifact Registry repository and both Cloud Run services up front and tells you to run `Bootstrap Infra` if the platform has not been provisioned yet.
 
 `APP_BASE_URL` is still important for production redirects, cookie/CORS consistency, and any future custom domain setup. Set it during the Terraform bootstrap once you know the public service URL or custom domain you want to use.
 

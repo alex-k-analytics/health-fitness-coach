@@ -21,6 +21,12 @@ variable "artifact_repository_id" {
   default     = "health-fitness-coach"
 }
 
+variable "scraper_service_name" {
+  description = "Cloud Run service name for the internal meal-plan scraper."
+  type        = string
+  default     = "health-fitness-coach-scraper"
+}
+
 variable "deployer_service_account_email" {
   description = "Existing GitHub Actions deployer service account email."
   type        = string
@@ -30,6 +36,12 @@ variable "deployer_service_account_email" {
 variable "app_image" {
   description = "Container image reference deployed to Cloud Run."
   type        = string
+}
+
+variable "scraper_image" {
+  description = "Container image reference deployed to the scraper Cloud Run service."
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "db_name" {
@@ -93,6 +105,25 @@ variable "openai_model" {
   default     = "gpt-4.1"
 }
 
+variable "atk_login_url" {
+  description = "Default ATK login URL passed to the application runtime."
+  type        = string
+  default     = "https://www.americastestkitchen.com/sign_in"
+}
+
+variable "recipe_source_credential_key" {
+  description = "Application key used to encrypt stored recipe-source credentials. Leave blank to have Terraform generate one."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "recipe_source_credential_key_secret_name" {
+  description = "Secret Manager secret name that Cloud Run should mount as RECIPE_SOURCE_CREDENTIAL_KEY."
+  type        = string
+  default     = ""
+}
+
 variable "jwt_secret" {
   description = "JWT signing secret. Leave blank to have Terraform generate one."
   type        = string
@@ -108,6 +139,18 @@ variable "min_instances" {
 
 variable "max_instances" {
   description = "Maximum Cloud Run instances."
+  type        = number
+  default     = 1
+}
+
+variable "scraper_min_instances" {
+  description = "Minimum Cloud Run instances for the scraper service."
+  type        = number
+  default     = 0
+}
+
+variable "scraper_max_instances" {
+  description = "Maximum Cloud Run instances for the scraper service."
   type        = number
   default     = 1
 }

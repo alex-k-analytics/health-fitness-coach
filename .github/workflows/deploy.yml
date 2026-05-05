@@ -15,6 +15,7 @@ env:
   PROJECT_ID: akalish-software
   REGION: us-central1
   SERVICE_NAME: health-fitness-coach
+  SCRAPER_SERVICE_NAME: health-fitness-coach-scraper
   ARTIFACT_REPOSITORY_ID: health-fitness-coach
   WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
   DEPLOYER_SERVICE_ACCOUNT: github-actions-service-account@akalish-software.iam.gserviceaccount.com
@@ -62,6 +63,15 @@ jobs:
             exit 1
           fi
 
+          if ! gcloud run services describe "${SCRAPER_SERVICE_NAME}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            >/dev/null 2>&1; then
+            echo "Cloud Run service ${SCRAPER_SERVICE_NAME} was not found in ${PROJECT_ID}/${REGION}."
+            echo "Run the Bootstrap Infra workflow once before using Deploy."
+            exit 1
+          fi
+
       - name: Configure Docker authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
@@ -100,25 +110,45 @@ jobs:
           cd backend
           npm run prisma:migrate:deploy
 
-      - name: Build and push image
+      - name: Build and push application image
         env:
-          IMAGE_URI: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          APP_IMAGE_URI: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
         run: |
-          docker build -t "${IMAGE_URI}" .
-          docker push "${IMAGE_URI}"
-          echo "IMAGE_URI=${IMAGE_URI}" >> "${GITHUB_ENV}"
+          docker build -t "${APP_IMAGE_URI}" .
+          docker push "${APP_IMAGE_URI}"
+          echo "APP_IMAGE_URI=${APP_IMAGE_URI}" >> "${GITHUB_ENV}"
 
-      - name: Deploy revision
+      - name: Build and push scraper image
+        env:
+          SCRAPER_IMAGE_URI: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY_ID }}/${{ env.SCRAPER_SERVICE_NAME }}:${{ github.sha }}
+        run: |
+          docker build -t "${SCRAPER_IMAGE_URI}" scraper-service
+          docker push "${SCRAPER_IMAGE_URI}"
+          echo "SCRAPER_IMAGE_URI=${SCRAPER_IMAGE_URI}" >> "${GITHUB_ENV}"
+
+      - name: Deploy application revision
         run: |
           gcloud run deploy "${SERVICE_NAME}" \
-            --image="${IMAGE_URI}" \
+            --image="${APP_IMAGE_URI}" \
             --region="${REGION}" \
             --project="${PROJECT_ID}" \
             --quiet
 
-      - name: Show service URL
+      - name: Deploy scraper revision
+        run: |
+          gcloud run deploy "${SCRAPER_SERVICE_NAME}" \
+            --image="${SCRAPER_IMAGE_URI}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet
+
+      - name: Show service URLs
         run: |
           gcloud run services describe "${SERVICE_NAME}" \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            --format='value(status.url)'
+          gcloud run services describe "${SCRAPER_SERVICE_NAME}" \
             --region="${REGION}" \
             --project="${PROJECT_ID}" \
             --format='value(status.url)'
