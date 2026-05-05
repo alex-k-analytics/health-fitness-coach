@@ -48,7 +48,7 @@ jobs:
         run: python -m py_compile scraper-service/app.py
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
 
       - name: Terraform format check
         working-directory: infra/terraform
