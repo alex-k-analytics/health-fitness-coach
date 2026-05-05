@@ -69,7 +69,8 @@ jobs:
             --project="${PROJECT_ID}" \
             >/dev/null 2>&1; then
             echo "Cloud Run service ${SCRAPER_SERVICE_NAME} was not found in ${PROJECT_ID}/${REGION}."
-            echo "Run the Bootstrap Infra workflow once before using Deploy."
+            echo "The scraper service was added by a newer infrastructure revision."
+            echo "Run the Bootstrap Infra workflow once to apply the new Terraform shape, then rerun Deploy."
             exit 1
           fi
 
