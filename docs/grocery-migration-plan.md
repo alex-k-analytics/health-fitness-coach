@@ -42,6 +42,38 @@ Features not to preserve as-is:
 
 ## Target Architecture
 
+### Recommended Hybrid Migration Architecture
+
+The recommended transition shape is a hybrid architecture:
+
+- `health-fitness-coach` becomes the user-facing application and system of record
+- a small dedicated Flask service remains responsible only for Playwright-based recipe acquisition
+
+This is the best near-term compromise because it avoids rewriting the hardest subsystem first while still moving the real product into the HFC architecture.
+
+In this model:
+
+- HFC owns auth
+- HFC owns frontend routes and UI
+- HFC owns PostgreSQL and Prisma models
+- HFC owns planning preferences
+- HFC owns recipe-source credential management
+- HFC owns planning history
+- HFC owns final plan persistence
+- HFC owns grocery-list and reviewed-recipe rendering
+- Flask owns browser automation and source scraping only
+
+The Flask service should not own:
+
+- users
+- sessions
+- planning history
+- planner preferences
+- grocery list persistence
+- reshuffle history
+
+It should behave like an internal acquisition service, not a second full app.
+
 ### Frontend
 
 Add a new authenticated planning area to the React app.
@@ -90,6 +122,8 @@ The backend should follow the existing HFC pattern:
 - Prisma persistence
 - ownership checks via `accountId`
 
+In the hybrid migration shape, the HFC backend also becomes the orchestration layer between the frontend and the Flask scraper service.
+
 ### AI and Planning
 
 Port the grocery planner as a TypeScript service, not as a Python subprocess.
@@ -107,6 +141,16 @@ This should mirror the architecture already used by HFC nutrition analysis:
 - structured model output
 - normalization before persistence
 - graceful fallback path
+
+Recommended transitional split:
+
+- Flask service: recipe acquisition and recipe parsing
+- HFC backend: planning orchestration, persistence, progress, and final result serving
+
+Long-term target:
+
+- keep Flask only if source acquisition truly requires it
+- otherwise port planning and acquisition boundaries further into HFC over time
 
 ## Proposed Prisma Models
 
@@ -274,11 +318,52 @@ Shape:
 
 1. client creates run
 2. backend marks run `RUNNING`
-3. backend performs recipe acquisition and planning
-4. backend saves outputs
-5. client polls `/status`
+3. backend calls the Flask acquisition service for recipe candidates
+4. backend performs planning and grocery generation
+5. backend saves outputs
+6. client polls `/status`
 
-This is the fastest path to feature parity.
+This is the fastest path to feature parity while keeping Playwright isolated.
+
+### MVP Request Flow
+
+Detailed ownership split:
+
+1. frontend calls HFC `POST /api/meal-plans/runs`
+2. HFC validates request and reads account-scoped recipe credentials
+3. HFC creates `MealPlanRun` with `RUNNING`
+4. HFC calls Flask acquisition service with normalized source request
+5. Flask logs into ATK, searches, and returns normalized recipe candidates
+6. HFC runs criteria review, selection, critique, and grocery-list generation
+7. HFC persists final run data
+8. frontend reads results only from HFC
+
+This keeps HFC as the only backend the client knows about.
+
+### Flask Service Contract
+
+The Flask scraper service should expose a narrow API.
+
+Suggested endpoint:
+
+- `POST /internal/recipes/acquire`
+
+Suggested request payload:
+
+- source id
+- source login data or a source credential token/reference
+- pantry ingredients
+- max recipes
+- acquisition options
+
+Suggested response payload:
+
+- normalized recipe candidates
+- scrape metadata
+- source status details
+- warnings or recoverable errors
+
+The response should not include user-owned plan state.
 
 ### Target
 
@@ -296,6 +381,22 @@ Possible target shapes later:
 - Cloud Run jobs
 - Pub/Sub triggered worker
 
+### Deployment Recommendation
+
+Do not run Flask inside the same HFC process.
+
+Recommended deployment:
+
+- HFC web/API service
+- separate small Flask acquisition service
+
+Avoid:
+
+- shelling out from Node to Python during request handling
+- sharing auth/session ownership with Flask
+- letting Flask read or write plan-history tables directly
+- exposing Flask directly to the frontend
+
 ## Recipe Acquisition Strategy
 
 This is the hardest migration area.
@@ -312,19 +413,23 @@ Recommended approach:
 ### Phase 1
 
 - keep ATK as the only supported planning source
-- isolate acquisition in `recipeAcquisitionService`
+- isolate acquisition behind `recipeAcquisitionService` in HFC
+- implement the actual scraping in the dedicated Flask service
 - store source credentials in DB
 - keep session-state handling behind one service boundary
+- keep the Flask API narrow and internal-facing
 
 ### Phase 2
 
 - move session state out of local dev assumptions
 - define production-safe storage for session artifacts
 - add source-health reporting and reconnect UX
+- add retries and failure classification between HFC and Flask
 
 ### Phase 3
 
 - add additional planning sources only after the service boundary is stable
+- evaluate whether Flask should remain only for scraping or whether the boundary can be reduced further
 
 ## Frontend Migration Plan
 
@@ -392,15 +497,24 @@ Issues:
 - headless-browser stability
 - Cloud Run execution time and memory pressure
 
-### 2. Synchronous Request Duration
+### 2. Cross-Service Complexity
+
+A hybrid architecture is safer than a full rewrite, but it introduces:
+
+- service-to-service authentication
+- network failure handling
+- versioned request and response contracts
+- observability across two runtimes
+
+### 3. Synchronous Request Duration
 
 Even if MVP uses direct request processing, it may become fragile under slow source login or scraping.
 
-### 3. State Migration
+### 4. State Migration
 
 The grocery app relies on local files for some persistent behavior. HFC should not.
 
-### 4. Scope Creep
+### 5. Scope Creep
 
 Source expansion beyond ATK will increase complexity quickly. Keep source scope narrow until the planning domain is stable.
 
@@ -464,4 +578,10 @@ The migration is successful when a signed-in HFC user can:
 - reopen prior plan runs
 - reshuffle one meal without losing the rest of the plan
 
-without relying on the old Flask app, SQLAlchemy models, or file-based planner state.
+while:
+
+- interacting only with HFC from the frontend
+- storing all product state in HFC-managed persistence
+- using Flask only as an internal scraping service when needed
+
+and without relying on the old Flask app as a user-facing product, SQLAlchemy models, or file-based planner state.
