@@ -29,11 +29,17 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponent() {
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    import.meta.env.MODE === "production";
+
   return (
     <>
       <GlobalBanner />
       <Outlet />
-      <TanStackRouterDevtools position="bottom-right" />
+      {!isProduction ? (
+        <TanStackRouterDevtools position="bottom-right" />
+      ) : null}
     </>
   );
 }
