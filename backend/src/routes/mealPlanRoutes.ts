@@ -72,6 +72,10 @@ function parseJsonArray<T>(value: Prisma.JsonValue | null | undefined, fallback:
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
 
+function toInputJson(value: unknown): Prisma.InputJsonValue {
+  return value as unknown as Prisma.InputJsonValue;
+}
+
 function parseRecipeSources(value: Prisma.JsonValue | null | undefined): RecipeSourceId[] {
   if (!Array.isArray(value)) return ["atk"];
   return value
@@ -260,11 +264,11 @@ async function processMealPlanRun(input: {
         status: "COMPLETED",
         progressStage: "Complete",
         progressPercent: 100,
-        selectedMealsJson: plan.selectedMeals as Prisma.InputJsonValue,
-        reviewedRecipesJson: plan.reviewedRecipes as Prisma.InputJsonValue,
-        groceryListJson: plan.groceryList as Prisma.InputJsonValue,
-        notesJson: plan.notes as Prisma.InputJsonValue,
-        scrapedRecipesJson: acquisition.recipes as Prisma.InputJsonValue,
+        selectedMealsJson: toInputJson(plan.selectedMeals),
+        reviewedRecipesJson: toInputJson(plan.reviewedRecipes),
+        groceryListJson: toInputJson(plan.groceryList),
+        notesJson: toInputJson(plan.notes),
+        scrapedRecipesJson: toInputJson(acquisition.recipes),
         scrapedCount: acquisition.scrapedCount,
         durationSeconds: Math.round((Date.now() - startedAt) / 100) / 10,
         errorMessage: null
@@ -384,7 +388,7 @@ mealPlanRoutes.post("/runs", async (req: AuthenticatedRequest, res) => {
       progressPercent: 0,
       ingredientsText: parsed.data.ingredients,
       instructionsText: mealPlanningService.composeInstructions(preference, parsed.data.instructions ?? ""),
-      recipeSources: recipeSources as unknown as Prisma.InputJsonValue,
+      recipeSources: toInputJson(recipeSources),
       maxRecipes: parsed.data.maxRecipes ?? preference.defaultMaxRecipes ?? 20,
       maxMeals: parsed.data.maxMeals ?? preference.defaultMaxMeals ?? 5,
       useOpenAi: parsed.data.useOpenAi ?? preference.defaultUseOpenAi ?? true
@@ -517,11 +521,11 @@ mealPlanRoutes.post("/runs/:id/reshuffle", async (req: AuthenticatedRequest, res
         useOpenAi: sourceRun.useOpenAi,
         scrapedCount: sourceRun.scrapedCount,
         durationSeconds: 0.1,
-        selectedMealsJson: updatedPlan.selectedMeals as Prisma.InputJsonValue,
-        reviewedRecipesJson: updatedPlan.reviewedRecipes as Prisma.InputJsonValue,
-        groceryListJson: updatedPlan.groceryList as Prisma.InputJsonValue,
-        notesJson: updatedPlan.notes as Prisma.InputJsonValue,
-        scrapedRecipesJson: scrapedRecipes as Prisma.InputJsonValue
+        selectedMealsJson: toInputJson(updatedPlan.selectedMeals),
+        reviewedRecipesJson: toInputJson(updatedPlan.reviewedRecipes),
+        groceryListJson: toInputJson(updatedPlan.groceryList),
+        notesJson: toInputJson(updatedPlan.notes),
+        scrapedRecipesJson: toInputJson(scrapedRecipes)
       }
     });
 

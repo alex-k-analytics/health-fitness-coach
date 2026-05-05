@@ -265,7 +265,7 @@ function pickHeuristicMeals(
 ) {
   const reviewMap = new Map(reviews.map((review) => [review.url || review.title.toLowerCase(), review]));
   const ranked = recipes
-    .map((recipe) => buildMealFromRecipe(pantryIngredients, recipe, reviewMap.get(recipe.url || recipe.title.toLowerCase())))
+    .map((recipe) => buildMealFromRecipe(recipe, pantryIngredients, reviewMap.get(recipe.url || recipe.title.toLowerCase())))
     .sort((a, b) => b.score - a.score || Number(b.criteriaFit) - Number(a.criteriaFit) || a.title.localeCompare(b.title));
 
   const selected: SelectedMeal[] = [];
@@ -440,7 +440,7 @@ function mapSelectedTitlesToMeals(
     const recipe = byTitle.get(title.toLowerCase());
     if (!recipe) continue;
     const review = reviewMap.get(recipe.url || recipe.title.toLowerCase());
-    selected.push(buildMealFromRecipe(pantryIngredients, recipe, review));
+    selected.push(buildMealFromRecipe(recipe, pantryIngredients, review));
   }
   return selected;
 }
@@ -521,7 +521,7 @@ export class MealPlanningService {
 
     const candidates = input.recipes
       .filter((recipe) => !excludedKeys.has(serializeTitleKey(recipe.title, recipe.url)))
-      .map((recipe) => buildMealFromRecipe(input.pantryIngredients, recipe, reviewMap.get(recipe.url || recipe.title.toLowerCase())))
+      .map((recipe) => buildMealFromRecipe(recipe, input.pantryIngredients, reviewMap.get(recipe.url || recipe.title.toLowerCase())))
       .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
       .slice(0, 5);
 
