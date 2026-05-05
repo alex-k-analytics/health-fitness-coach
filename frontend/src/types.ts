@@ -235,3 +235,116 @@ export interface Meal {
   createdAt: string;
   updatedAt: string;
 }
+
+export type RecipeSourceId = "atk" | "allrecipes" | "nytimes";
+
+export interface MealPlannerPreferences {
+  dietaryRestrictions: string;
+  plannerContext: string;
+  defaultMaxRecipes: number | null;
+  defaultMaxMeals: number | null;
+  defaultUseOpenAi: boolean | null;
+  updatedAt: string | null;
+}
+
+export interface RecipeSourceCredential {
+  source: RecipeSourceId;
+  label: string;
+  defaultLoginUrl: string;
+  supportedForPlanning: boolean;
+  configured: boolean;
+  enabled: boolean;
+  username: string;
+  loginUrl: string;
+  hasPassword: boolean;
+  updatedAt: string | null;
+}
+
+export interface MealPlanReview {
+  title: string;
+  url: string;
+  fitsCriteria: boolean;
+  criteriaScore: number;
+  reasons: string[];
+  estimatedTotalTimeMinutes?: number | null;
+  ratingValue?: number | null;
+  categories: string[];
+}
+
+export interface MealPlanSelectedMeal {
+  title: string;
+  url: string;
+  score: number;
+  matchingIngredients: string[];
+  missingIngredients: string[];
+  reasoning: string;
+  criteriaFit: boolean;
+  criteriaNotes: string[];
+  estimatedTotalTimeMinutes?: number | null;
+  ratingValue?: number | null;
+  categories: string[];
+}
+
+export interface GroceryListItem {
+  item: string;
+  category: string;
+  recipes: string[];
+  note: string;
+}
+
+export interface WeeklyMealPlan {
+  pantryIngredients: string[];
+  recipeSources: RecipeSourceId[];
+  agentInstructions: string;
+  reviewedRecipes: MealPlanReview[];
+  selectedMeals: MealPlanSelectedMeal[];
+  groceryList: GroceryListItem[];
+  notes: string[];
+}
+
+export interface MealPlanRunSummary {
+  id: string;
+  sourceRunId: string | null;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  progressStage: string | null;
+  progressPercent: number;
+  createdAt: string;
+  updatedAt: string;
+  ingredientsPreview: string[];
+  selectedMeals: string[];
+  recipeSources: RecipeSourceId[];
+  scrapedCount: number;
+  durationSeconds: number | null;
+  errorMessage: string | null;
+}
+
+export interface MealPlanRunDetail {
+  id: string;
+  sourceRunId: string | null;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  progressStage: string | null;
+  progressPercent: number;
+  request: {
+    ingredients: string;
+    instructions: string;
+    recipeSources: RecipeSourceId[];
+    maxRecipes: number;
+    maxMeals: number;
+    useOpenAi: boolean;
+  };
+  plan: WeeklyMealPlan | null;
+  scrapedRecipes: Array<{
+    title: string;
+    url: string;
+    ingredients: string[];
+    totalTimeMinutes?: number | null;
+    ratingValue?: number | null;
+    ratingCount?: number | null;
+    categories: string[];
+  }>;
+  scrapedCount: number;
+  durationSeconds: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -11,5 +11,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  meal-plan-scraper:
+    build:
+      context: ./scraper-service
+    restart: unless-stopped
+    environment:
+      PORT: 5050
+    ports:
+      - "5050:5050"
+
 volumes:
   postgres_data:

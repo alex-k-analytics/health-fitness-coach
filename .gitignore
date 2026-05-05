@@ -9,4 +9,5 @@ backend/uploads/
 *.tfstate.*
 gha-creds-*.json
 .opencode/
-
+__pycache__/
+*.pyc

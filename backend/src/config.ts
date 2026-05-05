@@ -33,5 +33,8 @@ export const config = {
   gcsBucketName: process.env.GCS_BUCKET_NAME ?? "",
   openAiApiKey: process.env.OPENAI_API_KEY ?? "",
   openAiModel: process.env.OPENAI_MODEL ?? "gpt-4.1",
-  maxUploadBytes: parseNumber(process.env.MAX_UPLOAD_BYTES, 8 * 1024 * 1024)
+  maxUploadBytes: parseNumber(process.env.MAX_UPLOAD_BYTES, 8 * 1024 * 1024),
+  mealPlanScraperUrl: process.env.MEAL_PLAN_SCRAPER_URL ?? "",
+  recipeSourceCredentialKey: process.env.RECIPE_SOURCE_CREDENTIAL_KEY ?? "",
+  atkDefaultLoginUrl: process.env.ATK_LOGIN_URL ?? "https://www.americastestkitchen.com/sign_in"
 } as const;

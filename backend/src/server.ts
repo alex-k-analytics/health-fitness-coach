@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/authRoutes.js";
 import { profileRoutes } from "./routes/profileRoutes.js";
 import { nutritionRoutes } from "./routes/nutritionRoutes.js";
 import { workoutRoutes } from "./routes/workoutRoutes.js";
+import { mealPlanRoutes } from "./routes/mealPlanRoutes.js";
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", requireAuth, profileRoutes);
 app.use("/api/nutrition", requireAuth, nutritionRoutes);
 app.use("/api/workouts", requireAuth, workoutRoutes);
+app.use("/api/meal-plans", requireAuth, mealPlanRoutes);
 
 if (fs.existsSync(config.frontendDistDir)) {
   app.use(express.static(config.frontendDistDir));

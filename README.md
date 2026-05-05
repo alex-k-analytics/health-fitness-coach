@@ -6,6 +6,7 @@ Private nutrition tracking app with:
 - per-user goals and health metrics
 - meal logging with multiple food and label photos
 - OpenAI-powered nutrition analysis with fallback heuristics
+- pantry-based weekly meal planning with reviewed recipes and grocery lists
 - reusable saved foods
 - PostgreSQL persistence and GCS-backed image storage in production
 - Terraform-managed GCP infrastructure and GitHub Actions deployment
@@ -14,6 +15,7 @@ Private nutrition tracking app with:
 
 - `frontend/`: React + Vite + TypeScript
 - `backend/`: Express + TypeScript + Prisma
+- `scraper-service/`: dedicated Flask service for internal recipe acquisition
 - `infra/terraform/`: Cloud Run, Cloud SQL, Artifact Registry, Secret Manager, and GCS
 - `Dockerfile`: production image that serves both the API and built frontend from one Cloud Run service
 
@@ -48,7 +50,13 @@ npm run prisma:generate
 npm run dev
 ```
 
-4. In another terminal, install frontend dependencies and run Vite:
+4. In another terminal, run the internal meal-plan scraper service:
+
+```bash
+docker compose up -d meal-plan-scraper
+```
+
+5. In another terminal, install frontend dependencies and run Vite:
 
 ```bash
 cd frontend
@@ -56,7 +64,7 @@ npm install
 npm run dev
 ```
 
-5. Optional: apply the schema to a local Postgres instance:
+6. Optional: apply the schema to a local Postgres instance:
 
 ```bash
 cd backend
@@ -64,6 +72,8 @@ npx prisma db push
 ```
 
 The frontend expects the API at `http://localhost:4000/api` by default.
+
+For grocery planning, the backend expects the internal scraper service at `MEAL_PLAN_SCRAPER_URL`. The default local value in `.env.example` is `http://localhost:5050`.
 
 ## iPhone app development
 
@@ -108,15 +118,24 @@ The backend allows Capacitor origins by default through `NATIVE_APP_ORIGINS=capa
 - `POST /api/nutrition/estimate`: analyze food photos and label screenshots before saving a meal.
 - `POST /api/nutrition/meals`: multipart meal submission with `plateImages`, `labelImages`, and `otherImages`.
 - `POST /api/nutrition/saved-foods`: create reusable food entries.
+- `POST /api/meal-plans/runs`: start a weekly planning run from pantry ingredients.
+- `POST /api/meal-plans/runs/:id/reshuffle`: replace one meal inside a completed plan.
 
 If `OPENAI_API_KEY` is configured, the backend sends meal photos and serving context to the OpenAI Responses API. If it is not configured, the app still stores the meal and produces a conservative fallback estimate.
 
+Meal planning uses a hybrid backend split:
+
+- the main HFC app owns auth, UI, Prisma/Postgres, preferences, source credentials, run history, and final meal-plan state
+- `scraper-service/` owns only recipe acquisition and returns normalized recipe candidates to the HFC backend
+
 ## Production deployment
 
-The production deployment uses one Cloud Run service that serves:
+The current Terraform deployment provisions one Cloud Run service that serves:
 
 - the Express API
 - the built React frontend
+
+The new `scraper-service/` is implemented in-repo, but the production Terraform and GitHub Actions wiring for a second dedicated Cloud Run scraper service is still a follow-up task.
 
 Terraform provisions:
 

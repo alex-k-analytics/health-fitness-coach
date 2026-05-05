@@ -15,6 +15,7 @@ import { Route as AuthIndexRouteImport } from './routes/_auth/index'
 import { Route as AuthWorkoutsRouteImport } from './routes/_auth/workouts'
 import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
 import { Route as AuthMealsRouteImport } from './routes/_auth/meals'
+import { Route as AuthPlanningRouteImport } from './routes/_auth/planning'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -45,17 +46,24 @@ const AuthMealsRoute = AuthMealsRouteImport.update({
   path: '/meals',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthPlanningRoute = AuthPlanningRouteImport.update({
+  id: '/planning',
+  path: '/planning',
+  getParentRoute: () => AuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthIndexRoute
   '/login': typeof LoginRoute
   '/meals': typeof AuthMealsRoute
+  '/planning': typeof AuthPlanningRoute
   '/settings': typeof AuthSettingsRoute
   '/workouts': typeof AuthWorkoutsRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/meals': typeof AuthMealsRoute
+  '/planning': typeof AuthPlanningRoute
   '/settings': typeof AuthSettingsRoute
   '/workouts': typeof AuthWorkoutsRoute
   '/': typeof AuthIndexRoute
@@ -65,20 +73,22 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/_auth/meals': typeof AuthMealsRoute
+  '/_auth/planning': typeof AuthPlanningRoute
   '/_auth/settings': typeof AuthSettingsRoute
   '/_auth/workouts': typeof AuthWorkoutsRoute
   '/_auth/': typeof AuthIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/meals' | '/settings' | '/workouts'
+  fullPaths: '/' | '/login' | '/meals' | '/planning' | '/settings' | '/workouts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/meals' | '/settings' | '/workouts' | '/'
+  to: '/login' | '/meals' | '/planning' | '/settings' | '/workouts' | '/'
   id:
     | '__root__'
     | '/_auth'
     | '/login'
     | '/_auth/meals'
+    | '/_auth/planning'
     | '/_auth/settings'
     | '/_auth/workouts'
     | '/_auth/'
@@ -133,11 +143,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthMealsRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/planning': {
+      id: '/_auth/planning'
+      path: '/planning'
+      fullPath: '/planning'
+      preLoaderRoute: typeof AuthPlanningRouteImport
+      parentRoute: typeof AuthRoute
+    }
   }
 }
 
 interface AuthRouteChildren {
   AuthMealsRoute: typeof AuthMealsRoute
+  AuthPlanningRoute: typeof AuthPlanningRoute
   AuthSettingsRoute: typeof AuthSettingsRoute
   AuthWorkoutsRoute: typeof AuthWorkoutsRoute
   AuthIndexRoute: typeof AuthIndexRoute
@@ -145,6 +163,7 @@ interface AuthRouteChildren {
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthMealsRoute: AuthMealsRoute,
+  AuthPlanningRoute: AuthPlanningRoute,
   AuthSettingsRoute: AuthSettingsRoute,
   AuthWorkoutsRoute: AuthWorkoutsRoute,
   AuthIndexRoute: AuthIndexRoute,

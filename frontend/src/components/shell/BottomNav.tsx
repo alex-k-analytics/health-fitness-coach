@@ -1,10 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-import { Home, UtensilsCrossed, Dumbbell, Settings } from "lucide-react";
+import { Home, UtensilsCrossed, Dumbbell, Settings, ShoppingBasket } from "lucide-react";
 
 const TABS = [
   { path: "/", label: "Home", icon: Home },
   { path: "/meals", label: "Meals", icon: UtensilsCrossed },
+  { path: "/planning", label: "Planning", icon: ShoppingBasket },
   { path: "/workouts", label: "Workouts", icon: Dumbbell },
   { path: "/settings", label: "Settings", icon: Settings }
 ];

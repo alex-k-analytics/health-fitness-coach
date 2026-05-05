@@ -1,0 +1,155 @@
+import { config } from "../config.js";
+import type {
+  PlanningRecipeCandidate,
+  RecipeSourceId,
+  ScraperAcquireRequest,
+  ScraperAcquireResponse
+} from "./mealPlanningTypes.js";
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function buildMockRecipes(pantryIngredients: string[], maxRecipes: number): PlanningRecipeCandidate[] {
+  const ingredients = pantryIngredients.slice(0, 6);
+  const lead = ingredients[0] ?? "chicken";
+  const support = ingredients[1] ?? "rice";
+  const third = ingredients[2] ?? "garlic";
+
+  const recipes: PlanningRecipeCandidate[] = [
+    {
+      title: `${lead} skillet with ${support}`,
+      url: "https://example.invalid/recipes/skillet",
+      ingredients: [lead, support, third, "olive oil", "salt", "pepper", "lemon"],
+      totalTimeMinutes: 35,
+      ratingValue: 4.6,
+      ratingCount: 123,
+      categories: ["skillet", "dinner", "weeknight"]
+    },
+    {
+      title: `${lead} pasta with ${third}`,
+      url: "https://example.invalid/recipes/pasta",
+      ingredients: [lead, third, "pasta", "parmesan", "butter", "spinach"],
+      totalTimeMinutes: 40,
+      ratingValue: 4.4,
+      ratingCount: 88,
+      categories: ["pasta", "dinner"]
+    },
+    {
+      title: `Sheet-pan ${lead} and vegetables`,
+      url: "https://example.invalid/recipes/sheet-pan",
+      ingredients: [lead, "broccoli", "carrots", "olive oil", "garlic", "potatoes"],
+      totalTimeMinutes: 45,
+      ratingValue: 4.7,
+      ratingCount: 201,
+      categories: ["sheet-pan", "dinner"]
+    },
+    {
+      title: `${support} bowl with ${lead}`,
+      url: "https://example.invalid/recipes/bowl",
+      ingredients: [support, lead, "cucumber", "yogurt", "dill", "lemon"],
+      totalTimeMinutes: 30,
+      ratingValue: 4.2,
+      ratingCount: 64,
+      categories: ["bowl", "lunch", "dinner"]
+    },
+    {
+      title: `Soup with ${lead} and ${third}`,
+      url: "https://example.invalid/recipes/soup",
+      ingredients: [lead, third, "broth", "onion", "celery", "carrots"],
+      totalTimeMinutes: 55,
+      ratingValue: 4.0,
+      ratingCount: 49,
+      categories: ["soup", "dinner"]
+    },
+    {
+      title: `Salad with ${lead} and greens`,
+      url: "https://example.invalid/recipes/salad",
+      ingredients: [lead, "mixed greens", "tomatoes", "olive oil", "vinegar", "croutons"],
+      totalTimeMinutes: 20,
+      ratingValue: 4.1,
+      ratingCount: 37,
+      categories: ["salad", "lunch"]
+    }
+  ];
+
+  return recipes.slice(0, Math.max(1, Math.min(maxRecipes, recipes.length)));
+}
+
+function normalizeRecipe(raw: any): PlanningRecipeCandidate | null {
+  const title = normalizeWhitespace(String(raw?.title ?? ""));
+  const url = normalizeWhitespace(String(raw?.url ?? ""));
+  if (!title) {
+    return null;
+  }
+  const ingredients = Array.isArray(raw?.ingredients)
+    ? raw.ingredients
+        .map((item: unknown) => normalizeWhitespace(String(item ?? "")))
+        .filter(Boolean)
+    : [];
+  const categories = Array.isArray(raw?.categories)
+    ? raw.categories
+        .map((item: unknown) => normalizeWhitespace(String(item ?? "")))
+        .filter(Boolean)
+    : [];
+
+  return {
+    title,
+    url,
+    ingredients,
+    totalTimeMinutes: typeof raw?.totalTimeMinutes === "number" ? raw.totalTimeMinutes : null,
+    ratingValue: typeof raw?.ratingValue === "number" ? raw.ratingValue : null,
+    ratingCount: typeof raw?.ratingCount === "number" ? raw.ratingCount : null,
+    categories
+  };
+}
+
+export class RecipeAcquisitionService {
+  async acquireRecipes(input: ScraperAcquireRequest): Promise<ScraperAcquireResponse> {
+    if (!config.mealPlanScraperUrl.trim()) {
+      const recipes = buildMockRecipes(input.pantryIngredients, input.maxRecipes);
+      return {
+        recipes,
+        scrapedCount: recipes.length,
+        warnings: ["Using built-in mock recipe acquisition because MEAL_PLAN_SCRAPER_URL is not configured."]
+      };
+    }
+
+    const response = await fetch(`${config.mealPlanScraperUrl.replace(/\/$/, "")}/internal/recipes/acquire`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(input)
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const errorMessage =
+        payload && typeof payload === "object" && typeof (payload as { error?: unknown }).error === "string"
+          ? (payload as { error: string }).error
+          : `Scraper request failed with status ${response.status}.`;
+      throw new Error(errorMessage);
+    }
+
+    const rawRecipes = Array.isArray((payload as { recipes?: unknown[] })?.recipes)
+      ? (payload as { recipes: unknown[] }).recipes
+      : [];
+    const recipes = rawRecipes
+      .map((item) => normalizeRecipe(item))
+      .filter((item): item is PlanningRecipeCandidate => item !== null);
+
+    return {
+      recipes,
+      scrapedCount:
+        typeof (payload as { scrapedCount?: unknown })?.scrapedCount === "number"
+          ? (payload as { scrapedCount: number }).scrapedCount
+          : recipes.length,
+      warnings: Array.isArray((payload as { warnings?: unknown[] })?.warnings)
+        ? (payload as { warnings: unknown[] }).warnings.map((item) => normalizeWhitespace(String(item ?? ""))).filter(Boolean)
+        : []
+    };
+  }
+}
+
+export const recipeAcquisitionService = new RecipeAcquisitionService();

@@ -39,8 +39,18 @@ model Account {
   workouts         WorkoutEntry[]
   workoutSessions  WorkoutSession[]
   workoutExercises WorkoutExercise[]
+  mealPlannerPreference MealPlannerPreference?
+  recipeSourceCredentials RecipeSourceCredential[]
+  mealPlanRuns     MealPlanRun[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+}
+
+enum MealPlanRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 model HealthMetric {
@@ -209,4 +219,64 @@ model WorkoutExercise {
 
   @@index([workoutSessionId, order])
   @@index([accountId, createdAt(sort: Desc)])
+}
+
+model MealPlannerPreference {
+  accountId          String   @id
+  dietaryRestrictions String?
+  plannerContext     String?
+  defaultMaxRecipes  Int?
+  defaultMaxMeals    Int?
+  defaultUseOpenAi   Boolean?
+  account            Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  updatedAt          DateTime @updatedAt
+}
+
+model RecipeSourceCredential {
+  id                 String   @id @default(cuid())
+  accountId          String
+  source             String
+  username           String
+  passwordCiphertext String
+  passwordHash       String
+  loginUrl           String
+  enabled            Boolean  @default(true)
+  account            Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([accountId, source])
+  @@index([accountId, source])
+}
+
+model MealPlanRun {
+  id                 String            @id @default(cuid())
+  accountId          String
+  sourceRunId        String?
+  status             MealPlanRunStatus @default(PENDING)
+  progressStage      String?
+  progressPercent    Int               @default(0)
+  ingredientsText    String
+  instructionsText   String
+  recipeSources      Json?
+  maxRecipes         Int
+  maxMeals           Int
+  useOpenAi          Boolean           @default(true)
+  scrapedCount       Int               @default(0)
+  durationSeconds    Float?
+  selectedMealsJson  Json?
+  reviewedRecipesJson Json?
+  groceryListJson    Json?
+  notesJson          Json?
+  scrapedRecipesJson Json?
+  errorMessage       String?
+  account            Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceRun          MealPlanRun?      @relation("MealPlanRunToMealPlanRun", fields: [sourceRunId], references: [id], onDelete: SetNull)
+  derivedRuns        MealPlanRun[]     @relation("MealPlanRunToMealPlanRun")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([accountId, createdAt(sort: Desc)])
+  @@index([accountId, status, updatedAt(sort: Desc)])
+  @@index([sourceRunId])
 }
