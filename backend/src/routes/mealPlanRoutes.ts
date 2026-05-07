@@ -216,6 +216,15 @@ async function processMealPlanRun(input: {
   useOpenAi: boolean;
 }) {
   const startedAt = Date.now();
+  console.log("Meal plan run started.", {
+    runId: input.runId,
+    accountId: input.accountId,
+    recipeSources: input.recipeSources,
+    maxRecipes: input.maxRecipes,
+    maxMeals: input.maxMeals,
+    useOpenAi: input.useOpenAi
+  });
+
   try {
     await updateRunProgress(input.runId, "Preparing pantry ingredients", 8);
     const preferences = defaultPreferences(
@@ -274,7 +283,21 @@ async function processMealPlanRun(input: {
         errorMessage: null
       }
     });
+    console.log("Meal plan run completed.", {
+      runId: input.runId,
+      accountId: input.accountId,
+      scrapedCount: acquisition.scrapedCount,
+      selectedMealCount: plan.selectedMeals.length,
+      durationSeconds: Math.round((Date.now() - startedAt) / 100) / 10
+    });
   } catch (error) {
+    console.error("Meal plan run failed.", {
+      runId: input.runId,
+      accountId: input.accountId,
+      recipeSources: input.recipeSources,
+      message: error instanceof Error ? error.message : "Unknown planning error",
+      stack: error instanceof Error ? error.stack : undefined
+    });
     await prisma.mealPlanRun.update({
       where: { id: input.runId },
       data: {

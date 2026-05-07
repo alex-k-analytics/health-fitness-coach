@@ -10,6 +10,29 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+async function summarizeScraperHealth(baseUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${baseUrl}/health`);
+    const payload = await response.json().catch(() => null);
+    const service =
+      payload && typeof payload === "object" && typeof (payload as { service?: unknown }).service === "string"
+        ? (payload as { service: string }).service
+        : null;
+
+    if (response.ok && service) {
+      return `Health check responded with service "${service}".`;
+    }
+
+    if (response.ok) {
+      return "Health check succeeded, but the service identity was not included in the response.";
+    }
+
+    return `Health check returned status ${response.status}.`;
+  } catch (error) {
+    return `Health check failed: ${error instanceof Error ? error.message : "unknown error"}.`;
+  }
+}
+
 function buildMockRecipes(pantryIngredients: string[], maxRecipes: number): PlanningRecipeCandidate[] {
   const ingredients = pantryIngredients.slice(0, 6);
   const lead = ingredients[0] ?? "chicken";
@@ -115,21 +138,48 @@ export class RecipeAcquisitionService {
       };
     }
 
-    const response = await fetch(`${config.mealPlanScraperUrl.replace(/\/$/, "")}/internal/recipes/acquire`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(input)
-    });
+    const scraperBaseUrl = config.mealPlanScraperUrl.replace(/\/$/, "");
+    const acquireUrl = `${scraperBaseUrl}/internal/recipes/acquire`;
+    let response: Response;
+
+    try {
+      response = await fetch(acquireUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    } catch (error) {
+      console.error("Meal-plan scraper request failed before receiving a response.", {
+        acquireUrl,
+        configuredScraperBaseUrl: scraperBaseUrl,
+        source: input.source,
+        message: error instanceof Error ? error.message : "Unknown fetch error",
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new Error("Unable to reach the scraper service. Verify MEAL_PLAN_SCRAPER_URL and Cloud Run connectivity.");
+    }
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
+      const healthSummary = response.status === 404 ? await summarizeScraperHealth(scraperBaseUrl) : null;
+      console.error("Meal-plan scraper request returned a non-OK response.", {
+        acquireUrl,
+        configuredScraperBaseUrl: scraperBaseUrl,
+        source: input.source,
+        status: response.status,
+        statusText: response.statusText,
+        responsePayload: payload,
+        healthSummary
+      });
       const errorMessage =
         payload && typeof payload === "object" && typeof (payload as { error?: unknown }).error === "string"
           ? (payload as { error: string }).error
-          : `Scraper request failed with status ${response.status}.`;
-      throw new Error(errorMessage);
+          : response.status === 404
+            ? "Scraper request failed with status 404. Verify MEAL_PLAN_SCRAPER_URL points to the scraper service and that /internal/recipes/acquire is deployed."
+            : `Scraper request failed with status ${response.status}.`;
+      throw new Error(healthSummary ? `${errorMessage} ${healthSummary}` : errorMessage);
     }
 
     const rawRecipes = Array.isArray((payload as { recipes?: unknown[] })?.recipes)
