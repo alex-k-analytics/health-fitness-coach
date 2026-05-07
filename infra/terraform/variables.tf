@@ -33,6 +33,12 @@ variable "deployer_service_account_email" {
   default     = "github-actions-service-account@akalish-software.iam.gserviceaccount.com"
 }
 
+variable "bootstrap_service_account_email" {
+  description = "GitHub Actions bootstrap service account email."
+  type        = string
+  default     = "github-actions-bootstrap@akalish-software.iam.gserviceaccount.com"
+}
+
 variable "app_image" {
   description = "Container image reference deployed to Cloud Run."
   type        = string

@@ -34,6 +34,7 @@ jobs:
       TF_VAR_scraper_service_name: health-fitness-coach-scraper
       TF_VAR_artifact_repository_id: health-fitness-coach
       TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
+      TF_VAR_bootstrap_service_account_email: github-actions-bootstrap@akalish-software.iam.gserviceaccount.com
       TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
       TF_VAR_scraper_image: us-docker.pkg.dev/cloudrun/container/hello
       TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}
@@ -49,6 +50,28 @@ jobs:
           project_id: ${{ env.PROJECT_ID }}
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.BOOTSTRAP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Ensure bootstrap networking IAM
+        run: |
+          set -euo pipefail
+
+          for role in \
+            roles/compute.networkAdmin \
+            roles/vpcaccess.admin \
+            roles/serviceusage.serviceUsageAdmin
+          do
+            gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+              --member="serviceAccount:${BOOTSTRAP_SERVICE_ACCOUNT}" \
+              --role="${role}" \
+              --quiet
+          done
+
+          sleep 15
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -109,6 +132,7 @@ jobs:
           TF_VAR_scraper_service_name: health-fitness-coach-scraper
           TF_VAR_artifact_repository_id: health-fitness-coach
           TF_VAR_deployer_service_account_email: github-actions-service-account@akalish-software.iam.gserviceaccount.com
+          TF_VAR_bootstrap_service_account_email: github-actions-bootstrap@akalish-software.iam.gserviceaccount.com
           TF_VAR_app_image: us-docker.pkg.dev/cloudrun/container/hello
           TF_VAR_scraper_image: us-docker.pkg.dev/cloudrun/container/hello
           TF_VAR_openai_api_key: ${{ secrets.OPENAI_API_KEY }}

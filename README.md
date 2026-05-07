@@ -187,6 +187,12 @@ This repo is wired to two GitHub Actions identities:
 - deployer service account: `github-actions-service-account@akalish-software.iam.gserviceaccount.com`
 - bootstrap service account: `github-actions-bootstrap@akalish-software.iam.gserviceaccount.com`
 
+When using the internal scraper path with Serverless VPC Access, the bootstrap identity also needs enough IAM to create and manage the new network resources that Terraform provisions. At minimum, the bootstrap service account needs:
+
+- `roles/compute.networkAdmin`
+- `roles/vpcaccess.admin`
+- `roles/serviceusage.serviceUsageAdmin`
+
 The intended order is:
 
 1. Run `Bootstrap Infra` once.
