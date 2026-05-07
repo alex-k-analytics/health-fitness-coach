@@ -13,6 +13,7 @@ import type {
 } from "@/types";
 import {
   useCreateMealPlanRunMutation,
+  useDeleteMealPlanRunMutation,
   useDeleteRecipeSourceMutation,
   useMealPlanPreferencesQuery,
   useMealPlanRunQuery,
@@ -61,6 +62,10 @@ function saveCheckedItems(runId: string, checkedItems: Set<string>) {
   window.localStorage.setItem(localStorageKey(runId), JSON.stringify(Array.from(checkedItems)));
 }
 
+function clearCheckedItems(runId: string) {
+  window.localStorage.removeItem(localStorageKey(runId));
+}
+
 function groceryItemKey(item: GroceryListItem) {
   return `${item.item.toLowerCase()}|${item.category.toLowerCase()}`;
 }
@@ -73,6 +78,7 @@ export function PlanningPage() {
   const saveSource = useSaveRecipeSourceMutation();
   const deleteSource = useDeleteRecipeSourceMutation();
   const createRun = useCreateMealPlanRunMutation();
+  const deleteRun = useDeleteMealPlanRunMutation();
   const reshuffleRun = useReshuffleMealPlanMutation();
 
   const [ingredients, setIngredients] = useState("");
@@ -124,11 +130,15 @@ export function PlanningPage() {
   }, [sources]);
 
   useEffect(() => {
-    if (!selectedRunId) {
-      const firstCompleted = runs?.runs?.[0]?.id ?? null;
-      if (firstCompleted) {
-        setSelectedRunId(firstCompleted);
+    const nextRuns = runs?.runs ?? [];
+    if (nextRuns.length === 0) {
+      if (selectedRunId !== null) {
+        setSelectedRunId(null);
       }
+      return;
+    }
+    if (!selectedRunId || !nextRuns.some((run) => run.id === selectedRunId)) {
+      setSelectedRunId(nextRuns[0]?.id ?? null);
     }
   }, [runs, selectedRunId]);
 
@@ -216,6 +226,26 @@ export function PlanningPage() {
   function openRun(run: MealPlanRunSummary) {
     setSelectedRunId(run.id);
     setIngredients(run.ingredientsPreview.join("\n"));
+  }
+
+  function deleteHistoricalRun(run: MealPlanRunSummary) {
+    if (run.status === "PENDING" || run.status === "RUNNING") {
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete the planning run from ${formatDateTime(run.createdAt)}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    deleteRun.mutate(run.id, {
+      onSuccess: () => {
+        clearCheckedItems(run.id);
+        if (selectedRunId === run.id) {
+          const nextRun = (runs?.runs ?? []).find((candidate) => candidate.id !== run.id) ?? null;
+          setSelectedRunId(nextRun?.id ?? null);
+        }
+      }
+    });
   }
 
   function reshuffleMeal(meal: MealPlanSelectedMeal) {
@@ -600,28 +630,49 @@ export function PlanningPage() {
                 <p className="text-sm text-muted-foreground">No planning runs yet.</p>
               ) : (
                 (runs?.runs ?? []).map((run) => (
-                  <button
+                  <div
                     key={run.id}
-                    type="button"
-                    className={`w-full rounded-md border p-3 text-left ${run.id === selectedRunId ? "border-primary" : ""}`}
-                    onClick={() => openRun(run)}
+                    className={`rounded-md border p-3 ${run.id === selectedRunId ? "border-primary" : ""}`}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <strong>{formatDateTime(run.createdAt)}</strong>
-                      <Badge variant={run.status === "COMPLETED" ? "success" : run.status === "FAILED" ? "destructive" : "outline"}>
-                        {run.status.toLowerCase()}
-                      </Badge>
+                    <div className="flex items-start justify-between gap-3">
+                      <button
+                        type="button"
+                        className="flex-1 text-left"
+                        onClick={() => openRun(run)}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <strong>{formatDateTime(run.createdAt)}</strong>
+                          <Badge
+                            variant={run.status === "COMPLETED" ? "success" : run.status === "FAILED" ? "destructive" : "outline"}
+                          >
+                            {run.status.toLowerCase()}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          Sources: {run.recipeSources.join(", ") || "atk"}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Ingredients: {run.ingredientsPreview.join(", ") || "none"}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Meals: {run.selectedMeals.join(", ") || "none yet"}
+                        </div>
+                      </button>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="destructive"
+                        onClick={() => deleteHistoricalRun(run)}
+                        disabled={
+                          deleteRun.isPending ||
+                          run.status === "PENDING" ||
+                          run.status === "RUNNING"
+                        }
+                      >
+                        Delete
+                      </Button>
                     </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      Sources: {run.recipeSources.join(", ") || "atk"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Ingredients: {run.ingredientsPreview.join(", ") || "none"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Meals: {run.selectedMeals.join(", ") || "none yet"}
-                    </div>
-                  </button>
+                  </div>
                 ))
               )}
             </CardContent>

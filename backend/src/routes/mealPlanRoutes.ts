@@ -492,6 +492,32 @@ mealPlanRoutes.get("/runs/:id/status", async (req: AuthenticatedRequest, res) =>
   });
 });
 
+mealPlanRoutes.delete("/runs/:id", async (req: AuthenticatedRequest, res) => {
+  const auth = getRequiredAuth(req);
+  const run = await prisma.mealPlanRun.findFirst({
+    where: {
+      id: req.params.id,
+      accountId: auth.accountId
+    },
+    select: {
+      id: true,
+      status: true
+    }
+  });
+  if (!run) {
+    return res.status(404).json({ error: "Meal plan run not found." });
+  }
+  if (run.status === "PENDING" || run.status === "RUNNING") {
+    return res.status(400).json({ error: "Only completed or failed meal plan runs can be deleted." });
+  }
+
+  await prisma.mealPlanRun.delete({
+    where: { id: run.id }
+  });
+
+  return res.json({ deleted: true, id: run.id });
+});
+
 mealPlanRoutes.post("/runs/:id/reshuffle", async (req: AuthenticatedRequest, res) => {
   const parsed = reshuffleSchema.safeParse(req.body);
   if (!parsed.success) {

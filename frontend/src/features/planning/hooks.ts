@@ -148,6 +148,25 @@ export function useCreateMealPlanRunMutation() {
   });
 }
 
+export function useDeleteMealPlanRunMutation() {
+  const { queryClient, setGlobalNotice, setGlobalError } = createMutationHelpers();
+  return useMutation({
+    mutationFn: (runId: string) =>
+      apiFetch<{ deleted: boolean; id: string }>(`/meal-plans/runs/${runId}`, {
+        method: "DELETE"
+      }),
+    onSuccess: (_result, runId) => {
+      queryClient.invalidateQueries({ queryKey: ["mealPlanRuns"] });
+      queryClient.removeQueries({ queryKey: ["mealPlanRun", runId] });
+      queryClient.removeQueries({ queryKey: ["mealPlanStatus", runId] });
+      setGlobalNotice("Planning run deleted.");
+    },
+    onError: (error) => {
+      setGlobalError(error instanceof Error ? error.message : "Unable to delete planning run.");
+    }
+  });
+}
+
 export function useReshuffleMealPlanMutation() {
   const { queryClient, setGlobalNotice, setGlobalError } = createMutationHelpers();
   return useMutation({

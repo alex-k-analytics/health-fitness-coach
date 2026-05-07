@@ -119,6 +119,7 @@ The backend allows Capacitor origins by default through `NATIVE_APP_ORIGINS=capa
 - `POST /api/nutrition/meals`: multipart meal submission with `plateImages`, `labelImages`, and `otherImages`.
 - `POST /api/nutrition/saved-foods`: create reusable food entries.
 - `POST /api/meal-plans/runs`: start a weekly planning run from pantry ingredients.
+- `DELETE /api/meal-plans/runs/:id`: delete a completed or failed planning run from history.
 - `POST /api/meal-plans/runs/:id/reshuffle`: replace one meal inside a completed plan.
 
 If `OPENAI_API_KEY` is configured, the backend sends meal photos and serving context to the OpenAI Responses API. If it is not configured, the app still stores the meal and produces a conservative fallback estimate.
