@@ -71,7 +71,15 @@ jobs:
               --quiet
           done
 
-          sleep 15
+          sleep 60
+
+      - name: Refresh Google Cloud credentials
+        uses: google-github-actions/auth@v3
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.BOOTSTRAP_SERVICE_ACCOUNT }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -82,7 +90,21 @@ jobs:
 
       - name: Bootstrap infrastructure with placeholder image
         working-directory: infra/terraform
-        run: terraform apply -auto-approve -input=false -lock-timeout=10m
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4; do
+            if terraform apply -auto-approve -input=false -lock-timeout=10m; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 4 ]; then
+              exit 1
+            fi
+
+            echo "Terraform apply failed on attempt ${attempt}; waiting for IAM propagation before retry."
+            sleep 45
+          done
 
       - name: Setup Node
         uses: actions/setup-node@v6
