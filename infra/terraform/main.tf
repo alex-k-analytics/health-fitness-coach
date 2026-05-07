@@ -3,10 +3,12 @@ locals {
   required_services = toset([
     "artifactregistry.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "compute.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
     "sqladmin.googleapis.com",
-    "storage.googleapis.com"
+    "storage.googleapis.com",
+    "vpcaccess.googleapis.com"
   ])
   openai_api_key_enabled                   = nonsensitive(var.openai_api_key) != ""
   openai_api_key_secret_name               = var.openai_api_key_secret_name != "" ? var.openai_api_key_secret_name : "${local.sanitized_service_name}-openai-api-key"
@@ -189,6 +191,55 @@ resource "google_storage_bucket_iam_member" "runtime_bucket_admin" {
   member = "serviceAccount:${google_service_account.app_runtime.email}"
 }
 
+resource "google_compute_network" "serverless" {
+  name                    = var.serverless_vpc_network_name
+  auto_create_subnetworks = false
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_compute_subnetwork" "serverless_connector" {
+  name                     = var.serverless_vpc_subnet_name
+  region                   = var.region
+  network                  = google_compute_network.serverless.id
+  ip_cidr_range            = var.serverless_vpc_subnet_cidr
+  private_ip_google_access = true
+
+  depends_on = [google_compute_network.serverless]
+}
+
+resource "google_vpc_access_connector" "app" {
+  name   = var.serverless_vpc_connector_name
+  region = var.region
+
+  subnet {
+    name = google_compute_subnetwork.serverless_connector.name
+  }
+
+  min_instances = var.serverless_vpc_connector_min_instances
+  max_instances = var.serverless_vpc_connector_max_instances
+
+  depends_on = [google_compute_subnetwork.serverless_connector]
+}
+
+resource "google_compute_router" "serverless_nat" {
+  name    = "${local.sanitized_service_name}-serverless-router"
+  region  = var.region
+  network = google_compute_network.serverless.id
+
+  depends_on = [google_compute_network.serverless]
+}
+
+resource "google_compute_router_nat" "serverless_nat" {
+  name                               = "${local.sanitized_service_name}-serverless-nat"
+  region                             = var.region
+  router                             = google_compute_router.serverless_nat.name
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  depends_on = [google_compute_router.serverless_nat]
+}
+
 resource "google_cloud_run_v2_service" "app" {
   name     = var.service_name
   location = var.region
@@ -201,6 +252,11 @@ resource "google_cloud_run_v2_service" "app" {
     scaling {
       min_instance_count = var.min_instances
       max_instance_count = var.max_instances
+    }
+
+    vpc_access {
+      connector = google_vpc_access_connector.app.id
+      egress    = "ALL_TRAFFIC"
     }
 
     volumes {
@@ -324,7 +380,9 @@ resource "google_cloud_run_v2_service" "app" {
     google_secret_manager_secret_version.openai_api_key,
     google_project_iam_member.runtime_cloudsql_client,
     google_project_iam_member.runtime_secret_accessor,
-    google_storage_bucket_iam_member.runtime_bucket_admin
+    google_storage_bucket_iam_member.runtime_bucket_admin,
+    google_vpc_access_connector.app,
+    google_compute_router_nat.serverless_nat
   ]
 }
 
@@ -370,5 +428,5 @@ resource "google_cloud_run_v2_service_iam_member" "scraper_internal_invoker" {
   location = var.region
   name     = google_cloud_run_v2_service.scraper.name
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:${google_service_account.app_runtime.email}"
 }

@@ -155,6 +155,47 @@ variable "scraper_max_instances" {
   default     = 1
 }
 
+variable "serverless_vpc_network_name" {
+  description = "Dedicated VPC network name for Cloud Run egress."
+  type        = string
+  default     = "health-fitness-coach-serverless"
+}
+
+variable "serverless_vpc_subnet_name" {
+  description = "Dedicated subnet name for the Cloud Run VPC connector."
+  type        = string
+  default     = "health-fitness-coach-serverless-us-central1"
+}
+
+variable "serverless_vpc_subnet_cidr" {
+  description = "CIDR range reserved for the Cloud Run VPC connector subnet."
+  type        = string
+  default     = "10.8.0.0/28"
+}
+
+variable "serverless_vpc_connector_name" {
+  description = "Serverless VPC Access connector name used by the application service."
+  type        = string
+  default     = "hfc-serverless-vpccon"
+
+  validation {
+    condition     = length(var.serverless_vpc_connector_name) <= 25
+    error_message = "serverless_vpc_connector_name must be 25 characters or fewer."
+  }
+}
+
+variable "serverless_vpc_connector_min_instances" {
+  description = "Minimum connector instance count for the Serverless VPC Access connector."
+  type        = number
+  default     = 2
+}
+
+variable "serverless_vpc_connector_max_instances" {
+  description = "Maximum connector instance count for the Serverless VPC Access connector."
+  type        = number
+  default     = 3
+}
+
 variable "deletion_protection" {
   description = "Enable deletion protection on Cloud SQL."
   type        = bool

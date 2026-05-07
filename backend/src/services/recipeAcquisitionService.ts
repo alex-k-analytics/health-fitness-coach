@@ -10,9 +10,46 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+async function buildScraperHeaders(baseUrl: string): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+
+  if (!process.env.K_SERVICE) {
+    return headers;
+  }
+
+  const metadataUrl =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity" +
+    `?audience=${encodeURIComponent(baseUrl)}`;
+
+  const response = await fetch(metadataUrl, {
+    headers: {
+      "Metadata-Flavor": "Google"
+    }
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(
+      `Unable to obtain Cloud Run identity token for the scraper service (status ${response.status}${details ? `: ${normalizeWhitespace(details)}` : ""}).`
+    );
+  }
+
+  const token = normalizeWhitespace(await response.text());
+  if (!token) {
+    throw new Error("Unable to obtain Cloud Run identity token for the scraper service.");
+  }
+
+  headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 async function summarizeScraperHealth(baseUrl: string): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl}/health`);
+    const response = await fetch(`${baseUrl}/health`, {
+      headers: await buildScraperHeaders(baseUrl)
+    });
     const payload = await response.json().catch(() => null);
     const service =
       payload && typeof payload === "object" && typeof (payload as { service?: unknown }).service === "string"
@@ -143,11 +180,10 @@ export class RecipeAcquisitionService {
     let response: Response;
 
     try {
+      const headers = await buildScraperHeaders(scraperBaseUrl);
       response = await fetch(acquireUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers,
         body: JSON.stringify(input)
       });
     } catch (error) {
