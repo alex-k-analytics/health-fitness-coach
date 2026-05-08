@@ -45,6 +45,7 @@ export function useMealPlanStatusQuery(runId: string | null, enabled = true) {
         id: string;
         status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
         progressStage: string | null;
+        progressDetail: string | null;
         progressPercent: number;
         errorMessage: string | null;
         updatedAt: string;

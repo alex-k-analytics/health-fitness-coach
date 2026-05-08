@@ -257,6 +257,7 @@ model MealPlanRun {
   sourceRunId        String?
   status             MealPlanRunStatus @default(PENDING)
   progressStage      String?
+  progressDetail     String?
   progressPercent    Int               @default(0)
   ingredientsText    String
   instructionsText   String

@@ -19,6 +19,10 @@ import { recipeAcquisitionService } from "../services/recipeAcquisitionService.j
 export const mealPlanRoutes = Router();
 
 const planningSourceIds = RECIPE_SOURCE_DEFINITIONS.filter((source) => source.supportedForPlanning).map((source) => source.id);
+const planningSourceLabelById = Object.fromEntries(RECIPE_SOURCE_DEFINITIONS.map((source) => [source.id, source.label])) as Record<
+  RecipeSourceId,
+  string
+>;
 
 const preferencesSchema = z.object({
   dietaryRestrictions: z.string().max(4000).optional(),
@@ -83,6 +87,10 @@ function parseRecipeSources(value: Prisma.JsonValue | null | undefined): RecipeS
     .filter((item): item is RecipeSourceId => planningSourceIds.includes(item as RecipeSourceId));
 }
 
+function formatRecipeSourceLabels(recipeSources: RecipeSourceId[]) {
+  return recipeSources.map((source) => planningSourceLabelById[source] ?? source).join(", ");
+}
+
 function parsePlan(run: {
   selectedMealsJson: Prisma.JsonValue | null;
   reviewedRecipesJson: Prisma.JsonValue | null;
@@ -115,6 +123,7 @@ function serializeSummary(run: {
   sourceRunId: string | null;
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   progressStage: string | null;
+  progressDetail: string | null;
   progressPercent: number;
   ingredientsText: string;
   recipeSources: Prisma.JsonValue | null;
@@ -135,6 +144,7 @@ function serializeSummary(run: {
     sourceRunId: run.sourceRunId,
     status: run.status,
     progressStage: run.progressStage,
+    progressDetail: run.progressDetail,
     progressPercent: run.progressPercent,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
@@ -152,6 +162,7 @@ function serializeDetail(run: {
   sourceRunId: string | null;
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   progressStage: string | null;
+  progressDetail: string | null;
   progressPercent: number;
   ingredientsText: string;
   instructionsText: string;
@@ -175,6 +186,7 @@ function serializeDetail(run: {
     sourceRunId: run.sourceRunId,
     status: run.status,
     progressStage: run.progressStage,
+    progressDetail: run.progressDetail,
     progressPercent: run.progressPercent,
     request: {
       ingredients: run.ingredientsText,
@@ -194,12 +206,13 @@ function serializeDetail(run: {
   };
 }
 
-async function updateRunProgress(runId: string, stage: string, progressPercent: number) {
+async function updateRunProgress(runId: string, stage: string, progressPercent: number, detail: string) {
   await prisma.mealPlanRun.update({
     where: { id: runId },
     data: {
       status: "RUNNING",
       progressStage: stage,
+      progressDetail: detail,
       progressPercent
     }
   });
@@ -226,7 +239,12 @@ async function processMealPlanRun(input: {
   });
 
   try {
-    await updateRunProgress(input.runId, "Preparing pantry ingredients", 8);
+    await updateRunProgress(
+      input.runId,
+      "Preparing pantry ingredients",
+      8,
+      "Loading saved planning preferences and parsing pantry ingredients."
+    );
     const preferences = defaultPreferences(
       await prisma.mealPlannerPreference.findUnique({
         where: { accountId: input.accountId }
@@ -239,13 +257,23 @@ async function processMealPlanRun(input: {
       throw new Error("Enter at least one pantry ingredient.");
     }
 
-    await updateRunProgress(input.runId, "Loading recipe source credentials", 14);
+    await updateRunProgress(
+      input.runId,
+      "Loading recipe source credentials",
+      14,
+      `Checking saved credentials for ${formatRecipeSourceLabels(input.recipeSources)}.`
+    );
     const sourceLogins = await Promise.all(
       input.recipeSources.map((source) => recipeCredentialService.resolvePlanningSourceLogin(input.accountId, source))
     );
     const atkLogin = sourceLogins[0];
 
-    await updateRunProgress(input.runId, "Acquiring recipe candidates", 28);
+    await updateRunProgress(
+      input.runId,
+      "Acquiring recipe candidates",
+      28,
+      `Requesting up to ${input.maxRecipes} normalized recipes from ${planningSourceLabelById[input.recipeSources[0]] ?? input.recipeSources[0]}.`
+    );
     const acquisition = await recipeAcquisitionService.acquireRecipes({
       source: input.recipeSources[0],
       login: atkLogin,
@@ -254,7 +282,12 @@ async function processMealPlanRun(input: {
       options: { headless: true }
     });
 
-    await updateRunProgress(input.runId, "Building weekly plan", 68);
+    await updateRunProgress(
+      input.runId,
+      "Building weekly plan",
+      68,
+      `Reviewing ${acquisition.recipes.length} candidates against your instructions and selecting up to ${input.maxMeals} meals.`
+    );
     const plan = await mealPlanningService.buildPlan({
       pantryIngredients,
       recipeSources: input.recipeSources,
@@ -272,6 +305,7 @@ async function processMealPlanRun(input: {
       data: {
         status: "COMPLETED",
         progressStage: "Complete",
+        progressDetail: `Selected ${plan.selectedMeals.length} meals from ${acquisition.scrapedCount} scanned recipes.`,
         progressPercent: 100,
         selectedMealsJson: toInputJson(plan.selectedMeals),
         reviewedRecipesJson: toInputJson(plan.reviewedRecipes),
@@ -303,6 +337,7 @@ async function processMealPlanRun(input: {
       data: {
         status: "FAILED",
         progressStage: "Failed",
+        progressDetail: "Planning stopped before a weekly plan could be completed.",
         progressPercent: 100,
         errorMessage: error instanceof Error ? error.message : "Unknown planning error"
       }
@@ -408,6 +443,7 @@ mealPlanRoutes.post("/runs", async (req: AuthenticatedRequest, res) => {
       accountId: auth.accountId,
       status: "PENDING",
       progressStage: "Queued",
+      progressDetail: "Waiting for the planning worker to start.",
       progressPercent: 0,
       ingredientsText: parsed.data.ingredients,
       instructionsText: mealPlanningService.composeInstructions(preference, parsed.data.instructions ?? ""),
@@ -435,6 +471,7 @@ mealPlanRoutes.post("/runs", async (req: AuthenticatedRequest, res) => {
     runId: run.id,
     status: run.status,
     progressStage: run.progressStage,
+    progressDetail: run.progressDetail,
     progressPercent: run.progressPercent
   });
 });
@@ -474,6 +511,7 @@ mealPlanRoutes.get("/runs/:id/status", async (req: AuthenticatedRequest, res) =>
       id: true,
       status: true,
       progressStage: true,
+      progressDetail: true,
       progressPercent: true,
       errorMessage: true,
       updatedAt: true
@@ -486,6 +524,7 @@ mealPlanRoutes.get("/runs/:id/status", async (req: AuthenticatedRequest, res) =>
     id: run.id,
     status: run.status,
     progressStage: run.progressStage,
+    progressDetail: run.progressDetail,
     progressPercent: run.progressPercent,
     errorMessage: run.errorMessage,
     updatedAt: run.updatedAt.toISOString()
@@ -561,6 +600,7 @@ mealPlanRoutes.post("/runs/:id/reshuffle", async (req: AuthenticatedRequest, res
         sourceRunId: sourceRun.id,
         status: "COMPLETED",
         progressStage: "Complete",
+        progressDetail: `Reshuffled one meal and rebuilt the grocery list from ${sourceRun.scrapedCount} saved recipes.`,
         progressPercent: 100,
         ingredientsText: sourceRun.ingredientsText,
         instructionsText: sourceRun.instructionsText,

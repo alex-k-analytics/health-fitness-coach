@@ -146,6 +146,7 @@ export function PlanningPage() {
   const currentStatus = statusQuery.data;
   const activeRun = runDetail && runDetail.id === selectedRunId ? runDetail : null;
   const activePlan = activeRun?.plan ?? null;
+  const visibleStatus = currentStatus ?? activeRun;
   const availableSources = sources?.sources ?? [];
   const selectedPlanningSources = availableSources
     .filter((source) => source.supportedForPlanning && source.enabled && source.username && source.hasPassword)
@@ -349,14 +350,22 @@ export function PlanningPage() {
                   Configure and enable an ATK source with a saved password below to run live planning.
                 </p>
               ) : null}
-              {currentStatus ? (
+              {visibleStatus ? (
                 <div className="rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <strong>{currentStatus.progressStage || currentStatus.status}</strong>
-                    <span>{currentStatus.progressPercent}%</span>
+                    <strong>{visibleStatus.progressStage || visibleStatus.status}</strong>
+                    <span>{visibleStatus.progressPercent}%</span>
                   </div>
-                  {currentStatus.errorMessage ? (
-                    <p className="mt-2 text-red-600">{currentStatus.errorMessage}</p>
+                  {visibleStatus.progressDetail ? (
+                    <p className="mt-2 text-muted-foreground">{visibleStatus.progressDetail}</p>
+                  ) : null}
+                  {"updatedAt" in visibleStatus ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Last updated {formatDateTime(visibleStatus.updatedAt)}
+                    </p>
+                  ) : null}
+                  {visibleStatus.errorMessage ? (
+                    <p className="mt-2 text-red-600">{visibleStatus.errorMessage}</p>
                   ) : null}
                 </div>
               ) : null}
@@ -388,6 +397,16 @@ export function PlanningPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="font-medium">{meal.title}</div>
+                              {meal.url ? (
+                                <a
+                                  href={meal.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 inline-flex text-sm text-primary underline-offset-4 hover:underline"
+                                >
+                                  Open recipe
+                                </a>
+                              ) : null}
                               <div className="text-sm text-muted-foreground">
                                 Score {meal.score}
                                 {meal.estimatedTotalTimeMinutes ? ` · ${meal.estimatedTotalTimeMinutes} min` : ""}
@@ -399,6 +418,15 @@ export function PlanningPage() {
                             </Button>
                           </div>
                           {meal.reasoning ? <p className="mt-2 text-sm">{meal.reasoning}</p> : null}
+                          {meal.matchingIngredients.length > 0 ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {meal.matchingIngredients.slice(0, 8).map((ingredient, index) => (
+                                <Badge key={`${ingredient}-${index}`} variant="success">
+                                  {ingredient}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
                           {meal.criteriaNotes.length > 0 ? (
                             <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
                               {meal.criteriaNotes.slice(0, 3).map((note) => (
@@ -452,13 +480,38 @@ export function PlanningPage() {
                     )}
                   </div>
 
+                  {activePlan.notes.length > 0 ? (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Planning Notes</h3>
+                      <div className="space-y-2">
+                        {activePlan.notes.map((note, index) => (
+                          <div key={`${index}-${note}`} className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                            {note}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="space-y-3">
                     <h3 className="font-semibold">Reviewed Recipes</h3>
                     <div className="space-y-2">
                       {activePlan.reviewedRecipes.slice(0, 18).map((review) => (
                         <div key={`${review.title}-${review.url}`} className="rounded-md border p-3 text-sm">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="font-medium">{review.title}</span>
+                            <div>
+                              <span className="font-medium">{review.title}</span>
+                              {review.url ? (
+                                <a
+                                  href={review.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 block text-sm text-primary underline-offset-4 hover:underline"
+                                >
+                                  Open recipe
+                                </a>
+                              ) : null}
+                            </div>
                             <Badge variant={review.fitsCriteria ? "success" : "secondary"}>
                               {review.fitsCriteria ? "fit" : "not fit"}
                             </Badge>

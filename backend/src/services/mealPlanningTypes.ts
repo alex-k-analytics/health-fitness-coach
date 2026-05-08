@@ -110,6 +110,7 @@ export interface MealPlanRunDetail {
   sourceRunId: string | null;
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   progressStage: string | null;
+  progressDetail: string | null;
   progressPercent: number;
   request: {
     ingredients: string;
@@ -133,6 +134,7 @@ export interface MealPlanRunSummary {
   sourceRunId: string | null;
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   progressStage: string | null;
+  progressDetail: string | null;
   progressPercent: number;
   createdAt: string;
   updatedAt: string;
