@@ -42,6 +42,7 @@ import {
   useUpdateMealPlanPreferencesMutation
 } from "./hooks";
 import { formatDateTime, valueToInput } from "@/lib/mealUtils";
+import { formatReadinessIssues, getPlanningSourceReadiness } from "@/lib/recipeSources";
 
 type SourceDraft = {
   username: string;
@@ -184,10 +185,9 @@ export function PlanningPage() {
   const activePlan = activeRun?.plan ?? null;
   const visibleStatus = currentStatus ?? activeRun;
   const availableSources = sources?.sources ?? [];
-  const selectedPlanningSources = availableSources
-    .filter((source) => source.supportedForPlanning && source.enabled && source.username && source.hasPassword)
-    .map((source) => source.source);
-  const sourceReady = selectedPlanningSources.length > 0;
+  const sourceReadiness = getPlanningSourceReadiness(availableSources);
+  const selectedPlanningSources = sourceReadiness.readySources.map((source) => source.source);
+  const sourceReady = sourceReadiness.ready;
   const runIsActive = visibleStatus?.status === "PENDING" || visibleStatus?.status === "RUNNING";
 
   const checkedItems = useMemo(
@@ -384,7 +384,7 @@ export function PlanningPage() {
           icon={Sparkles}
           label="Status"
           value={visibleStatus ? planningStatusLabel(visibleStatus.status) : "Ready"}
-          sub={visibleStatus?.progressDetail ?? (sourceReady ? "Recipe source connected" : "Connect ATK before live planning")}
+          sub={visibleStatus?.progressDetail ?? sourceReadiness.message}
           status={visibleStatus?.status}
         />
       </div>
@@ -615,7 +615,7 @@ export function PlanningPage() {
                     <div>
                       <p className="text-sm font-semibold text-foreground">Connect ATK before live planning</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Save and enable an America's Test Kitchen source with a password before starting a live run.
+                        {sourceReadiness.message}
                       </p>
                     </div>
                     <Button size="sm" variant="warning" onClick={() => setActiveView("settings")}>
@@ -827,11 +827,15 @@ export function PlanningPage() {
                       <div>
                         <div className="font-medium">{source.label}</div>
                         <div className="text-sm text-muted-foreground">
-                          {source.supportedForPlanning ? "Supported for planning" : "Stored only"}
+                          {source.planningReady
+                            ? "Ready for planning"
+                            : source.supportedForPlanning
+                              ? formatReadinessIssues(source.planningReadinessIssues)
+                              : "Stored only"}
                         </div>
                       </div>
-                      <Badge variant={source.configured ? "outline" : "secondary"}>
-                        {source.configured ? "configured" : "not configured"}
+                      <Badge variant={source.planningReady ? "success" : source.configured ? "outline" : "secondary"}>
+                        {source.planningReady ? "ready" : source.configured ? "configured" : "not configured"}
                       </Badge>
                     </div>
                     <div className="grid gap-2">

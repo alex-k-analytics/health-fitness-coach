@@ -73,6 +73,8 @@ export interface RecipeSourceCredentialPayload {
   label: string;
   defaultLoginUrl: string;
   supportedForPlanning: boolean;
+  planningReady: boolean;
+  planningReadinessIssues: string[];
   configured: boolean;
   enabled: boolean;
   username: string;

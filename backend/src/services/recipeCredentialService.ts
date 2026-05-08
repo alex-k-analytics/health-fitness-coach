@@ -75,18 +75,57 @@ function serializeSource(
   } | null
 ): RecipeSourceCredentialPayload {
   const source = SOURCE_BY_ID[sourceId];
+  const enabled = credential?.enabled ?? false;
+  const username = credential?.username ?? "";
+  const hasPassword = Boolean(credential?.passwordCiphertext);
+  const planningReadinessIssues = getPlanningReadinessIssues({
+    supportedForPlanning: source.supportedForPlanning,
+    enabled,
+    username,
+    hasPassword
+  });
+
   return {
     source: source.id,
     label: source.label,
     defaultLoginUrl: defaultLoginUrl(sourceId),
     supportedForPlanning: source.supportedForPlanning,
+    planningReady: planningReadinessIssues.length === 0,
+    planningReadinessIssues,
     configured: credential !== null,
-    enabled: credential?.enabled ?? false,
-    username: credential?.username ?? "",
+    enabled,
+    username,
     loginUrl: credential?.loginUrl ?? defaultLoginUrl(sourceId),
-    hasPassword: Boolean(credential?.passwordCiphertext),
+    hasPassword,
     updatedAt: credential?.updatedAt.toISOString() ?? null
   };
+}
+
+function getPlanningReadinessIssues({
+  supportedForPlanning,
+  enabled,
+  username,
+  hasPassword
+}: {
+  supportedForPlanning: boolean;
+  enabled: boolean;
+  username: string;
+  hasPassword: boolean;
+}) {
+  const issues: string[] = [];
+  if (!supportedForPlanning) {
+    issues.push("Planning is not supported for this source yet.");
+  }
+  if (!enabled) {
+    issues.push("Source is disabled.");
+  }
+  if (!username.trim()) {
+    issues.push("Username or email is missing.");
+  }
+  if (!hasPassword) {
+    issues.push("Saved password is missing.");
+  }
+  return issues;
 }
 
 export class RecipeCredentialService {

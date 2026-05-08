@@ -28,6 +28,7 @@ import {
   getProgressPercent,
   kgToLbs
 } from "@/lib/mealUtils";
+import { getPlanningSourceReadiness } from "@/lib/recipeSources";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { WeightModal } from "@/components/shell/WeightModal";
@@ -51,8 +52,7 @@ import type {
   HealthMetric,
   Meal,
   MealPlanRunSummary,
-  NutritionSummary,
-  RecipeSourceCredential
+  NutritionSummary
 } from "@/types";
 
 type PlanningStatus = MealPlanRunSummary["status"];
@@ -148,7 +148,8 @@ export function DashboardPage() {
   const activePlan = selectedRunDetail?.plan ?? null;
   const planningStatus =
     livePlanningStatus ?? selectedRunDetail ?? selectedRunSummary ?? null;
-  const sourceReady = hasReadyPlanningSource(recipeSources?.sources ?? []);
+  const sourceReadiness = getPlanningSourceReadiness(recipeSources?.sources ?? []);
+  const sourceReady = sourceReadiness.ready;
   const planningLoading =
     loadingPlanningRuns ||
     loadingRecipeSources ||
@@ -372,6 +373,7 @@ export function DashboardPage() {
           selectedMeals={selectedMeals.slice(0, 3).map((meal) => meal.title)}
           scrapedCount={selectedRunDetail?.scrapedCount ?? selectedRunSummary?.scrapedCount ?? 0}
           planAction={planAction}
+          sourceReadinessMessage={sourceReadiness.message}
         />
       </div>
 
@@ -511,16 +513,6 @@ function selectDashboardPlanningRun(runs: MealPlanRunSummary[]) {
     sorted.find((run) => run.status === "COMPLETED") ??
     sorted[0] ??
     null
-  );
-}
-
-function hasReadyPlanningSource(sources: RecipeSourceCredential[]) {
-  return sources.some(
-    (source) =>
-      source.supportedForPlanning &&
-      source.enabled &&
-      Boolean(source.username) &&
-      source.hasPassword
   );
 }
 
@@ -712,7 +704,8 @@ function PlanningCommandPanel({
   selectedMealCount,
   selectedMeals,
   scrapedCount,
-  planAction
+  planAction,
+  sourceReadinessMessage
 }: {
   loading: boolean;
   sourceReady: boolean;
@@ -727,6 +720,7 @@ function PlanningCommandPanel({
   selectedMeals: string[];
   scrapedCount: number;
   planAction: string;
+  sourceReadinessMessage: string;
 }) {
   return (
     <Card className="card-accent-success">
@@ -761,7 +755,7 @@ function PlanningCommandPanel({
                   Recipe source needed
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Connect and enable a supported recipe source before live planning.
+                  {sourceReadinessMessage}
                 </p>
               </div>
             </div>
