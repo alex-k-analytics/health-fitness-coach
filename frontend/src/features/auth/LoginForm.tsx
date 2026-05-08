@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLoginMutation } from "@/features/auth/hooks";
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
@@ -30,7 +30,9 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
         {loginMutation.error && (
           <Alert variant="destructive" className="mt-4">
-            {loginMutation.error instanceof Error ? loginMutation.error.message : "Sign in failed."}
+            <AlertDescription>
+              {loginMutation.error instanceof Error ? loginMutation.error.message : "Sign in failed."}
+            </AlertDescription>
           </Alert>
         )}
 

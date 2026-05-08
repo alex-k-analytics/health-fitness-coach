@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, FileText, Image, ChevronRight, Sparkles, Search, X } from "lucide-react";
 import {
@@ -426,7 +426,9 @@ export function MealComposer({
 
         {errors.length > 0 && (
           <Alert variant="destructive">
-            {errors[0] instanceof Error ? errors[0].message : String(errors[0])}
+            <AlertDescription>
+              {errors[0] instanceof Error ? errors[0].message : String(errors[0])}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -709,8 +711,10 @@ export function MealComposer({
 
                 {showMacroWarning && (
                   <Alert variant="warning" className="mt-3">
-                    Calories and protein/carbs/fat differ by {Math.round(calorieDelta)} cal.
-                    Save still uses your manual values.
+                    <AlertDescription>
+                      Calories and protein/carbs/fat differ by {Math.round(calorieDelta)} cal.
+                      Save still uses your manual values.
+                    </AlertDescription>
                   </Alert>
                 )}
 

@@ -14,8 +14,8 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthIndexRouteImport } from './routes/_auth/index'
 import { Route as AuthWorkoutsRouteImport } from './routes/_auth/workouts'
 import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
-import { Route as AuthMealsRouteImport } from './routes/_auth/meals'
 import { Route as AuthPlanningRouteImport } from './routes/_auth/planning'
+import { Route as AuthMealsRouteImport } from './routes/_auth/meals'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -41,14 +41,14 @@ const AuthSettingsRoute = AuthSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthRoute,
 } as any)
-const AuthMealsRoute = AuthMealsRouteImport.update({
-  id: '/meals',
-  path: '/meals',
-  getParentRoute: () => AuthRoute,
-} as any)
 const AuthPlanningRoute = AuthPlanningRouteImport.update({
   id: '/planning',
   path: '/planning',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthMealsRoute = AuthMealsRouteImport.update({
+  id: '/meals',
+  path: '/meals',
   getParentRoute: () => AuthRoute,
 } as any)
 
@@ -136,18 +136,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsRouteImport
       parentRoute: typeof AuthRoute
     }
-    '/_auth/meals': {
-      id: '/_auth/meals'
-      path: '/meals'
-      fullPath: '/meals'
-      preLoaderRoute: typeof AuthMealsRouteImport
-      parentRoute: typeof AuthRoute
-    }
     '/_auth/planning': {
       id: '/_auth/planning'
       path: '/planning'
       fullPath: '/planning'
       preLoaderRoute: typeof AuthPlanningRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/meals': {
+      id: '/_auth/meals'
+      path: '/meals'
+      fullPath: '/meals'
+      preLoaderRoute: typeof AuthMealsRouteImport
       parentRoute: typeof AuthRoute
     }
   }
