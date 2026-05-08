@@ -1,4 +1,5 @@
-import { useState, useCallback, useId, useMemo } from "react";
+import type * as React from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +12,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, FileText, Image, ChevronRight, Sparkles, Search, X } from "lucide-react";
-import { useMealEstimateMutation, useCreateMealMutation, useUpdateMealMutation, useSavedFoodsQuery } from "@/features/meals/hooks";
-import type { Meal, NutritionEstimate, SavedFood } from "@/types";
-import { getServingCount, scaleNutritionEstimate, toDateTimeLocalInput, valueToInput } from "@/lib/mealUtils";
+import {
+  useMealEstimateMutation,
+  useCreateMealMutation,
+  useUpdateMealMutation,
+  useSavedFoodsQuery
+} from "@/features/meals/hooks";
+import type {
+  Meal,
+  NutritionEstimate,
+  NutritionOverrides,
+  SavedFood
+} from "@/types";
+import {
+  getServingCount,
+  scaleNutritionEstimate,
+  toDateTimeLocalInput,
+  valueToInput
+} from "@/lib/mealUtils";
 
 interface MealComposerProps {
   trigger?: React.ReactNode;
@@ -22,23 +38,83 @@ interface MealComposerProps {
   onClose?: () => void;
 }
 
-export function MealComposer({ trigger, initialMeal, initialFood, onClose }: MealComposerProps) {
-  const initialEstimate = useMemo(() => estimateFromMeal(initialMeal), [initialMeal]);
+type MealComposerStep = "input" | "estimate" | "confirm";
+
+type NutritionOverrideDrafts = Record<keyof NutritionOverrides, string>;
+
+const NUTRITION_OVERRIDE_FIELDS: Array<{
+  key: keyof NutritionOverrides;
+  label: string;
+  unit: string;
+  mode: "integer" | "decimal";
+}> = [
+  { key: "estimatedCalories", label: "Calories", unit: "cal", mode: "integer" },
+  { key: "proteinGrams", label: "Protein", unit: "g", mode: "decimal" },
+  { key: "carbsGrams", label: "Carbs", unit: "g", mode: "decimal" },
+  { key: "fatGrams", label: "Fat", unit: "g", mode: "decimal" },
+  { key: "fiberGrams", label: "Fiber", unit: "g", mode: "decimal" },
+  { key: "sugarGrams", label: "Sugar", unit: "g", mode: "decimal" }
+];
+
+const EMPTY_OVERRIDE_DRAFTS: NutritionOverrideDrafts = {
+  estimatedCalories: "",
+  proteinGrams: "",
+  carbsGrams: "",
+  fatGrams: "",
+  fiberGrams: "",
+  sugarGrams: ""
+};
+
+export function MealComposer({
+  trigger,
+  initialMeal,
+  initialFood,
+  onClose
+}: MealComposerProps) {
+  const initialSourceAnalysis = useMemo(
+    () => sourceAnalysisFromMeal(initialMeal),
+    [initialMeal]
+  );
+  const initialOverrideDrafts = useMemo(
+    () => overrideDraftsFromMeal(initialMeal),
+    [initialMeal]
+  );
+  const initialHasOverrides = hasOverrideDrafts(initialOverrideDrafts);
+  const initialQuantity = valueToInput(initialMeal?.quantity ?? 1);
+
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"input" | "estimate" | "confirm">(initialEstimate ? "confirm" : "input");
+  const [step, setStep] = useState<MealComposerStep>(
+    initialSourceAnalysis ? "confirm" : "input"
+  );
   const [title, setTitle] = useState(initialMeal?.title ?? initialFood?.name ?? "");
   const [notes, setNotes] = useState(initialMeal?.notes ?? "");
-  const [eatenAt, setEatenAt] = useState(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : "");
-  const [servingDescription, setServingDescription] = useState(initialMeal?.servingDescription ?? initialFood?.servingDescription ?? "");
-  const [quantity, setQuantity] = useState(valueToInput(initialMeal?.quantity ?? 1));
-  const [savedFoodId, setSavedFoodId] = useState(initialMeal?.savedFood?.id ?? initialFood?.id ?? "");
+  const [eatenAt, setEatenAt] = useState(
+    initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : ""
+  );
+  const [servingDescription, setServingDescription] = useState(
+    initialMeal?.servingDescription ?? initialFood?.servingDescription ?? ""
+  );
+  const [quantity, setQuantity] = useState(initialQuantity);
+  const [savedFoodId, setSavedFoodId] = useState(
+    initialMeal?.savedFood?.id ?? initialFood?.id ?? ""
+  );
   const [savedFoodSearch, setSavedFoodSearch] = useState("");
   const [saveAsReusableFood, setSaveAsReusableFood] = useState(false);
   const [plateFiles, setPlateFiles] = useState<File[]>([]);
   const [labelFiles, setLabelFiles] = useState<File[]>([]);
   const [otherFiles, setOtherFiles] = useState<File[]>([]);
-  const [estimate, setEstimate] = useState<NutritionEstimate | null>(initialEstimate);
-  const [estimateBaseServings, setEstimateBaseServings] = useState(getServingCount(valueToInput(initialMeal?.quantity ?? 1)));
+  const [sourceAnalysis, setSourceAnalysis] = useState<NutritionEstimate | null>(
+    initialSourceAnalysis
+  );
+  const [sourceAnalysisBaseServings, setSourceAnalysisBaseServings] = useState(
+    getServingCount(initialQuantity)
+  );
+  const [overrideDrafts, setOverrideDrafts] = useState<NutritionOverrideDrafts>(
+    initialOverrideDrafts
+  );
+  const [correctionsOpen, setCorrectionsOpen] = useState(initialHasOverrides);
+  const [overrideScaleNotice, setOverrideScaleNotice] = useState<string | null>(null);
+  const previousQuantityRef = useRef(getServingCount(initialQuantity));
 
   const estimateMutation = useMealEstimateMutation();
   const createMutation = useCreateMealMutation();
@@ -46,9 +122,9 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   const { data: savedFoods, isLoading: loadingSavedFoods } = useSavedFoodsQuery();
 
   const isEdit = !!initialMeal;
-  const isFromSavedFood = !!initialFood && !initialMeal;
   const savedFoodOptions = savedFoods?.foods ?? [];
-  const selectedSavedFood = savedFoodOptions.find((food) => food.id === savedFoodId) ?? initialFood ?? null;
+  const selectedSavedFood =
+    savedFoodOptions.find((food) => food.id === savedFoodId) ?? initialFood ?? null;
   const filteredSavedFoods = useMemo(() => {
     const query = savedFoodSearch.trim().toLowerCase();
     if (!query) return savedFoodOptions.slice(0, 8);
@@ -69,64 +145,74 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
       .slice(0, 8);
   }, [savedFoodOptions, savedFoodSearch]);
 
-  const handleEstimate = useCallback(() => {
-    const formData = buildFormData();
-    estimateMutation.mutate(formData, {
-      onSuccess: (result) => {
-        setEstimate(result.analysis);
-        setEstimateBaseServings(getServingCount(quantity));
-        setStep("confirm");
-      }
-    });
-  }, [title, notes, eatenAt, servingDescription, quantity, savedFoodId, saveAsReusableFood, plateFiles, labelFiles, otherFiles, estimateMutation]);
+  const displayedSourceAnalysis = sourceAnalysis
+    ? scaleNutritionEstimate(
+        sourceAnalysis,
+        getServingCount(quantity) / sourceAnalysisBaseServings
+      )
+    : null;
+  const nutritionOverrides = useMemo(
+    () => parseNutritionOverrides(overrideDrafts),
+    [overrideDrafts]
+  );
+  const hasActiveOverrides = hasNutritionOverrides(nutritionOverrides);
+  const displayedFinalNutrition = displayedSourceAnalysis
+    ? applyNutritionOverridesToEstimate(displayedSourceAnalysis, nutritionOverrides)
+    : null;
+  const changedOverrideKeys = getChangedOverrideKeys(nutritionOverrides);
+  const macroCalories = displayedFinalNutrition
+    ? displayedFinalNutrition.proteinGrams * 4 +
+      displayedFinalNutrition.carbsGrams * 4 +
+      displayedFinalNutrition.fatGrams * 9
+    : 0;
+  const calorieDelta = displayedFinalNutrition
+    ? Math.abs(displayedFinalNutrition.estimatedCalories - macroCalories)
+    : 0;
+  const showMacroWarning = displayedFinalNutrition !== null && calorieDelta > 25;
+  const canScaleEstimatedMacros =
+    displayedSourceAnalysis !== null &&
+    nutritionOverrides.estimatedCalories !== undefined &&
+    nutritionOverrides.estimatedCalories >= 0 &&
+    nutritionOverrides.proteinGrams === undefined &&
+    nutritionOverrides.carbsGrams === undefined &&
+    nutritionOverrides.fatGrams === undefined &&
+    displayedSourceAnalysis.estimatedCalories > 0;
+  const errors = [estimateMutation.error, createMutation.error, updateMutation.error].filter(
+    Boolean
+  );
 
-  const handleSave = useCallback(() => {
-    if (!estimate) return;
-    const formData = buildFormData();
-    const servingMultiplier = getServingCount(quantity) / estimateBaseServings;
-    const scaledAnalysis = scaleNutritionEstimate(estimate, servingMultiplier);
+  useEffect(() => {
+    const currentServings = getServingCount(quantity);
+    const previousServings = previousQuantityRef.current;
 
-    if (isEdit) {
-      formData.append("confirmedAnalysis", JSON.stringify(scaledAnalysis));
-      updateMutation.mutate({ mealId: initialMeal!.id, body: { confirmedAnalysis: scaledAnalysis, title, notes: notes || null, eatenAt: eatenAt ? new Date(eatenAt).toISOString() : undefined, servingDescription: servingDescription || null, quantity: getServingCount(quantity) } });
-    } else {
-      formData.append("confirmedAnalysis", JSON.stringify(scaledAnalysis));
-      formData.append("reusableAnalysis", JSON.stringify(estimate));
-      createMutation.mutate({ formData, confirmedAnalysis: scaledAnalysis, reusableAnalysis: estimate });
+    if (currentServings === previousServings) {
+      return;
     }
-    reset();
-    setOpen(false);
-    onClose?.();
-  }, [estimate, quantity, estimateBaseServings, isEdit, initialMeal, title, notes, eatenAt, servingDescription, createMutation, updateMutation, onClose]);
 
-  const handleSaveSavedFood = useCallback(() => {
-    if (!selectedSavedFood) return;
-    const savedFoodEstimate = estimateFromSavedFood(selectedSavedFood);
-    if (!savedFoodEstimate) return;
-
-    const formData = buildFormData();
-    const scaledAnalysis = scaleNutritionEstimate(savedFoodEstimate, getServingCount(quantity));
-    formData.append("confirmedAnalysis", JSON.stringify(scaledAnalysis));
-    createMutation.mutate({ formData, confirmedAnalysis: scaledAnalysis, reusableAnalysis: savedFoodEstimate });
-    reset();
-    setOpen(false);
-    onClose?.();
-  }, [selectedSavedFood, quantity, title, notes, eatenAt, servingDescription, savedFoodId, saveAsReusableFood, plateFiles, labelFiles, otherFiles, createMutation, onClose]);
-
-  const selectSavedFood = useCallback((food: SavedFood) => {
-    const savedFoodEstimate = estimateFromSavedFood(food);
-    setSavedFoodId(food.id);
-    setTitle(food.name);
-    setServingDescription(food.servingDescription ?? "");
-    setSavedFoodSearch("");
-    setEstimate(savedFoodEstimate);
-    setEstimateBaseServings(1);
-    if (savedFoodEstimate) {
-      setStep("confirm");
+    if (
+      open &&
+      step === "confirm" &&
+      hasOverrideDrafts(overrideDrafts) &&
+      previousServings > 0
+    ) {
+      const ratio = currentServings / previousServings;
+      setOverrideDrafts((current) => scaleNutritionOverrideDrafts(current, ratio));
+      setOverrideScaleNotice("Corrected values scaled with servings.");
     }
-  }, []);
 
-  function buildFormData() {
+    previousQuantityRef.current = currentServings;
+  }, [open, overrideDrafts, quantity, step]);
+
+  const resetCorrections = useCallback(
+    (nextDrafts = EMPTY_OVERRIDE_DRAFTS) => {
+      setOverrideDrafts(nextDrafts);
+      setCorrectionsOpen(hasOverrideDrafts(nextDrafts));
+      setOverrideScaleNotice(null);
+    },
+    []
+  );
+
+  const buildFormData = useCallback(() => {
     const formData = new FormData();
     formData.append("title", title);
     if (notes) formData.append("notes", notes);
@@ -135,62 +221,206 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
     if (quantity) formData.append("quantity", quantity);
     if (savedFoodId) formData.append("savedFoodId", savedFoodId);
     formData.append("saveAsReusableFood", String(saveAsReusableFood));
-    plateFiles.forEach((f) => formData.append("plateImages", f));
-    labelFiles.forEach((f) => formData.append("labelImages", f));
-    otherFiles.forEach((f) => formData.append("otherImages", f));
+    plateFiles.forEach((file) => formData.append("plateImages", file));
+    labelFiles.forEach((file) => formData.append("labelImages", file));
+    otherFiles.forEach((file) => formData.append("otherImages", file));
     return formData;
-  }
+  }, [
+    eatenAt,
+    labelFiles,
+    notes,
+    otherFiles,
+    plateFiles,
+    quantity,
+    saveAsReusableFood,
+    savedFoodId,
+    servingDescription,
+    title
+  ]);
 
-  function reset() {
+  const reset = useCallback(() => {
+    const nextQuantity = valueToInput(initialMeal?.quantity ?? 1);
     setTitle(initialMeal?.title ?? initialFood?.name ?? "");
     setNotes(initialMeal?.notes ?? "");
     setEatenAt(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : "");
-    setServingDescription(initialMeal?.servingDescription ?? initialFood?.servingDescription ?? "");
-    const initialQuantity = valueToInput(initialMeal?.quantity ?? 1);
-    setQuantity(initialQuantity);
+    setServingDescription(
+      initialMeal?.servingDescription ?? initialFood?.servingDescription ?? ""
+    );
+    setQuantity(nextQuantity);
     setSavedFoodId(initialMeal?.savedFood?.id ?? initialFood?.id ?? "");
     setSavedFoodSearch("");
     setSaveAsReusableFood(false);
     setPlateFiles([]);
     setLabelFiles([]);
     setOtherFiles([]);
-    setEstimate(initialEstimate);
-    setEstimateBaseServings(getServingCount(initialQuantity));
-    setStep(initialEstimate ? "confirm" : "input");
-  }
+    setSourceAnalysis(initialSourceAnalysis);
+    setSourceAnalysisBaseServings(getServingCount(nextQuantity));
+    resetCorrections(initialOverrideDrafts);
+    setStep(initialSourceAnalysis ? "confirm" : "input");
+    previousQuantityRef.current = getServingCount(nextQuantity);
+  }, [
+    initialFood,
+    initialMeal,
+    initialOverrideDrafts,
+    initialSourceAnalysis,
+    resetCorrections
+  ]);
 
-  const hasPhotoInput = plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0;
-  const hasReusableFoodInput = Boolean(savedFoodId);
-  const hasServingDetailsInput = Boolean(servingDescription.trim());
-  const hasInputs = hasPhotoInput || hasReusableFoodInput || hasServingDetailsInput;
-  const canEstimate = title.trim() && hasInputs;
-  const canSaveSavedFood = !isEdit && selectedSavedFood?.calories !== null && Boolean(title.trim());
-  const displayedEstimate = estimate ? scaleNutritionEstimate(estimate, getServingCount(quantity) / estimateBaseServings) : null;
+  const closeAndReset = useCallback(() => {
+    reset();
+    setOpen(false);
+    onClose?.();
+  }, [onClose, reset]);
 
-  const errors = [estimateMutation.error, createMutation.error, updateMutation.error].filter(Boolean);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setOpen(false);
     if (!open) return;
     reset();
     onClose?.();
-  };
+  }, [onClose, open, reset]);
 
-  const closeAndReset = () => {
-    reset();
-    setOpen(false);
-    onClose?.();
-  };
+  const handleEstimate = useCallback(() => {
+    const formData = buildFormData();
+    setStep("estimate");
+    estimateMutation.mutate(formData, {
+      onSuccess: (result) => {
+        setSourceAnalysis(result.analysis);
+        setSourceAnalysisBaseServings(getServingCount(quantity));
+        resetCorrections();
+        setStep("confirm");
+      },
+      onError: () => {
+        setStep("input");
+      }
+    });
+  }, [buildFormData, estimateMutation, quantity, resetCorrections]);
+
+  const handleSave = useCallback(() => {
+    if (!displayedSourceAnalysis) return;
+
+    const formData = buildFormData();
+    formData.append("sourceAnalysis", JSON.stringify(displayedSourceAnalysis));
+    formData.append("nutritionOverrides", JSON.stringify(nutritionOverrides));
+
+    if (isEdit) {
+      updateMutation.mutate(
+        {
+          mealId: initialMeal!.id,
+          body: {
+            title,
+            notes: notes || null,
+            eatenAt: eatenAt ? new Date(eatenAt).toISOString() : undefined,
+            servingDescription: servingDescription || null,
+            quantity: getServingCount(quantity),
+            sourceAnalysis: displayedSourceAnalysis,
+            nutritionOverrides
+          }
+        },
+        {
+          onSuccess: () => {
+            closeAndReset();
+          }
+        }
+      );
+      return;
+    }
+
+    createMutation.mutate(formData, {
+      onSuccess: () => {
+        closeAndReset();
+      }
+    });
+  }, [
+    buildFormData,
+    closeAndReset,
+    createMutation,
+    displayedSourceAnalysis,
+    eatenAt,
+    initialMeal,
+    isEdit,
+    notes,
+    nutritionOverrides,
+    quantity,
+    servingDescription,
+    title,
+    updateMutation
+  ]);
+
+  const selectSavedFood = useCallback(
+    (food: SavedFood) => {
+      const savedFoodAnalysis = sourceAnalysisFromSavedFood(food);
+      setSavedFoodId(food.id);
+      setTitle(food.name);
+      setServingDescription(food.servingDescription ?? "");
+      setSavedFoodSearch("");
+      setSourceAnalysis(savedFoodAnalysis);
+      setSourceAnalysisBaseServings(1);
+      resetCorrections();
+      previousQuantityRef.current = getServingCount(quantity);
+      if (savedFoodAnalysis) {
+        setStep("confirm");
+      }
+    },
+    [quantity, resetCorrections]
+  );
+
+  const clearSelectedSavedFood = useCallback(() => {
+    setSavedFoodId("");
+    setSavedFoodSearch("");
+    setSourceAnalysis(null);
+    setSourceAnalysisBaseServings(getServingCount(quantity));
+    resetCorrections();
+    setStep("input");
+  }, [quantity, resetCorrections]);
+
+  const handleScaleEstimatedMacros = useCallback(() => {
+    if (!displayedSourceAnalysis || nutritionOverrides.estimatedCalories === undefined) {
+      return;
+    }
+
+    const scale = nutritionOverrides.estimatedCalories / displayedSourceAnalysis.estimatedCalories;
+    setOverrideDrafts((current) => ({
+      ...current,
+      proteinGrams: formatScaledOverrideValue(displayedSourceAnalysis.proteinGrams * scale),
+      carbsGrams: formatScaledOverrideValue(displayedSourceAnalysis.carbsGrams * scale),
+      fatGrams: formatScaledOverrideValue(displayedSourceAnalysis.fatGrams * scale)
+    }));
+    setCorrectionsOpen(true);
+  }, [displayedSourceAnalysis, nutritionOverrides.estimatedCalories]);
+
+  const hasPhotoInput =
+    plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0;
+  const hasReusableFoodInput = Boolean(savedFoodId);
+  const hasServingDetailsInput = Boolean(servingDescription.trim());
+  const hasInputs = hasPhotoInput || hasReusableFoodInput || hasServingDetailsInput;
+  const canEstimate = Boolean(title.trim()) && hasInputs;
+  const breakdownTitle = hasActiveOverrides
+    ? "Original estimate breakdown"
+    : "Estimate breakdown";
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(o); }}>
-      <DialogTrigger asChild>
-        {trigger || <Button>Log Food</Button>}
-      </DialogTrigger>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          handleClose();
+          return;
+        }
+
+        setOpen(true);
+      }}
+    >
+      <DialogTrigger asChild>{trigger || <Button>Log Food</Button>}</DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Edit Food" : step === "input" ? "Log Food" : step === "estimate" ? "Estimating..." : "Review & Save"}
+            {isEdit
+              ? "Edit Food"
+              : step === "input"
+                ? "Log Food"
+                : step === "estimate"
+                  ? "Estimating..."
+                  : "Review & Save"}
           </DialogTitle>
         </DialogHeader>
 
@@ -200,16 +430,26 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
           </Alert>
         )}
 
-        {/* Step indicator */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className={step === "input" ? "text-primary font-semibold" : (step === "confirm" || step === "estimate" ? "text-success" : "")}>Input</span>
+          <span
+            className={
+              step === "input"
+                ? "font-semibold text-primary"
+                : step === "confirm" || step === "estimate"
+                  ? "text-success"
+                  : ""
+            }
+          >
+            Input
+          </span>
           <ChevronRight className="h-3 w-3" />
-          <span className={step === "confirm" ? "text-primary font-semibold" : ""}>Review</span>
+          <span className={step === "confirm" ? "font-semibold text-primary" : ""}>
+            Review
+          </span>
         </div>
 
         {step === "input" && (
           <div className="grid gap-5">
-            {/* Saved foods */}
             {savedFoodOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Saved foods</Label>
@@ -218,7 +458,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input
                       value={savedFoodSearch}
-                      onChange={(e) => setSavedFoodSearch(e.target.value)}
+                      onChange={(event) => setSavedFoodSearch(event.target.value)}
                       placeholder="Search reusable foods"
                       className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
                     />
@@ -227,12 +467,7 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setSavedFoodId("");
-                          setSavedFoodSearch("");
-                          setEstimate(null);
-                          setEstimateBaseServings(1);
-                        }}
+                        onClick={clearSelectedSavedFood}
                       >
                         Clear
                       </Button>
@@ -246,24 +481,34 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                         <Skeleton className="h-10 w-full" />
                       </div>
                     ) : filteredSavedFoods.length === 0 ? (
-                      <p className="px-3 py-4 text-sm text-muted-foreground">No saved foods match.</p>
+                      <p className="px-3 py-4 text-sm text-muted-foreground">
+                        No saved foods match.
+                      </p>
                     ) : (
-                      filteredSavedFoods.map((food: SavedFood) => (
+                      filteredSavedFoods.map((food) => (
                         <button
                           key={food.id}
                           type="button"
                           className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
-                            savedFoodId === food.id ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                            savedFoodId === food.id
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                              : ""
                           }`}
                           onClick={() => selectSavedFood(food)}
                         >
                           <span className="min-w-0">
                             <span className="block truncate font-medium">{food.name}</span>
                             <span className="block truncate text-xs opacity-80">
-                              {[food.brand, food.servingDescription].filter(Boolean).join(" · ") || "Reusable food"}
+                              {[food.brand, food.servingDescription]
+                                .filter(Boolean)
+                                .join(" · ") || "Reusable food"}
                             </span>
                           </span>
-                          {food.calories !== null && <span className="ml-3 shrink-0 text-xs opacity-80">{Math.round(food.calories)} cal</span>}
+                          {food.calories !== null && (
+                            <span className="ml-3 shrink-0 text-xs opacity-80">
+                              {Math.round(food.calories)} cal
+                            </span>
+                          )}
                         </button>
                       ))
                     )}
@@ -272,7 +517,9 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                 {selectedSavedFood && (
                   <p className="text-xs text-muted-foreground">
                     Selected: {selectedSavedFood.name}
-                    {selectedSavedFood.servingDescription ? ` · ${selectedSavedFood.servingDescription}` : ""}
+                    {selectedSavedFood.servingDescription
+                      ? ` · ${selectedSavedFood.servingDescription}`
+                      : ""}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
@@ -286,16 +533,25 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
                 No saved foods yet. Add a photo or serving details to estimate a new meal.
               </div>
             )}
-            {/* Title & basic info */}
+
             <div className="grid gap-2">
               <Label>What did you eat?</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Grilled chicken salad" required />
+              <Input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="e.g. Grilled chicken salad"
+                required
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Date & Time</Label>
-                <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
+                <Input
+                  type="datetime-local"
+                  value={eatenAt}
+                  onChange={(event) => setEatenAt(event.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Servings</Label>
@@ -305,35 +561,69 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
 
             <div className="grid gap-2">
               <Label>Serving Details</Label>
-              <Input value={servingDescription} onChange={(e) => setServingDescription(e.target.value)} placeholder="e.g. 1 bowl, 2 slices" />
+              <Input
+                value={servingDescription}
+                onChange={(event) => setServingDescription(event.target.value)}
+                placeholder="e.g. 1 bowl, 2 slices"
+              />
             </div>
 
             <Separator />
 
-            {/* Photos - collapsible section */}
             <div className="grid gap-3">
               <Label>Photos (optional)</Label>
               <div className="grid gap-2">
-                <PhotoPicker label="Plate photos" files={plateFiles} onFiles={setPlateFiles} icon={Camera} />
-                <PhotoPicker label="Nutrition label" files={labelFiles} onFiles={setLabelFiles} icon={FileText} />
-                <PhotoPicker label="Other photos" files={otherFiles} onFiles={setOtherFiles} icon={Image} />
+                <PhotoPicker
+                  label="Plate photos"
+                  files={plateFiles}
+                  onFiles={setPlateFiles}
+                  icon={Camera}
+                />
+                <PhotoPicker
+                  label="Nutrition label"
+                  files={labelFiles}
+                  onFiles={setLabelFiles}
+                  icon={FileText}
+                />
+                <PhotoPicker
+                  label="Other photos"
+                  files={otherFiles}
+                  onFiles={setOtherFiles}
+                  icon={Image}
+                />
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <Checkbox id="saveAsReusable" checked={saveAsReusableFood} onCheckedChange={(v) => setSaveAsReusableFood(v === true)} />
-              <Label htmlFor="saveAsReusable" className="text-sm font-normal">Save as reusable food for next time</Label>
+              <Checkbox
+                id="saveAsReusable"
+                checked={saveAsReusableFood}
+                onCheckedChange={(value) => setSaveAsReusableFood(value === true)}
+              />
+              <Label htmlFor="saveAsReusable" className="text-sm font-normal">
+                Save as reusable food for next time
+              </Label>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={closeAndReset}>Cancel</Button>
-              {canSaveSavedFood && (
-                <Button type="button" onClick={handleSaveSavedFood} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Saving..." : "Save meal"}
-                </Button>
-              )}
-              <Button onClick={handleEstimate} disabled={!canEstimate || estimateMutation.isPending}>
-                {estimateMutation.isPending ? <><Sparkles className="h-4 w-4 mr-1 animate-spin" /> Estimating...</> : <><Sparkles className="h-4 w-4 mr-1" /> Estimate Nutrition</>}
+              <Button type="button" variant="outline" onClick={closeAndReset}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEstimate}
+                disabled={!canEstimate || estimateMutation.isPending}
+              >
+                {estimateMutation.isPending ? (
+                  <>
+                    <Sparkles className="mr-1 h-4 w-4 animate-spin" />
+                    Estimating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-1 h-4 w-4" />
+                    Estimate Nutrition
+                  </>
+                )}
               </Button>
             </div>
             {!hasInputs && (
@@ -344,73 +634,187 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
           </div>
         )}
 
-        {step === "confirm" && displayedEstimate && (
+        {step === "confirm" && displayedSourceAnalysis && displayedFinalNutrition && (
           <div className="grid gap-5">
-            {/* Editable fields */}
             <div className="grid gap-2">
               <Label>What did you eat?</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Date & Time</Label>
-                <Input type="datetime-local" value={eatenAt} onChange={(e) => setEatenAt(e.target.value)} />
+                <Input
+                  type="datetime-local"
+                  value={eatenAt}
+                  onChange={(event) => setEatenAt(event.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Servings</Label>
                 <NumericInput mode="decimal" value={quantity} onValueChange={setQuantity} />
               </div>
             </div>
+
             <div className="grid gap-2">
               <Label>Serving Details</Label>
-              <Input value={servingDescription} onChange={(e) => setServingDescription(e.target.value)} placeholder="e.g. 1 bowl" />
+              <Input
+                value={servingDescription}
+                onChange={(event) => setServingDescription(event.target.value)}
+                placeholder="e.g. 1 bowl"
+              />
             </div>
 
             <Separator />
 
-            {/* Nutrition estimate */}
             <Card>
               <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold">Estimated Nutrition</span>
-                  <Badge variant={displayedEstimate.status === "COMPLETED" ? "success" : "warning"}>
-                    {displayedEstimate.status === "COMPLETED" ? "Complete" : displayedEstimate.status === "PENDING" ? "Pending" : displayedEstimate.status}
-                  </Badge>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Nutrition to Save</span>
+                    <Badge
+                      variant={
+                        displayedSourceAnalysis.status === "COMPLETED" ? "success" : "warning"
+                      }
+                    >
+                      {displayedSourceAnalysis.status === "COMPLETED"
+                        ? "Complete"
+                        : displayedSourceAnalysis.status === "PENDING"
+                          ? "Pending"
+                          : displayedSourceAnalysis.status}
+                    </Badge>
+                    {hasActiveOverrides && <Badge variant="brand">Corrected</Badge>}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCorrectionsOpen((current) => !current)}
+                  >
+                    {correctionsOpen ? "Hide corrections" : "Correct numbers"}
+                  </Button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.estimatedCalories}</p>
-                    <p className="text-xs text-muted-foreground">Calories</p>
+
+                <NutritionSummaryGrid estimate={displayedFinalNutrition} />
+
+                {displayedSourceAnalysis.summary && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {displayedSourceAnalysis.summary}
+                  </p>
+                )}
+
+                {overrideScaleNotice && (
+                  <p className="mt-3 text-xs font-medium text-brand">{overrideScaleNotice}</p>
+                )}
+
+                {showMacroWarning && (
+                  <Alert variant="warning" className="mt-3">
+                    Calories and protein/carbs/fat differ by {Math.round(calorieDelta)} cal.
+                    Save still uses your manual values.
+                  </Alert>
+                )}
+
+                {correctionsOpen && (
+                  <div className="mt-4 grid gap-3 rounded-lg border bg-muted/20 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">Manual corrections</p>
+                        <p className="text-xs text-muted-foreground">
+                          Leave a field blank to keep the estimate.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3">
+                      {NUTRITION_OVERRIDE_FIELDS.map((field) => {
+                        const estimatedValue = displayedSourceAnalysis[field.key];
+                        const isManual = overrideDrafts[field.key].trim() !== "";
+
+                        return (
+                          <div
+                            key={field.key}
+                            className="grid gap-2 rounded-md border bg-background p-3"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <Label htmlFor={`override-${field.key}`}>{field.label}</Label>
+                              <Badge variant={isManual ? "brand" : "secondary"}>
+                                {isManual ? "Manual" : "Estimated"}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                              <NumericInput
+                                id={`override-${field.key}`}
+                                mode={field.mode}
+                                allowEmpty
+                                value={overrideDrafts[field.key]}
+                                onValueChange={(value) => {
+                                  setOverrideDrafts((current) => ({
+                                    ...current,
+                                    [field.key]: value
+                                  }));
+                                  setCorrectionsOpen(true);
+                                  setOverrideScaleNotice(null);
+                                }}
+                                placeholder={String(estimatedValue)}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                Est. {formatEstimateValue(estimatedValue, field.unit)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {canScaleEstimatedMacros && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-self-start"
+                        onClick={handleScaleEstimatedMacros}
+                      >
+                        Scale estimated macros to new calories
+                      </Button>
+                    )}
                   </div>
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.proteinGrams}g</p>
-                    <p className="text-xs text-muted-foreground">Protein</p>
+                )}
+
+                {hasActiveOverrides && (
+                  <div className="mt-4 grid gap-2 rounded-lg border bg-muted/20 p-3">
+                    <p className="text-sm font-semibold">Estimated vs saved</p>
+                    {changedOverrideKeys.map((key) => {
+                      const field = NUTRITION_OVERRIDE_FIELDS.find((item) => item.key === key);
+                      if (!field) return null;
+
+                      return (
+                        <div
+                          key={field.key}
+                          className="flex items-center justify-between gap-3 text-xs"
+                        >
+                          <span className="font-medium">{field.label}</span>
+                          <span className="text-muted-foreground">
+                            {formatEstimateValue(displayedSourceAnalysis[field.key], field.unit)}
+                          </span>
+                          <span className="font-semibold">
+                            {formatEstimateValue(displayedFinalNutrition[field.key], field.unit)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.carbsGrams}g</p>
-                    <p className="text-xs text-muted-foreground">Carbs</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.fatGrams}g</p>
-                    <p className="text-xs text-muted-foreground">Fat</p>
-                  </div>
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.fiberGrams}g</p>
-                    <p className="text-xs text-muted-foreground">Fiber</p>
-                  </div>
-                  <div className="text-center p-3 bg-secondary/50 rounded-lg">
-                    <p className="text-lg font-bold">{displayedEstimate.sugarGrams}g</p>
-                    <p className="text-xs text-muted-foreground">Sugar</p>
-                  </div>
-                </div>
-                {displayedEstimate.summary && <p className="text-sm text-muted-foreground mt-3">{displayedEstimate.summary}</p>}
-                {displayedEstimate.foodBreakdown.length > 0 && (
-                  <div className="mt-3 grid gap-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Breakdown</p>
-                    {displayedEstimate.foodBreakdown.map((item, i) => (
-                      <div key={i} className="text-xs text-muted-foreground flex justify-between">
+                )}
+
+                {displayedSourceAnalysis.foodBreakdown.length > 0 && (
+                  <div className="mt-4 grid gap-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {breakdownTitle}
+                    </p>
+                    {displayedSourceAnalysis.foodBreakdown.map((item, index) => (
+                      <div
+                        key={`${item.label}-${index}`}
+                        className="flex justify-between text-xs text-muted-foreground"
+                      >
                         <span>{item.label}</span>
                         <span>{item.calories} cal</span>
                       </div>
@@ -421,10 +825,23 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
             </Card>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setStep("input")}>{isEdit ? "Edit details" : "Back"}</Button>
-              <Button type="button" variant="outline" onClick={closeAndReset}>Cancel</Button>
-              <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
-                {isEdit ? (updateMutation.isPending ? "Updating..." : "Update") : (createMutation.isPending ? "Saving..." : "Save")}
+              <Button type="button" variant="outline" onClick={() => setStep("input")}>
+                {isEdit ? "Edit details" : "Back"}
+              </Button>
+              <Button type="button" variant="outline" onClick={closeAndReset}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {isEdit
+                  ? updateMutation.isPending
+                    ? "Updating..."
+                    : "Update"
+                  : createMutation.isPending
+                    ? "Saving..."
+                    : "Save"}
               </Button>
             </div>
           </div>
@@ -434,11 +851,52 @@ export function MealComposer({ trigger, initialMeal, initialFood, onClose }: Mea
   );
 }
 
-function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
+function NutritionSummaryGrid({ estimate }: { estimate: NutritionEstimate }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <NutritionValueCard label="Calories" value={estimate.estimatedCalories} />
+        <NutritionValueCard label="Protein" value={estimate.proteinGrams} suffix="g" />
+        <NutritionValueCard label="Carbs" value={estimate.carbsGrams} suffix="g" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <NutritionValueCard label="Fat" value={estimate.fatGrams} suffix="g" />
+        <NutritionValueCard label="Fiber" value={estimate.fiberGrams} suffix="g" />
+        <NutritionValueCard label="Sugar" value={estimate.sugarGrams} suffix="g" />
+      </div>
+    </>
+  );
+}
+
+function NutritionValueCard({
+  label,
+  value,
+  suffix = ""
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+}) {
+  return (
+    <div className="rounded-lg bg-secondary/50 p-3 text-center">
+      <p className="text-lg font-bold">
+        {value}
+        {suffix}
+      </p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function PhotoPicker({
+  label,
+  files,
+  onFiles,
+  icon: Icon
+}: {
   label: string;
   files: File[];
   onFiles: (files: File[]) => void;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
   icon: React.ElementType;
 }) {
   const id = useId();
@@ -460,9 +918,9 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
         multiple
         accept="image/*"
         className="sr-only"
-        onChange={(e) => {
-          addFiles(e.target.files);
-          e.currentTarget.value = "";
+        onChange={(event) => {
+          addFiles(event.target.files);
+          event.currentTarget.value = "";
         }}
       />
       <input
@@ -471,9 +929,9 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
         accept="image/*"
         capture="environment"
         className="sr-only"
-        onChange={(e) => {
-          addFiles(e.target.files);
-          e.currentTarget.value = "";
+        onChange={(event) => {
+          addFiles(event.target.files);
+          event.currentTarget.value = "";
         }}
       />
       <div className="flex items-center justify-between gap-3">
@@ -483,10 +941,16 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
           {files.length > 0 && <Badge variant="secondary">{files.length}</Badge>}
         </div>
         <div className="flex shrink-0 gap-2">
-          <Label htmlFor={cameraInputId} className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted">
+          <Label
+            htmlFor={cameraInputId}
+            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted"
+          >
             Camera
           </Label>
-          <Label htmlFor={libraryInputId} className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted">
+          <Label
+            htmlFor={libraryInputId}
+            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted"
+          >
             Library
           </Label>
         </div>
@@ -494,9 +958,18 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
       {files.length > 0 && (
         <div className="mt-3 grid gap-1">
           {files.map((file, index) => (
-            <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 rounded bg-muted/50 px-2 py-1 text-xs">
+            <div
+              key={`${file.name}-${file.lastModified}`}
+              className="flex items-center justify-between gap-2 rounded bg-muted/50 px-2 py-1 text-xs"
+            >
               <span className="truncate">{file.name}</span>
-              <Button type="button" variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => removeFile(index)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5"
+                onClick={() => removeFile(index)}
+              >
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -507,9 +980,13 @@ function PhotoPicker({ label, files, onFiles, inputRef, icon: Icon }: {
   );
 }
 
-function estimateFromMeal(meal: Meal | undefined): NutritionEstimate | null {
+function sourceAnalysisFromMeal(meal: Meal | undefined): NutritionEstimate | null {
   if (!meal || meal.estimatedCalories === null) {
     return null;
+  }
+
+  if (meal.sourceAnalysis) {
+    return meal.sourceAnalysis;
   }
 
   return {
@@ -541,7 +1018,7 @@ function estimateFromMeal(meal: Meal | undefined): NutritionEstimate | null {
   };
 }
 
-function estimateFromSavedFood(food: SavedFood): NutritionEstimate | null {
+function sourceAnalysisFromSavedFood(food: SavedFood): NutritionEstimate | null {
   if (food.calories === null) {
     return null;
   }
@@ -574,4 +1051,102 @@ function estimateFromSavedFood(food: SavedFood): NutritionEstimate | null {
     ],
     rawAnalysis: {}
   };
+}
+
+function overrideDraftsFromMeal(meal: Meal | undefined): NutritionOverrideDrafts {
+  if (!meal?.nutritionOverrides) {
+    return { ...EMPTY_OVERRIDE_DRAFTS };
+  }
+
+  return {
+    estimatedCalories: valueToInput(meal.nutritionOverrides.estimatedCalories),
+    proteinGrams: valueToInput(meal.nutritionOverrides.proteinGrams),
+    carbsGrams: valueToInput(meal.nutritionOverrides.carbsGrams),
+    fatGrams: valueToInput(meal.nutritionOverrides.fatGrams),
+    fiberGrams: valueToInput(meal.nutritionOverrides.fiberGrams),
+    sugarGrams: valueToInput(meal.nutritionOverrides.sugarGrams)
+  };
+}
+
+function parseNutritionOverrides(drafts: NutritionOverrideDrafts): NutritionOverrides {
+  return NUTRITION_OVERRIDE_FIELDS.reduce<NutritionOverrides>((accumulator, field) => {
+    const raw = drafts[field.key].trim();
+    if (!raw) {
+      return accumulator;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return accumulator;
+    }
+
+    accumulator[field.key] = parsed;
+    return accumulator;
+  }, {});
+}
+
+function hasNutritionOverrides(overrides: NutritionOverrides): boolean {
+  return NUTRITION_OVERRIDE_FIELDS.some((field) => overrides[field.key] !== undefined);
+}
+
+function hasOverrideDrafts(drafts: NutritionOverrideDrafts): boolean {
+  return NUTRITION_OVERRIDE_FIELDS.some((field) => drafts[field.key].trim() !== "");
+}
+
+function applyNutritionOverridesToEstimate(
+  sourceAnalysis: NutritionEstimate,
+  nutritionOverrides: NutritionOverrides
+): NutritionEstimate {
+  return {
+    ...sourceAnalysis,
+    estimatedCalories:
+      nutritionOverrides.estimatedCalories ?? sourceAnalysis.estimatedCalories,
+    proteinGrams: nutritionOverrides.proteinGrams ?? sourceAnalysis.proteinGrams,
+    carbsGrams: nutritionOverrides.carbsGrams ?? sourceAnalysis.carbsGrams,
+    fatGrams: nutritionOverrides.fatGrams ?? sourceAnalysis.fatGrams,
+    fiberGrams: nutritionOverrides.fiberGrams ?? sourceAnalysis.fiberGrams,
+    sugarGrams: nutritionOverrides.sugarGrams ?? sourceAnalysis.sugarGrams
+  };
+}
+
+function scaleNutritionOverrideDrafts(
+  drafts: NutritionOverrideDrafts,
+  ratio: number
+): NutritionOverrideDrafts {
+  return NUTRITION_OVERRIDE_FIELDS.reduce<NutritionOverrideDrafts>(
+    (accumulator, field) => {
+      const raw = drafts[field.key].trim();
+      if (!raw) {
+        accumulator[field.key] = "";
+        return accumulator;
+      }
+
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) {
+        accumulator[field.key] = "";
+        return accumulator;
+      }
+
+      accumulator[field.key] = formatScaledOverrideValue(parsed * ratio);
+      return accumulator;
+    },
+    { ...EMPTY_OVERRIDE_DRAFTS }
+  );
+}
+
+function formatScaledOverrideValue(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function getChangedOverrideKeys(
+  overrides: NutritionOverrides
+): Array<keyof NutritionOverrides> {
+  return NUTRITION_OVERRIDE_FIELDS
+    .map((field) => field.key)
+    .filter((key) => overrides[key] !== undefined);
+}
+
+function formatEstimateValue(value: number, unit: string): string {
+  return `${value}${unit ? ` ${unit}` : ""}`;
 }

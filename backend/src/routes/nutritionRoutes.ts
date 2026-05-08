@@ -1,11 +1,19 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import multer from "multer";
 import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { getRequiredAuth, type AuthenticatedRequest } from "../middleware/auth.js";
-import { nutritionAnalysisService } from "../services/nutritionAnalysisService.js";
+import {
+  nutritionAnalysisService,
+  type NutritionAnalysisResult
+} from "../services/nutritionAnalysisService.js";
+import {
+  applyNutritionOverrides,
+  nutritionOverrideKeys,
+  type NutritionOverrides
+} from "../services/nutritionOverrideService.js";
 import { storageService } from "../services/storageService.js";
 
 export const nutritionRoutes = Router();
@@ -55,11 +63,229 @@ const mealInclude = {
   savedFood: true
 } satisfies Prisma.MealEntryInclude;
 
+const nutrientAmountSchema = z.object({
+  name: z.string(),
+  amount: z.number().min(0),
+  unit: z.string()
+});
+
+const foodBreakdownItemSchema = z.object({
+  label: z.string(),
+  quantityDescription: z.string(),
+  calories: z.number().min(0),
+  proteinGrams: z.number().min(0),
+  carbsGrams: z.number().min(0),
+  fatGrams: z.number().min(0)
+});
+
+const nutritionEstimateSchema = z.object({
+  status: z.enum(["PENDING", "COMPLETED", "FALLBACK", "FAILED"]),
+  model: z.string(),
+  summary: z.string(),
+  confidenceScore: z.number().min(0).max(1),
+  estimatedCalories: z.number().min(0),
+  proteinGrams: z.number().min(0),
+  carbsGrams: z.number().min(0),
+  fatGrams: z.number().min(0),
+  fiberGrams: z.number().min(0),
+  sugarGrams: z.number().min(0),
+  sodiumMg: z.number().min(0),
+  micronutrients: z.array(nutrientAmountSchema),
+  vitamins: z.array(nutrientAmountSchema),
+  assumptions: z.array(z.string()),
+  foodBreakdown: z.array(foodBreakdownItemSchema),
+  rawAnalysis: z.record(z.string(), z.unknown())
+});
+
+const nutritionOverridesSchema = z.object({
+  estimatedCalories: z.number().min(0).optional(),
+  proteinGrams: z.number().min(0).optional(),
+  carbsGrams: z.number().min(0).optional(),
+  fatGrams: z.number().min(0).optional(),
+  fiberGrams: z.number().min(0).optional(),
+  sugarGrams: z.number().min(0).optional()
+});
+
+type MealPayload = Prisma.MealEntryGetPayload<{
+  include: typeof mealInclude;
+}>;
+
+type MealAnalysisFields = Pick<
+  MealPayload,
+  | "title"
+  | "servingDescription"
+  | "analysisStatus"
+  | "analysisSummary"
+  | "confidenceScore"
+  | "estimatedCalories"
+  | "proteinGrams"
+  | "carbsGrams"
+  | "fatGrams"
+  | "fiberGrams"
+  | "sugarGrams"
+  | "sodiumMg"
+  | "micronutrients"
+  | "vitamins"
+  | "assumptions"
+  | "foodBreakdown"
+  | "rawAnalysis"
+  | "aiModel"
+  | "sourceAnalysis"
+  | "nutritionOverrides"
+>;
+
+const getFallbackFoodBreakdown = (meal: Pick<MealAnalysisFields, "title" | "servingDescription" | "estimatedCalories" | "proteinGrams" | "carbsGrams" | "fatGrams">) => [
+  {
+    label: meal.title,
+    quantityDescription: meal.servingDescription ?? "1 serving",
+    calories: meal.estimatedCalories ?? 0,
+    proteinGrams: meal.proteinGrams ?? 0,
+    carbsGrams: meal.carbsGrams ?? 0,
+    fatGrams: meal.fatGrams ?? 0
+  }
+];
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const hasNutritionOverrides = (overrides: NutritionOverrides | null | undefined) =>
+  nutritionOverrideKeys.some((key) => overrides?.[key] !== undefined);
+
+const parseStoredSourceAnalysis = (value: unknown) => {
+  const parsed = nutritionEstimateSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+const parseStoredNutritionOverrides = (value: unknown) => {
+  const parsed = nutritionOverridesSchema.safeParse(value);
+  if (!parsed.success || !hasNutritionOverrides(parsed.data)) {
+    return null;
+  }
+
+  return parsed.data;
+};
+
+const synthesizeSourceAnalysis = (meal: MealAnalysisFields): NutritionAnalysisResult | null => {
+  if (meal.estimatedCalories === null) {
+    return null;
+  }
+
+  const micronutrients = z.array(nutrientAmountSchema).safeParse(meal.micronutrients);
+  const vitamins = z.array(nutrientAmountSchema).safeParse(meal.vitamins);
+  const assumptions = z.array(z.string()).safeParse(meal.assumptions);
+  const foodBreakdown = z.array(foodBreakdownItemSchema).safeParse(meal.foodBreakdown);
+
+  return {
+    status: meal.analysisStatus,
+    model: meal.aiModel ?? "saved-meal",
+    summary: meal.analysisSummary ?? "",
+    confidenceScore:
+      typeof meal.confidenceScore === "number"
+        ? Math.min(Math.max(meal.confidenceScore, 0), 1)
+        : 1,
+    estimatedCalories: meal.estimatedCalories,
+    proteinGrams: meal.proteinGrams ?? 0,
+    carbsGrams: meal.carbsGrams ?? 0,
+    fatGrams: meal.fatGrams ?? 0,
+    fiberGrams: meal.fiberGrams ?? 0,
+    sugarGrams: meal.sugarGrams ?? 0,
+    sodiumMg: meal.sodiumMg ?? 0,
+    micronutrients: micronutrients.success ? micronutrients.data : [],
+    vitamins: vitamins.success ? vitamins.data : [],
+    assumptions: assumptions.success ? assumptions.data : [],
+    foodBreakdown: foodBreakdown.success
+      ? foodBreakdown.data
+      : getFallbackFoodBreakdown(meal),
+    rawAnalysis: isPlainObject(meal.rawAnalysis) ? meal.rawAnalysis : {}
+  };
+};
+
+const getMealSourceAnalysis = (meal: MealAnalysisFields) =>
+  parseStoredSourceAnalysis(meal.sourceAnalysis) ?? synthesizeSourceAnalysis(meal);
+
+const getMealNutritionOverrides = (meal: Pick<MealAnalysisFields, "nutritionOverrides">) =>
+  parseStoredNutritionOverrides(meal.nutritionOverrides);
+
+const getAnalysisUpdateData = (
+  sourceAnalysis: NutritionAnalysisResult,
+  nutritionOverrides: NutritionOverrides | null | undefined
+): Prisma.MealEntryUpdateInput => {
+  const finalAnalysis = applyNutritionOverrides(sourceAnalysis, nutritionOverrides);
+  const storedOverrides =
+    nutritionOverrides && hasNutritionOverrides(nutritionOverrides)
+      ? nutritionOverrides
+      : null;
+
+  return {
+    analysisStatus: finalAnalysis.status,
+    analysisSummary: finalAnalysis.summary,
+    confidenceScore: finalAnalysis.confidenceScore,
+    estimatedCalories: finalAnalysis.estimatedCalories,
+    proteinGrams: finalAnalysis.proteinGrams,
+    carbsGrams: finalAnalysis.carbsGrams,
+    fatGrams: finalAnalysis.fatGrams,
+    fiberGrams: finalAnalysis.fiberGrams,
+    sugarGrams: finalAnalysis.sugarGrams,
+    sodiumMg: finalAnalysis.sodiumMg,
+    micronutrients: finalAnalysis.micronutrients as unknown as Prisma.InputJsonValue,
+    vitamins: finalAnalysis.vitamins as unknown as Prisma.InputJsonValue,
+    assumptions: finalAnalysis.assumptions as unknown as Prisma.InputJsonValue,
+    foodBreakdown: finalAnalysis.foodBreakdown
+      ? (finalAnalysis.foodBreakdown as unknown as Prisma.InputJsonValue)
+      : Prisma.DbNull,
+    rawAnalysis: finalAnalysis.rawAnalysis as unknown as Prisma.InputJsonValue,
+    aiModel: finalAnalysis.model,
+    sourceAnalysis: sourceAnalysis as unknown as Prisma.InputJsonValue,
+    nutritionOverrides: storedOverrides
+      ? (storedOverrides as unknown as Prisma.InputJsonValue)
+      : Prisma.DbNull
+  };
+};
+
+const parseJsonField = <T>(
+  value: unknown,
+  schema: z.ZodType<T>,
+  label: string
+):
+  | { ok: true; data: T | undefined }
+  | { ok: false; status: number; error: unknown } => {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, data: undefined };
+  }
+
+  let parsedJson: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsedJson = JSON.parse(value);
+    } catch {
+      return {
+        ok: false,
+        status: 400,
+        error: `${label} payload is not valid JSON`
+      };
+    }
+  }
+
+  const parsed = schema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      status: 400,
+      error: parsed.error.flatten()
+    };
+  }
+
+  return {
+    ok: true,
+    data: parsed.data
+  };
+};
+
 const serializeMeal = (
-  meal: Prisma.MealEntryGetPayload<{
-    include: typeof mealInclude;
-  }>
+  meal: MealPayload
 ) => ({
+  sourceAnalysis: getMealSourceAnalysis(meal),
+  nutritionOverrides: getMealNutritionOverrides(meal),
   id: meal.id,
   title: meal.title,
   notes: meal.notes,
@@ -184,53 +410,14 @@ const createMealBodySchema = z.object({
   saveAsReusableFood: z.boolean().optional()
 });
 
-const confirmedAnalysisSchema = z.object({
-  status: z.enum(["PENDING", "COMPLETED", "FALLBACK", "FAILED"]),
-  model: z.string(),
-  summary: z.string(),
-  confidenceScore: z.number().min(0).max(1),
-  estimatedCalories: z.number().min(0),
-  proteinGrams: z.number().min(0),
-  carbsGrams: z.number().min(0),
-  fatGrams: z.number().min(0),
-  fiberGrams: z.number().min(0),
-  sugarGrams: z.number().min(0),
-  sodiumMg: z.number().min(0),
-  micronutrients: z.array(
-    z.object({
-      name: z.string(),
-      amount: z.number().min(0),
-      unit: z.string()
-    })
-  ),
-  vitamins: z.array(
-    z.object({
-      name: z.string(),
-      amount: z.number().min(0),
-      unit: z.string()
-    })
-  ),
-  assumptions: z.array(z.string()),
-  foodBreakdown: z.array(
-    z.object({
-      label: z.string(),
-      quantityDescription: z.string(),
-      calories: z.number().min(0),
-      proteinGrams: z.number().min(0),
-      carbsGrams: z.number().min(0),
-      fatGrams: z.number().min(0)
-    })
-  ),
-  rawAnalysis: z.unknown()
-});
-
 const updateMealBodySchema = z.object({
   title: z.string().min(1).max(160),
   notes: z.string().max(1000).nullable().optional(),
   eatenAt: z.string().datetime().optional(),
   servingDescription: z.string().max(160).nullable().optional(),
   quantity: z.number().positive().max(1000).optional(),
-  confirmedAnalysis: confirmedAnalysisSchema.optional()
+  sourceAnalysis: nutritionEstimateSchema.optional(),
+  nutritionOverrides: nutritionOverridesSchema.optional()
 });
 
 const mealUploadFields = [
@@ -398,7 +585,8 @@ nutritionRoutes.patch("/meals/:mealId", async (req: AuthenticatedRequest, res) =
     return res.status(404).json({ error: "Meal was not found" });
   }
 
-  const analysis = parsed.data.confirmedAnalysis;
+  const sourceAnalysis =
+    parsed.data.sourceAnalysis ?? getMealSourceAnalysis(existingMeal);
   const meal = await prisma.mealEntry.update({
     where: {
       id: existingMeal.id
@@ -409,25 +597,8 @@ nutritionRoutes.patch("/meals/:mealId", async (req: AuthenticatedRequest, res) =
       eatenAt: parsed.data.eatenAt ? new Date(parsed.data.eatenAt) : existingMeal.eatenAt,
       servingDescription: parsed.data.servingDescription?.trim() || null,
       quantity: parsed.data.quantity ?? null,
-      ...(analysis
-        ? {
-            analysisStatus: analysis.status,
-            analysisSummary: analysis.summary,
-            confidenceScore: analysis.confidenceScore,
-            estimatedCalories: analysis.estimatedCalories,
-            proteinGrams: analysis.proteinGrams,
-            carbsGrams: analysis.carbsGrams,
-            fatGrams: analysis.fatGrams,
-            fiberGrams: analysis.fiberGrams,
-            sugarGrams: analysis.sugarGrams,
-            sodiumMg: analysis.sodiumMg,
-            micronutrients: analysis.micronutrients as Prisma.InputJsonValue,
-            vitamins: analysis.vitamins as Prisma.InputJsonValue,
-            assumptions: analysis.assumptions as Prisma.InputJsonValue,
-            foodBreakdown: analysis.foodBreakdown as Prisma.InputJsonValue,
-            rawAnalysis: analysis.rawAnalysis as Prisma.InputJsonValue,
-            aiModel: analysis.model
-          }
+      ...(sourceAnalysis
+        ? getAnalysisUpdateData(sourceAnalysis, parsed.data.nutritionOverrides)
         : {})
     },
     include: mealInclude
@@ -658,6 +829,24 @@ nutritionRoutes.post(
       return res.status(error.status).json({ error: error.message });
     }
 
+    const parsedSourceAnalysis = parseJsonField(
+      req.body.sourceAnalysis,
+      nutritionEstimateSchema,
+      "Source analysis"
+    );
+    if (!parsedSourceAnalysis.ok) {
+      return res.status(parsedSourceAnalysis.status).json({ error: parsedSourceAnalysis.error });
+    }
+
+    const parsedNutritionOverrides = parseJsonField(
+      req.body.nutritionOverrides,
+      nutritionOverridesSchema,
+      "Nutrition overrides"
+    );
+    if (!parsedNutritionOverrides.ok) {
+      return res.status(parsedNutritionOverrides.status).json({ error: parsedNutritionOverrides.error });
+    }
+
     const meal = await prisma.mealEntry.create({
       data: {
         accountId: context.auth.accountId,
@@ -672,40 +861,9 @@ nutritionRoutes.post(
       }
     });
 
-    let analysis;
-    let reusableAnalysis;
-    if (req.body.confirmedAnalysis) {
-      let parsedAnalysisJson: unknown;
-      try {
-        parsedAnalysisJson = JSON.parse(String(req.body.confirmedAnalysis));
-      } catch {
-        return res.status(400).json({ error: "Confirmed analysis payload is not valid JSON" });
-      }
-
-      const confirmedAnalysis = confirmedAnalysisSchema.safeParse(parsedAnalysisJson);
-      if (!confirmedAnalysis.success) {
-        return res.status(400).json({ error: confirmedAnalysis.error.flatten() });
-      }
-
-      analysis = confirmedAnalysis.data;
-
-      if (req.body.reusableAnalysis) {
-        let parsedReusableAnalysisJson: unknown;
-        try {
-          parsedReusableAnalysisJson = JSON.parse(String(req.body.reusableAnalysis));
-        } catch {
-          return res.status(400).json({ error: "Reusable analysis payload is not valid JSON" });
-        }
-
-        const parsedReusableAnalysis = confirmedAnalysisSchema.safeParse(parsedReusableAnalysisJson);
-        if (!parsedReusableAnalysis.success) {
-          return res.status(400).json({ error: parsedReusableAnalysis.error.flatten() });
-        }
-
-        reusableAnalysis = parsedReusableAnalysis.data;
-      }
-    } else {
-      analysis = await nutritionAnalysisService.analyzeMeal({
+    const sourceAnalysis =
+      parsedSourceAnalysis.data ??
+      (await nutritionAnalysisService.analyzeMeal({
         title: parsed.data.title.trim(),
         notes: parsed.data.notes?.trim() || undefined,
         eatenAtISO: meal.eatenAt.toISOString(),
@@ -732,8 +890,16 @@ nutritionRoutes.post(
           mimeType: file.mimetype,
           kind
         }))
-      });
-    }
+      }));
+    const nutritionOverrides = parsedNutritionOverrides.data;
+    const finalAnalysis = applyNutritionOverrides(
+      sourceAnalysis,
+      nutritionOverrides
+    );
+    const analysisUpdateData = getAnalysisUpdateData(
+      sourceAnalysis,
+      nutritionOverrides
+    );
 
     const imageRecords = await Promise.all(
       context.uploadedImages.map(async ({ file, kind }) =>
@@ -753,22 +919,21 @@ nutritionRoutes.post(
 
     let createdFoodId: string | null = null;
     if (parsed.data.saveAsReusableFood) {
-      const savedAnalysis = reusableAnalysis ?? analysis;
       const createdFood = await prisma.savedFood.create({
         data: {
           accountId: context.auth.accountId,
           name: parsed.data.title.trim(),
           servingDescription: parsed.data.servingDescription?.trim() || "1 serving",
           servingWeightGrams: parsed.data.weightGrams ?? null,
-          calories: savedAnalysis.estimatedCalories,
-          proteinGrams: savedAnalysis.proteinGrams,
-          carbsGrams: savedAnalysis.carbsGrams,
-          fatGrams: savedAnalysis.fatGrams,
-          fiberGrams: savedAnalysis.fiberGrams,
-          sugarGrams: savedAnalysis.sugarGrams,
-          sodiumMg: savedAnalysis.sodiumMg,
-          micronutrients: savedAnalysis.micronutrients as Prisma.InputJsonValue,
-          notes: savedAnalysis.summary
+          calories: finalAnalysis.estimatedCalories,
+          proteinGrams: finalAnalysis.proteinGrams,
+          carbsGrams: finalAnalysis.carbsGrams,
+          fatGrams: finalAnalysis.fatGrams,
+          fiberGrams: finalAnalysis.fiberGrams,
+          sugarGrams: finalAnalysis.sugarGrams,
+          sodiumMg: finalAnalysis.sodiumMg,
+          micronutrients: finalAnalysis.micronutrients as unknown as Prisma.InputJsonValue,
+          notes: finalAnalysis.summary
         }
       });
       createdFoodId = createdFood.id;
@@ -777,22 +942,7 @@ nutritionRoutes.post(
     const finalMeal = await prisma.mealEntry.update({
       where: { id: meal.id },
       data: {
-        analysisStatus: analysis.status,
-        analysisSummary: analysis.summary,
-        confidenceScore: analysis.confidenceScore,
-        estimatedCalories: analysis.estimatedCalories,
-        proteinGrams: analysis.proteinGrams,
-        carbsGrams: analysis.carbsGrams,
-        fatGrams: analysis.fatGrams,
-        fiberGrams: analysis.fiberGrams,
-        sugarGrams: analysis.sugarGrams,
-        sodiumMg: analysis.sodiumMg,
-        micronutrients: analysis.micronutrients as Prisma.InputJsonValue,
-        vitamins: analysis.vitamins as Prisma.InputJsonValue,
-        assumptions: analysis.assumptions as Prisma.InputJsonValue,
-        foodBreakdown: analysis.foodBreakdown as Prisma.InputJsonValue,
-        rawAnalysis: analysis.rawAnalysis as Prisma.InputJsonValue,
-        aiModel: analysis.model,
+        ...analysisUpdateData,
         images: {
           create: imageRecords
         }

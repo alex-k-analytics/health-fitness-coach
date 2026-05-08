@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/api";
 import { useShellStore } from "@/stores/shellStore";
 import type { Meal, NutritionEstimate, SavedFood } from "@/types";
-import { getServingCount, scaleNutritionEstimate } from "@/lib/mealUtils";
 
 export function useMealsQuery(limit = 24) {
   return useQuery({
@@ -19,7 +18,6 @@ export function useSavedFoodsQuery() {
 }
 
 export function useMealEstimateMutation() {
-  const queryClient = useQueryClient();
   const setGlobalNotice = useShellStore.getState().setGlobalNotice;
   const setGlobalError = useShellStore.getState().setGlobalError;
 
@@ -48,10 +46,10 @@ export function useCreateMealMutation() {
   const setGlobalError = useShellStore.getState().setGlobalError;
 
   return useMutation({
-    mutationFn: (data: { formData: FormData; confirmedAnalysis: NutritionEstimate; reusableAnalysis: NutritionEstimate }) =>
+    mutationFn: (formData: FormData) =>
       apiFetch<{ meal: Meal; savedFoodId: string | null }>("/nutrition/meals", {
         method: "POST",
-        body: data.formData
+        body: formData
       }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["meals"] });

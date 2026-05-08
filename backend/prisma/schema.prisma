@@ -119,6 +119,8 @@ model MealEntry {
   assumptions        Json?
   foodBreakdown      Json?
   rawAnalysis        Json?
+  sourceAnalysis     Json?
+  nutritionOverrides Json?
   aiModel            String?
   account            Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
   savedFood          SavedFood?         @relation(fields: [savedFoodId], references: [id], onDelete: SetNull)

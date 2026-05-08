@@ -8,6 +8,9 @@ import type { Meal } from "@/types";
 
 export function MealCard({ meal }: { meal: Meal }) {
   const plateImage = meal.images?.find((image) => image.kind === "PLATE") ?? null;
+  const isCorrected =
+    meal.nutritionOverrides !== null &&
+    Object.values(meal.nutritionOverrides).some((value) => value !== undefined);
 
   return (
     <Card className="py-0">
@@ -35,6 +38,7 @@ export function MealCard({ meal }: { meal: Meal }) {
             <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
               {meal.servingDescription && <span>{meal.servingDescription}</span>}
               {plateImage && <span>food photo</span>}
+              {isCorrected && <Badge variant="brand">Corrected</Badge>}
               {meal.analysisStatus && meal.analysisStatus !== "COMPLETED" && (
                 <Badge variant="warning">{meal.analysisStatus}</Badge>
               )}

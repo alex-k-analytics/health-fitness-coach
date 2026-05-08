@@ -71,6 +71,15 @@ export interface NutritionEstimate {
   rawAnalysis: unknown;
 }
 
+export interface NutritionOverrides {
+  estimatedCalories?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
+  fiberGrams?: number;
+  sugarGrams?: number;
+}
+
 export interface NutritionSummary {
   today: {
     mealCount: number;
@@ -219,6 +228,8 @@ export interface Meal {
       }>
     | null;
   aiModel: string | null;
+  sourceAnalysis: NutritionEstimate | null;
+  nutritionOverrides: NutritionOverrides | null;
   savedFood:
     | {
         id: string;
