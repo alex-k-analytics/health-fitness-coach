@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
@@ -59,27 +60,78 @@ export function DashboardHeader() {
           })}
         </nav>
         <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="icon-sm" onClick={toggleColorMode} aria-label={`Theme: ${colorMode}`}>
-            {modeIcons[colorMode]}
-          </Button>
-          <MealComposer trigger={<Button variant="ghost" size="icon-sm" aria-label="Log food">
-            <UtensilsCrossed className="h-4 w-4" />
-          </Button>} />
-          <WorkoutSessionModal defaultIntent="quick" trigger={<Button variant="ghost" size="icon-sm" aria-label="Log workout">
-            <Dumbbell className="h-4 w-4" />
-          </Button>} />
-          <WeightModal trigger={<Button variant="ghost" size="icon-sm" aria-label="Log weight">
-            <Scale className="h-4 w-4" />
-          </Button>} />
-          <ProfileDrawer>
-            <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label={`Open profile for ${memberName}`}>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/20">
-                {memberInitials}
-              </span>
+          <HeaderTooltip label={`Theme: ${colorMode}`}>
+            <Button variant="ghost" size="icon-sm" onClick={toggleColorMode} aria-label={`Theme: ${colorMode}`}>
+              {modeIcons[colorMode]}
             </Button>
+          </HeaderTooltip>
+          <MealComposer trigger={
+            <HeaderTooltip label="Log food">
+              <Button variant="ghost" size="icon-sm" aria-label="Log food">
+                <UtensilsCrossed className="h-4 w-4" />
+              </Button>
+            </HeaderTooltip>
+          } />
+          <WorkoutSessionModal defaultIntent="quick" trigger={
+            <HeaderTooltip label="Log workout">
+              <Button variant="ghost" size="icon-sm" aria-label="Log workout">
+                <Dumbbell className="h-4 w-4" />
+              </Button>
+            </HeaderTooltip>
+          } />
+          <WeightModal trigger={
+            <HeaderTooltip label="Log weight">
+              <Button variant="ghost" size="icon-sm" aria-label="Log weight">
+                <Scale className="h-4 w-4" />
+              </Button>
+            </HeaderTooltip>
+          } />
+          <ProfileDrawer>
+            <HeaderTooltip label={`Open profile for ${memberName}`} align="end">
+              <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label={`Open profile for ${memberName}`}>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/20">
+                  {memberInitials}
+                </span>
+              </Button>
+            </HeaderTooltip>
           </ProfileDrawer>
         </div>
       </div>
     </header>
   );
 }
+
+type HeaderTooltipProps = React.HTMLAttributes<HTMLElement> & {
+  label: string;
+  align?: "center" | "end";
+  children: React.ReactElement;
+};
+
+const HeaderTooltip = React.forwardRef<HTMLElement, HeaderTooltipProps>(({
+  label,
+  align = "center",
+  children,
+  className,
+  ...props
+}, ref) => {
+  const trigger = React.cloneElement(children, {
+    ...props,
+    ref
+  } as React.HTMLAttributes<HTMLElement> & { ref: React.ForwardedRef<HTMLElement> });
+
+  return (
+    <span className={cn("group relative inline-flex", className)}>
+      {trigger}
+      <span
+        role="tooltip"
+        className={cn(
+          "pointer-events-none absolute top-full z-50 mt-1.5 hidden whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-md group-hover:block group-focus-within:block",
+          align === "end" ? "right-0" : "left-1/2 -translate-x-1/2"
+        )}
+      >
+        {label}
+      </span>
+    </span>
+  );
+});
+HeaderTooltip.displayName = "HeaderTooltip";

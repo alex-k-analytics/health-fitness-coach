@@ -27,42 +27,16 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - `frontend/UI_DOCS.md` now reflects the five-route navigation and responsive header/bottom-nav behavior.
 - Workout modal copy now derives from the selected flow, so completed-workout logging no longer appears as a planned/live workout.
 - Meal composer now defaults new entries to the current local date/time and clarifies that the user must describe the meal, choose a saved food, or attach a photo before estimating.
+- Header icon-only actions now expose hover/focus tooltips while keeping accessible labels for assistive technology.
 - TypeScript checks pass for both frontend and backend.
 
 ## Medium Findings
 
-### 1. Header Icon Actions Are Hard To Interpret Visually
-
-Severity: `Medium`
-
-Page/flow: App shell
-
-Evidence:
-
-- `docs/ux-audit-screenshots/mobile-dashboard-empty.png`
-- `docs/ux-audit-screenshots/desktop-dashboard-empty.png`
-
-Actual:
-
-- Header actions are icon-only: theme, meal, workout, weight, and profile.
-- They have accessible labels, but no visible labels or tooltips for sighted mouse users.
-
-Expected:
-
-- Icon-only tools should expose tooltips on hover/focus, especially for less obvious icons like scale and theme.
-
-Impact:
-
-- The header is compact, but discoverability is weak for new users.
-
-Recommended fix:
-
-- Add tooltips for header icon buttons.
-- Consider showing short text labels on desktop for the highest-frequency actions.
+No open medium findings after the latest pass.
 
 ## Low Findings
 
-### 2. Devtools Overlay Interferes With Local UX Review
+### 1. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
@@ -98,6 +72,7 @@ Recommended fix:
 ## Verification Notes
 
 - `npm run typecheck` passed in `frontend/`.
+- `npm run ux:audit` passed in `frontend/` after adding header action tooltips and a desktop header tooltip regression check.
 - `npm run typecheck` passed in `backend/`.
 - `npm run prisma:push` synced the local database schema, but Prisma Client generation hit a Windows file-lock on `query_engine-windows.dll.node`.
 - `backend/src/seed.ts` now resets the seeded account password to `password123` on rerun so future audits use deterministic credentials.

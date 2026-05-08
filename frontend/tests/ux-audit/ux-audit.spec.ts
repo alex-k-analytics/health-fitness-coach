@@ -60,6 +60,41 @@ async function screenshot(page: Page, name: string) {
   return `docs/ux-audit-screenshots/${file}`;
 }
 
+async function verifyHeaderActionTooltips(page: Page, viewportName: string, findings: Finding[]) {
+  if (viewportName !== "desktop") return;
+
+  const checks = [
+    { buttonName: /theme:/i, tooltipName: /theme:/i },
+    { buttonName: /log food/i, tooltipName: /log food/i },
+    { buttonName: /log workout/i, tooltipName: /log workout/i },
+    { buttonName: /log weight/i, tooltipName: /log weight/i },
+    { buttonName: /open profile/i, tooltipName: /open profile/i }
+  ];
+  const header = page.getByRole("banner");
+
+  for (const { buttonName, tooltipName } of checks) {
+    await header.getByRole("button", { name: buttonName }).first().hover();
+    await page.waitForTimeout(450);
+
+    const tooltipVisible = await page
+      .getByRole("tooltip", { name: tooltipName })
+      .isVisible()
+      .catch(() => false);
+
+    if (!tooltipVisible) {
+      const evidence = await screenshot(page, `${viewportName} missing header action tooltip`);
+      findings.push({
+        severity: "Medium",
+        page: "app shell",
+        title: "Header icon action is missing a visible tooltip",
+        actual: `Hovering the ${buttonName} header action did not expose a matching tooltip.`,
+        expected: "Icon-only header actions should show hover/focus tooltips for sighted users.",
+        evidence
+      });
+    }
+  }
+}
+
 function truncateEventText(text: string) {
   return text.length > 2000 ? `${text.slice(0, 2000)}...` : text;
 }
@@ -176,6 +211,7 @@ async function runViewportAudit({
 
   await page.waitForLoadState("networkidle");
   await screenshot(page, `${viewportName} dashboard empty`);
+  await verifyHeaderActionTooltips(page, viewportName, findings);
 
   const pageChecks = [
     ["/meals", "meals"],
