@@ -23,6 +23,7 @@ import {
 } from "@/features/planning/hooks";
 import {
   formatDate,
+  formatDateTime,
   formatMacroValue,
   formatWeight,
   getProgressPercent,
@@ -56,6 +57,7 @@ import type {
 } from "@/types";
 
 type PlanningStatus = MealPlanRunSummary["status"];
+const DASHBOARD_TODAY_MEAL_LIMIT = 5;
 
 export function DashboardPage() {
   const { data: nutritionSummary, isLoading: loadingNutrition } =
@@ -63,7 +65,7 @@ export function DashboardPage() {
   const { data: profile } = useProfileQuery();
   const { data: healthMetrics, isLoading: loadingMetrics } =
     useHealthMetricsQuery(12);
-  const { data: meals, isLoading: loadingMeals } = useMealsQuery(24);
+  const { data: meals, isLoading: loadingMeals } = useMealsQuery(60);
   const { data: sessions, isLoading: loadingSessions } =
     useWorkoutSessionsQuery(8);
   const { data: planningRuns, isLoading: loadingPlanningRuns } =
@@ -170,7 +172,11 @@ export function DashboardPage() {
     groceryRemaining
   });
 
-  const displayedMeals = mealHistory.slice(0, 3);
+  const todayMeals = mealHistory.filter((meal) => isTodayMeal(meal));
+  const displayedMeals = todayMeals.slice(0, DASHBOARD_TODAY_MEAL_LIMIT);
+  const todayMealCount = todaySummary?.mealCount ?? todayMeals.length;
+  const hiddenTodayMealCount = Math.max(0, todayMealCount - displayedMeals.length);
+  const latestMeal = mealHistory[0] ?? null;
   const workoutSessions = sessions?.sessions ?? [];
   const displayedWorkouts = workoutSessions.slice(0, 3);
   const todayWorkoutBurn = todaySummary?.caloriesBurned ?? 0;
@@ -379,41 +385,41 @@ export function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ActivityListCard
-          title="Recent Meals"
+          title="Today's Meals"
           description={
             loadingMeals
               ? "Loading..."
-              : `${todaySummary?.mealCount ?? 0} today`
+              : formatTodayMealsSummary(todaySummary, todayMealCount)
           }
           action={
-            <MealComposer
-              trigger={
-                <Button size="sm" variant="outline">
-                  <Plus className="h-4 w-4" />
-                  Log meal
-                </Button>
-              }
-            />
+            <div className="flex flex-wrap gap-2">
+              <MealComposer
+                trigger={
+                  <Button size="sm" variant="outline">
+                    <Plus className="h-4 w-4" />
+                    Log meal
+                  </Button>
+                }
+              />
+              <Button size="sm" variant="ghost" asChild>
+                <Link to="/meals">
+                  View log
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           }
         >
           {loadingMeals ? (
             <ActivitySkeleton />
           ) : displayedMeals.length === 0 ? (
-            <EmptyState
-              icon={UtensilsCrossed}
-              message="No meals logged yet."
-              action={
-                <MealComposer
-                  trigger={<Button size="sm">Log your first meal</Button>}
-                />
-              }
-            />
+            <TodayMealsEmptyState latestMeal={latestMeal} />
           ) : (
-            <div className="space-y-2">
-              {displayedMeals.map((meal: Meal) => (
-                <MealCard key={meal.id} meal={meal} />
-              ))}
-            </div>
+            <TodayMealsPreview
+              meals={displayedMeals}
+              hiddenCount={hiddenTodayMealCount}
+              totalCount={todayMealCount}
+            />
           )}
         </ActivityListCard>
 
@@ -907,6 +913,97 @@ function MacroMiniCard({
       </p>
     </div>
   );
+}
+
+function TodayMealsPreview({
+  meals,
+  hiddenCount,
+  totalCount
+}: {
+  meals: Meal[];
+  hiddenCount: number;
+  totalCount: number;
+}) {
+  return (
+    <div className="space-y-2">
+      {meals.map((meal) => (
+        <MealCard key={meal.id} meal={meal} />
+      ))}
+      {hiddenCount > 0 ? (
+        <Link
+          to="/meals"
+          className="surface-muted interactive-surface flex cursor-pointer items-center justify-between gap-3 p-3 text-sm"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-sm font-semibold text-primary">
+              +{hiddenCount}
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">
+                {hiddenCount} more meal{hiddenCount !== 1 ? "s" : ""} today
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {totalCount} total meal{totalCount !== 1 ? "s" : ""} logged today
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function TodayMealsEmptyState({ latestMeal }: { latestMeal: Meal | null }) {
+  return (
+    <div className="empty-panel min-h-40">
+      <div className="max-w-sm">
+        <UtensilsCrossed className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+        <p className="text-sm font-semibold text-foreground">
+          No meals logged today.
+        </p>
+        {latestMeal ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Last meal logged {formatDateTime(latestMeal.eatenAt)}.
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start today&apos;s log when you eat.
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <MealComposer
+            trigger={
+              <Button size="sm">
+                <Plus className="h-4 w-4" />
+                Log meal
+              </Button>
+            }
+          />
+          {latestMeal ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/meals">
+                Meal history
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatTodayMealsSummary(
+  today: NutritionSummary["today"] | undefined,
+  mealCount: number
+) {
+  if (mealCount === 0) return "No meals logged today";
+  return `${mealCount} today - ${Math.round(today?.calories ?? 0)} cal - ${formatMacroValue(today?.proteinGrams)} protein`;
+}
+
+function isTodayMeal(meal: Meal) {
+  return getLocalDateKey(new Date(meal.eatenAt)) === getLocalDateKey(new Date());
 }
 
 function ActivityListCard({

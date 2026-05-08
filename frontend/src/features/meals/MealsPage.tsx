@@ -7,12 +7,15 @@ import { useMealsQuery } from "@/features/meals/hooks";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { MealCard } from "@/components/shared/MealCard";
 import { formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
-import { Flame, Plus, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, Flame, History, Plus, UtensilsCrossed } from "lucide-react";
 import type { Meal } from "@/types";
 
 export function MealsPage() {
-  const { data: meals, isLoading } = useMealsQuery(24);
+  const { data: meals, isLoading } = useMealsQuery(60);
   const { data: nutritionSummary, isLoading: loadingNutrition } = useNutritionSummaryQuery();
+  const mealHistory = meals?.meals ?? [];
+  const { todayMeals, historicalMeals } = splitMealsByToday(mealHistory);
+  const historicalMealGroups = groupMealsByDate(historicalMeals);
   const today = nutritionSummary?.today;
   const goals = nutritionSummary?.goals;
   const calorieGoal = goals?.adjustedCalorieGoal ?? goals?.calorieGoal ?? null;
@@ -43,7 +46,9 @@ export function MealsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Meals</h1>
-          <p className="page-description">Review recent meals, macro progress, and AI nutrition estimates.</p>
+          <p className="page-description">
+            Track today&apos;s food log separately from your longer meal history.
+          </p>
         </div>
         <MealComposer
           trigger={
@@ -133,22 +138,101 @@ export function MealsPage() {
         ) : (
           <>
             <CardHeader>
-              <CardTitle>Food Log</CardTitle>
-              <CardDescription>
-                Recent meals with saved estimates and corrections.
-              </CardDescription>
+              <div className="flex items-center gap-2">
+                <span className="grid size-8 place-items-center rounded-md bg-primary/10 text-primary">
+                  <CalendarDays className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle>Today&apos;s Meals</CardTitle>
+                  <CardDescription>
+                    {todayMeals.length} meal{todayMeals.length !== 1 ? "s" : ""} logged today.
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {meals?.meals?.length === 0 ? (
-                <div className="text-center py-10">
-                  <UtensilsCrossed className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-muted-foreground">No meals logged yet.</p>
-                  <MealComposer trigger={<Button className="mt-4">Log your first meal</Button>} />
+              {todayMeals.length === 0 ? (
+                <div className="empty-panel min-h-44">
+                  <div>
+                    <UtensilsCrossed className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      No meals logged for today yet.
+                    </p>
+                    <MealComposer trigger={<Button className="mt-4">Log today&apos;s first meal</Button>} />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(meals?.meals ?? []).map((meal: Meal) => (
+                  {todayMeals.map((meal) => (
                     <MealCard key={meal.id} meal={meal} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </>
+        )}
+      </Card>
+
+      <Card>
+        {isLoading ? (
+          <CardContent className="pt-5 space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <Skeleton className="h-4 w-28 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <Skeleton className="h-8 w-20" />
+            </div>
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </CardContent>
+        ) : (
+          <>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <span className="grid size-8 place-items-center rounded-md bg-muted text-muted-foreground">
+                  <History className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle>Meal History</CardTitle>
+                  <CardDescription>
+                    Older meals with saved estimates and corrections.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {mealHistory.length === 0 ? (
+                <div className="empty-panel min-h-44">
+                  <div>
+                    <UtensilsCrossed className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">No meals logged yet.</p>
+                    <MealComposer trigger={<Button className="mt-4">Log your first meal</Button>} />
+                  </div>
+                </div>
+              ) : historicalMealGroups.length === 0 ? (
+                <div className="surface-muted p-4 text-sm text-muted-foreground">
+                  Older meals will appear here after today.
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {historicalMealGroups.map((group) => (
+                    <section key={group.dateKey} className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-sm font-semibold text-foreground">
+                          {formatHistoryDate(group.dateKey)}
+                        </h2>
+                        <span className="text-xs text-muted-foreground">
+                          {group.meals.length} meal{group.meals.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.meals.map((meal) => (
+                          <MealCard key={meal.id} meal={meal} />
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               )}
@@ -158,6 +242,50 @@ export function MealsPage() {
       </Card>
     </div>
   );
+}
+
+function splitMealsByToday(meals: Meal[]) {
+  const todayKey = getLocalDateKey(new Date());
+  return meals.reduce(
+    (groups, meal) => {
+      if (getLocalDateKey(new Date(meal.eatenAt)) === todayKey) {
+        groups.todayMeals.push(meal);
+      } else {
+        groups.historicalMeals.push(meal);
+      }
+      return groups;
+    },
+    { todayMeals: [] as Meal[], historicalMeals: [] as Meal[] }
+  );
+}
+
+function groupMealsByDate(meals: Meal[]) {
+  const groups = new Map<string, Meal[]>();
+  meals.forEach((meal) => {
+    const dateKey = getLocalDateKey(new Date(meal.eatenAt));
+    groups.set(dateKey, [...(groups.get(dateKey) ?? []), meal]);
+  });
+
+  return Array.from(groups.entries()).map(([dateKey, groupedMeals]) => ({
+    dateKey,
+    meals: groupedMeals
+  }));
+}
+
+function getLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatHistoryDate(dateKey: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(`${dateKey}T12:00:00`));
 }
 
 function MacroGoalCard({
