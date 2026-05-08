@@ -6,7 +6,7 @@ Date: May 8, 2026
 
 This audit used the local seeded account flow from `docs/ux-audit-plan.md` across mobile `375x812`, tablet `768x1024`, and desktop `1440x900`.
 
-Frontend and backend typechecks passed. The browser audit found a conditional desktop navigation overlap at shorter viewport heights and several UX clarity issues around planning setup, empty states, and modal copy.
+Frontend and backend typechecks passed. The browser audit found several UX clarity issues around planning setup, empty states, and modal copy.
 
 Evidence lives in:
 
@@ -22,44 +22,13 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Mobile layout is mostly readable, with clear cards, consistent labels, and usable full-screen dialogs.
 - Planning gives a clear blocked-state warning in the New Plan tab when ATK credentials are missing.
 - Dialog, drawer, button, and badge primitives now forward refs cleanly; the prior Radix/Vaul ref warning no longer appears in the UX audit.
+- Desktop primary navigation now lives in the header at `lg` and above, while mobile/tablet keep the fixed bottom nav; short desktop viewport checks no longer show nav/action overlap.
+- `frontend/UI_DOCS.md` now reflects the five-route navigation and responsive header/bottom-nav behavior.
 - TypeScript checks pass for both frontend and backend.
 
 ## High Findings
 
-### 1. Bottom Navigation Can Overlap Dashboard Actions On Short Desktop Viewports
-
-Severity: `Medium`
-
-Page/flow: Dashboard on shorter desktop browser windows
-
-Evidence:
-
-- `docs/ux-audit-screenshots/desktop-dashboard-empty.png`
-- `docs/ux-audit-screenshots/desktop-dashboard-viewport-only.png`
-
-Actual:
-
-- A targeted viewport check found no interactive overlap at `1440x900`.
-- The same check found overlap with the `Log food` and `View food log` actions at `1440x768` and `1280x720`.
-- The original full-page screenshot made this look more severe than it is because fixed-position elements appear in the captured viewport area.
-
-Expected:
-
-- Navigation should not cover active content at common desktop heights.
-- Desktop layouts should either reserve enough viewport space for fixed bottom navigation or use a desktop navigation pattern that does not float over content.
-
-Impact:
-
-- Users with shorter desktop windows, browser toolbars, or zoomed pages may see the bottom nav cover dashboard actions.
-- Users with taller windows may not experience this issue.
-
-Recommended fix:
-
-- Keep bottom tabs for mobile.
-- At larger breakpoints, consider moving primary navigation into the header or a left rail.
-- If bottom nav remains on desktop, reserve enough viewport space or adjust dashboard section placement so first-screen actions do not sit under the fixed nav at `1440x768` and `1280x720`.
-
-### 2. Planning Setup State Says "Ready" When Setup Is Required
+### 1. Planning Setup State Says "Ready" When Setup Is Required
 
 Severity: `High`
 
@@ -94,7 +63,7 @@ Recommended fix:
 
 ## Medium Findings
 
-### 3. Workout Modal Copy Is Internally Inconsistent
+### 2. Workout Modal Copy Is Internally Inconsistent
 
 Severity: `Medium`
 
@@ -124,7 +93,7 @@ Recommended fix:
 - Make title/subtitle derive from `defaultIntent` or selected workout flow.
 - Use clearer labels: `Start live workout` and `Log completed workout`.
 
-### 4. Meal Composer Starts With a Blank Date/Time
+### 3. Meal Composer Starts With a Blank Date/Time
 
 Severity: `Medium`
 
@@ -154,7 +123,7 @@ Recommended fix:
 - Default Date & Time to now for new entries.
 - Add required markers or inline helper text near the meal description/photo/saved-food options.
 
-### 5. Header Icon Actions Are Hard To Interpret Visually
+### 4. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -185,7 +154,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 6. Devtools Overlay Interferes With Local UX Review
+### 5. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
@@ -211,37 +180,9 @@ Recommended fix:
 
 - Gate router devtools behind an explicit env flag such as `VITE_ENABLE_ROUTER_DEVTOOLS=true`.
 
-### 7. UI Documentation Is Out Of Date
-
-Severity: `Low`
-
-Page/flow: Product documentation
-
-Evidence:
-
-- `frontend/UI_DOCS.md` still describes a four-tab app.
-- The current route tree and bottom nav expose five tabs, including Planning.
-
-Actual:
-
-- Documentation no longer matches the visible navigation.
-
-Expected:
-
-- UX docs should reflect Dashboard, Meals, Planning, Workouts, and Settings.
-
-Impact:
-
-- This increases audit and implementation friction.
-
-Recommended fix:
-
-- Update `frontend/UI_DOCS.md` after navigation changes.
-
 ## Suggested Additions
 
 - Add a first-run setup checklist on Dashboard: profile goals, recipe source, first meal, first workout, first weight.
-- Add a dedicated desktop navigation pattern instead of scaling the mobile bottom nav up.
 - Add a lightweight "Today" quick-log surface for the most common meal/workout actions.
 - Add clearer planning onboarding: what ATK is, why credentials are required, and what happens without OpenAI planning.
 - Add success confirmations that include the next best action, such as "Meal saved. Log another?" or "Workout saved. View dashboard?"

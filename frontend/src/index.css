@@ -269,6 +269,12 @@
     }
   }
 
+  @media (min-width: 1024px) {
+    .page-shell {
+      padding-bottom: 2rem;
+    }
+  }
+
   .page-header {
     display: flex;
     align-items: flex-end;

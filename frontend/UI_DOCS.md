@@ -76,9 +76,9 @@ frontend/src/
 
 | Component | Purpose |
 |---|---|
-| `ShellLayout` | Top-level authenticated layout: DashboardHeader + scrollable main + fixed BottomNav |
-| `DashboardHeader` | Sticky header with "Health Coach" logo (links to `/`), weight logging button, profile avatar (opens ProfileDrawer) |
-| `BottomNav` | Fixed bottom tab bar: Home, Meals, Workouts, Settings. Active tab highlighted in primary color. Backdrop blur. |
+| `ShellLayout` | Top-level authenticated layout: DashboardHeader + scrollable main + mobile/tablet BottomNav |
+| `DashboardHeader` | Sticky header with "Health Coach" logo (links to `/`), desktop route navigation, quick log actions, theme toggle, and profile avatar (opens ProfileDrawer) |
+| `BottomNav` | Fixed mobile/tablet bottom tab bar: Home, Meals, Planning, Workouts, Settings. Hidden at `lg` and above. Active tab highlighted in primary color. Backdrop blur. |
 | `ProfileDrawer` | Right-side drawer (vaul) with user avatar, ProfileForm, Sign Out + Close buttons |
 | `WeightModal` | Dialog to log weight in lbs (converts to kg for API) |
 | `GlobalBanner` | Top-of-page alert for global success (green) / error (red) messages. Click to dismiss. |
@@ -123,12 +123,13 @@ Button, Badge, Card (+Header/Title/Description/Content/Footer/Action), Checkbox,
                    /          \
               /login         _auth.tsx
                               (ShellLayout)
-                              /    |     |     \
-                           /     /meals  /workouts  /settings
-                          Dashboard   Meals      Workouts   Settings
+                              /    |        |        |        \
+                           /     /meals  /planning  /workouts  /settings
+                          Dashboard   Meals   Planning  Workouts   Settings
 ```
 
-- **BottomNav** provides 4-tab navigation (mobile-first, no sidebar/header nav)
+- **DashboardHeader** provides desktop primary navigation at `lg` and above.
+- **BottomNav** provides 5-tab mobile/tablet navigation below `lg`.
 - **DashboardHeader** logo links back to `/`
 - **ProfileDrawer** (from header avatar) provides Sign Out -> `/login`
 

@@ -1,16 +1,19 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
 import { useThemeStore } from "@/stores/themeStore";
+import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/mealUtils";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { ProfileDrawer } from "./ProfileDrawer";
 import { WeightModal } from "./WeightModal";
+import { TABS } from "./BottomNav";
 import { Dumbbell, Monitor, Moon, Scale, Sun, UtensilsCrossed } from "lucide-react";
 
 
 export function DashboardHeader() {
+  const { pathname } = useLocation();
   const { session } = useShellStore();
   const { colorMode, toggleColorMode } = useThemeStore();
   const memberName = session?.member?.displayName ?? "User";
@@ -24,7 +27,7 @@ export function DashboardHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/86 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link to="/" className="group inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
           <span className="grid size-8 place-items-center rounded-md bg-brand/15 text-sm font-bold text-brand ring-1 ring-brand/25 transition-colors group-hover:bg-brand/20">
             HC
@@ -34,6 +37,27 @@ export function DashboardHeader() {
             <p className="hidden text-[11px] font-medium text-muted-foreground sm:block">Nutrition, training, planning</p>
           </div>
         </Link>
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
+          {TABS.map(({ path, label, icon: Icon }) => {
+            const isActive = path === "/" ? (pathname === "/" || pathname === "") : pathname === path;
+            return (
+              <Link
+                key={path}
+                to={path}
+                className={cn(
+                  "inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  isActive
+                    ? "bg-primary/10 text-primary dark:bg-primary/15"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="icon-sm" onClick={toggleColorMode} aria-label={`Theme: ${colorMode}`}>
             {modeIcons[colorMode]}

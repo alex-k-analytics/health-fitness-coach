@@ -14,7 +14,7 @@ export function BottomNav() {
   const { pathname } = useLocation();
 
   return (
-    <nav className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50" aria-label="Primary navigation">
+    <nav className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 lg:hidden" aria-label="Primary navigation">
       <div className="mx-auto flex max-w-3xl rounded-lg border border-border/80 bg-card/95 p-1 shadow-lg shadow-black/10 backdrop-blur-xl">
         {TABS.map(({ path, label, icon: Icon }) => {
           const isActive = path === "/" ? (pathname === "/" || pathname === "") : pathname === path;
@@ -39,3 +39,5 @@ export function BottomNav() {
     </nav>
   );
 }
+
+export { TABS };
