@@ -488,14 +488,14 @@ export function MealComposer({
         setOpen(true);
       }}
     >
-      <DialogTrigger asChild>{trigger || <Button>Log Food</Button>}</DialogTrigger>
+      <DialogTrigger asChild>{trigger || <Button>Log meal</Button>}</DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit
-              ? "Edit Food"
+              ? "Edit Meal"
               : step === "input"
-                ? "Log Food"
+                ? "Log Meal"
                 : step === "estimate"
                   ? "Estimating..."
                   : "Review & Save"}
@@ -1037,6 +1037,24 @@ function PhotoPicker({
   const id = useId();
   const libraryInputId = `${id}-library`;
   const cameraInputId = `${id}-camera`;
+  const [previewItems, setPreviewItems] = useState<
+    Array<{ id: string; file: File; url: string }>
+  >([]);
+
+  useEffect(() => {
+    const nextPreviewItems = files.map((file, index) => ({
+      id: `${file.name}-${file.lastModified}-${file.size}-${index}`,
+      file,
+      url: URL.createObjectURL(file)
+    }));
+
+    setPreviewItems(nextPreviewItems);
+
+    return () => {
+      nextPreviewItems.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [files]);
+
   const addFiles = (incoming: FileList | null) => {
     if (!incoming?.length) return;
     onFiles([...files, ...Array.from(incoming)]);
@@ -1090,23 +1108,31 @@ function PhotoPicker({
           </Label>
         </div>
       </div>
-      {files.length > 0 && (
-        <div className="mt-3 grid gap-1">
-          {files.map((file, index) => (
-            <div
-              key={`${file.name}-${file.lastModified}`}
-              className="flex items-center justify-between gap-2 rounded bg-muted/50 px-2 py-1 text-xs"
-            >
-              <span className="truncate">{file.name}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-1.5"
-                onClick={() => removeFile(index)}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+      {previewItems.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {previewItems.map(({ id: previewId, file, url }, index) => (
+            <div key={previewId} className="surface-muted overflow-hidden">
+              <div className="aspect-square bg-muted">
+                <img
+                  src={url}
+                  alt={`Selected ${label.toLowerCase()}: ${file.name}`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="flex min-w-0 items-center justify-between gap-1.5 px-2 py-1.5">
+                <span className="truncate text-xs" title={file.name}>
+                  {file.name}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Remove ${file.name} from ${label.toLowerCase()}`}
+                  onClick={() => removeFile(index)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

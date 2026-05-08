@@ -61,7 +61,7 @@ export function MealsPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <CardContent className="grid gap-5 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5">
+        <CardContent className="p-4 sm:p-5">
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
               <span className="grid size-8 place-items-center rounded-md bg-primary/10 text-primary">
@@ -98,14 +98,6 @@ export function MealsPage() {
               </>
             )}
           </div>
-          <MealComposer
-            trigger={
-              <Button className="w-full sm:w-auto">
-                <Plus className="h-4 w-4" />
-                Log food
-              </Button>
-            }
-          />
         </CardContent>
       </Card>
 
