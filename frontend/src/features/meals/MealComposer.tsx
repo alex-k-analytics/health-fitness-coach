@@ -76,12 +76,17 @@ const EMPTY_OVERRIDE_DRAFTS: NutritionOverrideDrafts = {
   sugarGrams: ""
 };
 
+function getDefaultMealDateTime() {
+  return toDateTimeLocalInput(new Date().toISOString());
+}
+
 export function MealComposer({
   trigger,
   initialMeal,
   initialFood,
   onClose
 }: MealComposerProps) {
+  const formId = useId();
   const initialSourceAnalysis = useMemo(
     () => sourceAnalysisFromMeal(initialMeal),
     [initialMeal]
@@ -103,7 +108,7 @@ export function MealComposer({
   const [title, setTitle] = useState(initialMeal?.title ?? initialFood?.name ?? "");
   const [notes, setNotes] = useState(initialMeal?.notes ?? "");
   const [eatenAt, setEatenAt] = useState(
-    initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : ""
+    initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : getDefaultMealDateTime()
   );
   const [servingDescription, setServingDescription] = useState(
     initialMeal?.servingDescription ?? initialFood?.servingDescription ?? ""
@@ -282,7 +287,7 @@ export function MealComposer({
     const nextQuantity = valueToInput(initialMeal?.quantity ?? 1);
     setTitle(initialMeal?.title ?? initialFood?.name ?? "");
     setNotes(initialMeal?.notes ?? "");
-    setEatenAt(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : "");
+    setEatenAt(initialMeal ? toDateTimeLocalInput(initialMeal.eatenAt) : getDefaultMealDateTime());
     setServingDescription(
       initialMeal?.servingDescription ?? initialFood?.servingDescription ?? ""
     );
@@ -640,8 +645,9 @@ export function MealComposer({
             )}
 
             <div className="grid gap-2">
-              <Label>What did you eat?</Label>
+              <Label htmlFor={`${formId}-meal-title`}>What did you eat?</Label>
               <Input
+                id={`${formId}-meal-title`}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder={
@@ -650,20 +656,32 @@ export function MealComposer({
                     : "e.g. Grilled chicken salad"
                 }
               />
+              <p className="text-xs text-muted-foreground">
+                Add a description, choose a saved food, or attach a photo to estimate nutrition.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Date & Time</Label>
+                <Label htmlFor={`${formId}-eaten-at`}>Date & Time</Label>
                 <Input
+                  id={`${formId}-eaten-at`}
                   type="datetime-local"
                   value={eatenAt}
                   onChange={(event) => setEatenAt(event.target.value)}
                 />
+                {!isEdit ? (
+                  <p className="text-xs text-muted-foreground">Defaults to now.</p>
+                ) : null}
               </div>
               <div className="grid gap-2">
-                <Label>Servings</Label>
-                <NumericInput mode="decimal" value={quantity} onValueChange={setQuantity} />
+                <Label htmlFor={`${formId}-quantity`}>Servings</Label>
+                <NumericInput
+                  id={`${formId}-quantity`}
+                  mode="decimal"
+                  value={quantity}
+                  onValueChange={setQuantity}
+                />
               </div>
             </div>
 
@@ -770,22 +788,32 @@ export function MealComposer({
         {step === "confirm" && displayedSourceAnalysis && displayedFinalNutrition && (
           <div className="grid gap-5">
             <div className="grid gap-2">
-              <Label>What did you eat?</Label>
-              <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+              <Label htmlFor={`${formId}-confirm-title`}>What did you eat?</Label>
+              <Input
+                id={`${formId}-confirm-title`}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Date & Time</Label>
+                <Label htmlFor={`${formId}-confirm-eaten-at`}>Date & Time</Label>
                 <Input
+                  id={`${formId}-confirm-eaten-at`}
                   type="datetime-local"
                   value={eatenAt}
                   onChange={(event) => setEatenAt(event.target.value)}
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Servings</Label>
-                <NumericInput mode="decimal" value={quantity} onValueChange={setQuantity} />
+                <Label htmlFor={`${formId}-confirm-quantity`}>Servings</Label>
+                <NumericInput
+                  id={`${formId}-confirm-quantity`}
+                  mode="decimal"
+                  value={quantity}
+                  onValueChange={setQuantity}
+                />
               </div>
             </div>
 

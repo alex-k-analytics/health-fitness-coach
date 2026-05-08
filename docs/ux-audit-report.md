@@ -26,41 +26,12 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Desktop primary navigation now lives in the header at `lg` and above, while mobile/tablet keep the fixed bottom nav; short desktop viewport checks no longer show nav/action overlap.
 - `frontend/UI_DOCS.md` now reflects the five-route navigation and responsive header/bottom-nav behavior.
 - Workout modal copy now derives from the selected flow, so completed-workout logging no longer appears as a planned/live workout.
+- Meal composer now defaults new entries to the current local date/time and clarifies that the user must describe the meal, choose a saved food, or attach a photo before estimating.
 - TypeScript checks pass for both frontend and backend.
 
 ## Medium Findings
 
-### 1. Meal Composer Starts With a Blank Date/Time
-
-Severity: `Medium`
-
-Page/flow: Meal logging
-
-Evidence:
-
-- `docs/ux-audit-screenshots/mobile-meal-composer-initial.png`
-
-Actual:
-
-- Date & Time is blank on initial meal logging.
-- The primary action is disabled until a meal description, saved food, or photo is provided.
-- The helper text explains the requirement, but the required fields are not visually marked.
-
-Expected:
-
-- New meal entries should default to the current date/time.
-- Required entry paths should be visually obvious before the user reaches the disabled button.
-
-Impact:
-
-- Food logging is a high-frequency flow; defaulting time and clarifying required input would reduce friction.
-
-Recommended fix:
-
-- Default Date & Time to now for new entries.
-- Add required markers or inline helper text near the meal description/photo/saved-food options.
-
-### 2. Header Icon Actions Are Hard To Interpret Visually
+### 1. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -91,7 +62,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 3. Devtools Overlay Interferes With Local UX Review
+### 2. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
