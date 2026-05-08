@@ -239,6 +239,7 @@ async function runViewportAudit({
 }
 
 test("captures UX audit evidence for the local seeded app", async ({ baseURL }) => {
+  fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
 
   const findings: Finding[] = [];

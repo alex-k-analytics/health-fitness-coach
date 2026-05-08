@@ -51,8 +51,10 @@ Useful variants:
 
 - `npm run ux:audit:headed` runs the audit with a visible browser.
 - `npm run ux:audit:install` installs the Chromium browser bundle expected by Playwright.
-- `UX_AUDIT_BASE_URL=http://127.0.0.1:5173 npm run ux:audit` targets a custom frontend URL on macOS/Linux.
-- In PowerShell, use `$env:UX_AUDIT_BASE_URL='http://127.0.0.1:5173'; npm run ux:audit`.
+- `UX_AUDIT_BASE_URL=http://localhost:5173 npm run ux:audit` targets a custom frontend URL on macOS/Linux.
+- In PowerShell, use `$env:UX_AUDIT_BASE_URL='http://localhost:5173'; npm run ux:audit`.
+
+Use `localhost` rather than `127.0.0.1` unless the backend CORS config also allows the `127.0.0.1` origin.
 
 The audit writes screenshots and browser/network events to `docs/ux-audit-screenshots/`.
 

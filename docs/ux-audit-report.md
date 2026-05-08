@@ -6,14 +6,14 @@ Date: May 8, 2026
 
 This audit used the local seeded account flow from `docs/ux-audit-plan.md` across mobile `375x812`, tablet `768x1024`, and desktop `1440x900`.
 
-Frontend and backend typechecks passed. The browser audit found one blocking login issue, repeated React/Radix console errors, desktop navigation overlap, and several UX clarity issues around planning setup, empty states, and modal copy.
+Frontend and backend typechecks passed. The browser audit found repeated React/Radix console errors, desktop navigation overlap, and several UX clarity issues around planning setup, empty states, and modal copy.
 
 Evidence lives in:
 
 - `docs/ux-audit-screenshots/`
 - `docs/ux-audit-screenshots/audit-events.json`
 
-Because the UI login flow returned `500` during browser submission, authenticated pages were inspected after bootstrapping the same seeded account through the API and setting the returned token in local storage.
+The initial browser audit was accidentally run against `http://127.0.0.1:5173`, while the backend's default CORS config allows `http://localhost:5173`. That caused the browser login request to fail with `Origin is not allowed by CORS`. The Playwright UX config now defaults to `http://localhost:5173` to match local backend defaults.
 
 ## What Works
 
@@ -23,49 +23,9 @@ Because the UI login flow returned `500` during browser submission, authenticate
 - Planning gives a clear blocked-state warning in the New Plan tab when ATK credentials are missing.
 - TypeScript checks pass for both frontend and backend.
 
-## Critical Findings
-
-### 1. Login Form Returns `500` and Blocks Sign-In
-
-Severity: `Critical`
-
-Page/flow: Login
-
-Evidence:
-
-- `docs/ux-audit-screenshots/mobile-login-success-stayed-on-login.png`
-- `docs/ux-audit-screenshots/desktop-login-success-stayed-on-login.png`
-- `docs/ux-audit-screenshots/audit-events.json`
-
-Steps:
-
-1. Open `/login`.
-2. Submit `test@example.com` / `password123`.
-
-Actual:
-
-- The user remains on `/login`.
-- The form displays `Request failed: 500`.
-- Browser network events recorded `500 http://127.0.0.1:5173/api/auth/login`.
-
-Expected:
-
-- Successful credentials should navigate to the dashboard.
-- Failed credentials should return a clear `Invalid email or password` message, not a generic server failure.
-
-Impact:
-
-- This blocks normal app entry and masks whether credentials, API, proxying, or backend error handling caused the failure.
-
-Recommended fix:
-
-- Reproduce through the Vite proxy from the browser and inspect backend logs for `/api/auth/login`.
-- Ensure `authRoutes.post("/login")` returns expected `400`/`401` JSON for validation/auth failures and does not throw.
-- Add a regression test for successful login and wrong-password login through the frontend API path.
-
 ## High Findings
 
-### 2. Dialog and Drawer Triggers Emit Repeated Ref Warnings
+### 1. Dialog and Drawer Triggers Emit Repeated Ref Warnings
 
 Severity: `High`
 
@@ -95,7 +55,7 @@ Recommended fix:
 - Check other `asChild` primitives such as `Badge` if they are used as Radix children.
 - Re-run the browser audit and confirm the warning disappears.
 
-### 3. Fixed Bottom Navigation Obscures Desktop Dashboard Content
+### 2. Fixed Bottom Navigation Obscures Desktop Dashboard Content
 
 Severity: `High`
 
@@ -124,7 +84,7 @@ Recommended fix:
 - At `md`/`lg` and above, move primary navigation into the header or a left rail.
 - If bottom nav remains on larger screens, add enough bottom padding and avoid placing it over the main content column.
 
-### 4. Planning Setup State Says "Ready" When Setup Is Required
+### 3. Planning Setup State Says "Ready" When Setup Is Required
 
 Severity: `High`
 
@@ -159,7 +119,7 @@ Recommended fix:
 
 ## Medium Findings
 
-### 5. Workout Modal Copy Is Internally Inconsistent
+### 4. Workout Modal Copy Is Internally Inconsistent
 
 Severity: `Medium`
 
@@ -189,7 +149,7 @@ Recommended fix:
 - Make title/subtitle derive from `defaultIntent` or selected workout flow.
 - Use clearer labels: `Start live workout` and `Log completed workout`.
 
-### 6. Meal Composer Starts With a Blank Date/Time
+### 5. Meal Composer Starts With a Blank Date/Time
 
 Severity: `Medium`
 
@@ -219,7 +179,7 @@ Recommended fix:
 - Default Date & Time to now for new entries.
 - Add required markers or inline helper text near the meal description/photo/saved-food options.
 
-### 7. Header Icon Actions Are Hard To Interpret Visually
+### 6. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -250,7 +210,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 8. Devtools Overlay Interferes With Local UX Review
+### 7. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
@@ -276,7 +236,7 @@ Recommended fix:
 
 - Gate router devtools behind an explicit env flag such as `VITE_ENABLE_ROUTER_DEVTOOLS=true`.
 
-### 9. UI Documentation Is Out Of Date
+### 8. UI Documentation Is Out Of Date
 
 Severity: `Low`
 
