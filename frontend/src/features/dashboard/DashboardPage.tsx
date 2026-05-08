@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNutritionSummaryQuery } from "@/features/dashboard/hooks";
 import { useHealthMetricsQuery, useProfileQuery } from "@/features/settings/hooks";
-import { useMealsQuery } from "@/features/meals/hooks";
+import { RECENT_MEALS_QUERY_LIMIT, useMealsQuery } from "@/features/meals/hooks";
 import { useWorkoutSessionsQuery } from "@/features/workouts/hooks";
 import {
   useMealPlanRunQuery,
@@ -65,7 +65,8 @@ export function DashboardPage() {
   const { data: profile } = useProfileQuery();
   const { data: healthMetrics, isLoading: loadingMetrics } =
     useHealthMetricsQuery(12);
-  const { data: meals, isLoading: loadingMeals } = useMealsQuery(60);
+  const { data: meals, isError: mealListFailed, isLoading: loadingMeals } =
+    useMealsQuery(RECENT_MEALS_QUERY_LIMIT);
   const { data: sessions, isLoading: loadingSessions } =
     useWorkoutSessionsQuery(8);
   const { data: planningRuns, isLoading: loadingPlanningRuns } =
@@ -389,6 +390,8 @@ export function DashboardPage() {
           description={
             loadingMeals
               ? "Loading..."
+              : mealListFailed
+                ? "Meal list unavailable"
               : formatTodayMealsSummary(todaySummary, todayMealCount)
           }
           action={
@@ -412,6 +415,8 @@ export function DashboardPage() {
         >
           {loadingMeals ? (
             <ActivitySkeleton />
+          ) : mealListFailed ? (
+            <MealListErrorState />
           ) : displayedMeals.length === 0 ? (
             <TodayMealsEmptyState latestMeal={latestMeal} />
           ) : (
@@ -950,6 +955,24 @@ function TodayMealsPreview({
           <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
       ) : null}
+    </div>
+  );
+}
+
+function MealListErrorState() {
+  return (
+    <div className="surface-muted border-destructive/30 bg-destructive/10 p-4" role="alert">
+      <div className="flex items-start gap-3">
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Meal list could not be loaded.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Refresh or open the meal log again. Your daily totals may still be current.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

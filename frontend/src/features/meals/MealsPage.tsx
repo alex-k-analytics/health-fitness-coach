@@ -3,15 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNutritionSummaryQuery } from "@/features/dashboard/hooks";
-import { useMealsQuery } from "@/features/meals/hooks";
+import { RECENT_MEALS_QUERY_LIMIT, useMealsQuery } from "@/features/meals/hooks";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { MealCard } from "@/components/shared/MealCard";
 import { formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
-import { CalendarDays, Flame, History, Plus, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, CircleAlert, Flame, History, Plus, UtensilsCrossed } from "lucide-react";
 import type { Meal } from "@/types";
 
 export function MealsPage() {
-  const { data: meals, isLoading } = useMealsQuery(60);
+  const { data: meals, isError: mealListFailed, isLoading } = useMealsQuery(RECENT_MEALS_QUERY_LIMIT);
   const { data: nutritionSummary, isLoading: loadingNutrition } = useNutritionSummaryQuery();
   const mealHistory = meals?.meals ?? [];
   const { todayMeals, historicalMeals } = splitMealsByToday(mealHistory);
@@ -137,13 +137,17 @@ export function MealsPage() {
                 <div>
                   <CardTitle>Today&apos;s Meals</CardTitle>
                   <CardDescription>
-                    {todayMeals.length} meal{todayMeals.length !== 1 ? "s" : ""} logged today.
+                    {mealListFailed
+                      ? "Meal list unavailable."
+                      : `${todayMeals.length} meal${todayMeals.length !== 1 ? "s" : ""} logged today.`}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {todayMeals.length === 0 ? (
+              {mealListFailed ? (
+                <MealListErrorState />
+              ) : todayMeals.length === 0 ? (
                 <div className="empty-panel min-h-44">
                   <div>
                     <UtensilsCrossed className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
@@ -189,13 +193,17 @@ export function MealsPage() {
                 <div>
                   <CardTitle>Meal History</CardTitle>
                   <CardDescription>
-                    Older meals with saved estimates and corrections.
+                    {mealListFailed
+                      ? "Meal list unavailable."
+                      : "Older meals with saved estimates and corrections."}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {mealHistory.length === 0 ? (
+              {mealListFailed ? (
+                <MealListErrorState />
+              ) : mealHistory.length === 0 ? (
                 <div className="empty-panel min-h-44">
                   <div>
                     <UtensilsCrossed className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
@@ -232,6 +240,24 @@ export function MealsPage() {
           </>
         )}
       </Card>
+    </div>
+  );
+}
+
+function MealListErrorState() {
+  return (
+    <div className="surface-muted border-destructive/30 bg-destructive/10 p-4" role="alert">
+      <div className="flex items-start gap-3">
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Meal list could not be loaded.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Refresh or try again. Your daily totals may still be current.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,10 +3,25 @@ import { apiFetch } from "@/api";
 import { useShellStore } from "@/stores/shellStore";
 import type { Meal, NutritionEstimate, SavedFood } from "@/types";
 
+const MIN_MEALS_QUERY_LIMIT = 1;
+const MAX_MEALS_QUERY_LIMIT = 50;
+
+export const RECENT_MEALS_QUERY_LIMIT = MAX_MEALS_QUERY_LIMIT;
+
+function clampMealsQueryLimit(limit: number) {
+  if (!Number.isFinite(limit)) return 24;
+  return Math.min(
+    MAX_MEALS_QUERY_LIMIT,
+    Math.max(MIN_MEALS_QUERY_LIMIT, Math.trunc(limit))
+  );
+}
+
 export function useMealsQuery(limit = 24) {
+  const safeLimit = clampMealsQueryLimit(limit);
+
   return useQuery({
-    queryKey: ["meals", limit],
-    queryFn: () => apiFetch<{ meals: Meal[] }>(`/nutrition/meals?limit=${limit}`)
+    queryKey: ["meals", safeLimit],
+    queryFn: () => apiFetch<{ meals: Meal[] }>(`/nutrition/meals?limit=${safeLimit}`)
   });
 }
 
