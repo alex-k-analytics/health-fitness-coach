@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { WorkoutCard } from "@/components/shared/WorkoutCard";
 import { useWorkoutSessionsQuery } from "@/features/workouts/hooks";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Plus } from "lucide-react";
 import type { WorkoutSession } from "@/types";
 
 export function WorkoutsPage() {
@@ -13,13 +13,20 @@ export function WorkoutsPage() {
   const weeklySummary = buildWeeklyWorkoutSummary(workoutSessions);
 
   return (
-    <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell space-y-6">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workouts</h1>
-          <p className="text-sm text-muted-foreground">Your exercise history and sessions.</p>
+          <h1 className="page-title">Workouts</h1>
+          <p className="page-description">Track training sessions, weekly volume, distance, and calorie burn.</p>
         </div>
-        <WorkoutSessionModal />
+        <WorkoutSessionModal
+          trigger={
+            <Button size="sm">
+              <Plus className="h-4 w-4" />
+              Log workout
+            </Button>
+          }
+        />
       </div>
 
       <Card>
@@ -90,7 +97,7 @@ export function WorkoutsPage() {
 
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border bg-muted/20 p-4">
+    <div className="surface-muted p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
     </div>

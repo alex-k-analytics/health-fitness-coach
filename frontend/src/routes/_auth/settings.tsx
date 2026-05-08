@@ -11,10 +11,10 @@ export const Route = createFileRoute("/_auth/settings")({
 function SettingsPage() {
   const { isLoading } = useProfileQuery();
   return (
-    <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
+    <div className="page-shell space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your profile and health goals.</p>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-description">Manage your profile, calorie targets, and macro goals.</p>
       </div>
 
       <Card>

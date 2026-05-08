@@ -107,7 +107,7 @@ export function ProfileForm() {
           placeholder="e.g. Lose 10 lbs"
         />
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="grid gap-2">
           <Label htmlFor="calorieGoal">Calorie goal</Label>
           <NumericInput
@@ -135,7 +135,7 @@ export function ProfileForm() {
             id="activityLevel"
             value={formData.activityLevel}
             onChange={(e) => setFormData((prev) => ({ ...prev, activityLevel: e.target.value }))}
-            className="flex h-9 w-full rounded-md bg-transparent px-3 py-1 text-sm"
+            className="flex h-9 w-full rounded-md bg-transparent px-3 py-1 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
           >
             <option value="">Select...</option>
             {ACTIVITY_LEVELS.map((opt) => (
@@ -144,7 +144,7 @@ export function ProfileForm() {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="grid gap-2">
           <Label htmlFor="proteinGoal">Protein (g)</Label>
           <NumericInput

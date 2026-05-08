@@ -455,7 +455,7 @@ export function MealComposer({
             {savedFoodOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Saved foods</Label>
-                <div className="rounded-md border bg-background">
+                <div className="surface-panel">
                   <div className="flex items-center gap-2 border-b px-3 py-2">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <Input
@@ -531,7 +531,7 @@ export function MealComposer({
             )}
 
             {savedFoodOptions.length === 0 && (
-              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              <div className="surface-muted px-3 py-2 text-sm text-muted-foreground">
                 No saved foods yet. Add a photo or serving details to estimate a new meal.
               </div>
             )}
@@ -719,7 +719,7 @@ export function MealComposer({
                 )}
 
                 {correctionsOpen && (
-                  <div className="mt-4 grid gap-3 rounded-lg border bg-muted/20 p-3">
+                  <div className="surface-muted mt-4 grid gap-3 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold">Manual corrections</p>
@@ -737,7 +737,7 @@ export function MealComposer({
                         return (
                           <div
                             key={field.key}
-                            className="grid gap-2 rounded-md border bg-background p-3"
+                            className="surface-panel grid gap-2 p-3"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <Label htmlFor={`override-${field.key}`}>{field.label}</Label>
@@ -785,7 +785,7 @@ export function MealComposer({
                 )}
 
                 {hasActiveOverrides && (
-                  <div className="mt-4 grid gap-2 rounded-lg border bg-muted/20 p-3">
+                  <div className="surface-muted mt-4 grid gap-2 p-3">
                     <p className="text-sm font-semibold">Estimated vs saved</p>
                     {changedOverrideKeys.map((key) => {
                       const field = NUTRITION_OVERRIDE_FIELDS.find((item) => item.key === key);
@@ -915,7 +915,7 @@ function PhotoPicker({
   };
 
   return (
-    <div className="rounded-md border bg-background p-3">
+    <div className="surface-panel p-3">
       <input
         id={libraryInputId}
         type="file"
@@ -947,13 +947,13 @@ function PhotoPicker({
         <div className="flex shrink-0 gap-2">
           <Label
             htmlFor={cameraInputId}
-            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted"
+            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             Camera
           </Label>
           <Label
             htmlFor={libraryInputId}
-            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium hover:bg-muted"
+            className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             Library
           </Label>

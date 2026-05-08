@@ -23,7 +23,7 @@ export function WorkoutCard({ session }: { session: WorkoutSession }) {
     .join(" · ");
 
   return (
-    <Card className="py-0">
+    <Card className="interactive-surface py-0">
       <CardContent className="flex min-h-[96px] items-center justify-between gap-4 p-4">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -46,7 +46,7 @@ export function WorkoutCard({ session }: { session: WorkoutSession }) {
 
         <div className="flex shrink-0 items-center gap-3">
           {session.exercises?.length ? (
-            <div className="hidden rounded-md border bg-muted/30 px-3 py-2 text-center sm:block">
+            <div className="surface-muted hidden px-3 py-2 text-center sm:block">
               <p className="text-lg font-semibold leading-none">{session.exercises.length}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 exercise{session.exercises.length !== 1 ? "s" : ""}

@@ -46,10 +46,10 @@
     --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 72% 94%;
+    --secondary: 216 55% 94%;
     --secondary-foreground: 222 47% 20%;
 
-    --muted: 210 15% 85%;
+    --muted: 210 18% 88%;
     --muted-foreground: 215 16% 47%;
 
     --accent: 164 75% 44%;
@@ -70,31 +70,31 @@
     --brand: 164 75% 44%;
     --brand-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
+    --border: 214 25% 87%;
+    --input: 214 25% 87%;
     --ring: 221 83% 53%;
 
     --radius: 0.65rem;
   }
 
   .dark {
-    --background: 224 52% 8%;
+    --background: 224 56% 6%;
     --foreground: 213 26% 95%;
 
-    --card: 222 47% 10%;
+    --card: 222 45% 9%;
     --card-foreground: 213 26% 95%;
 
-    --popover: 222 47% 10%;
+    --popover: 222 45% 9%;
     --popover-foreground: 213 26% 95%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 216 33% 17%;
+    --secondary: 216 34% 15%;
     --secondary-foreground: 213 26% 95%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 217 30% 16%;
+    --muted-foreground: 215 22% 70%;
 
     --accent: 160 78% 48%;
     --accent-foreground: 0 0% 100%;
@@ -114,8 +114,8 @@
     --brand: 160 78% 48%;
     --brand-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    --border: 217 28% 22%;
+    --input: 217 28% 22%;
     --ring: 217 91% 60%;
   }
 
@@ -189,7 +189,9 @@
   /* ── Gradient backgrounds ── */
 
   .bg-gradient-hero {
-    background: linear-gradient(135deg, hsl(var(--primary) / 0.12) 0%, hsl(var(--accent) / 0.08) 50%, hsl(var(--background)) 100%);
+    background:
+      radial-gradient(circle at top left, hsl(var(--accent) / 0.13), transparent 34%),
+      linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--secondary) / 0.46) 100%);
   }
 
   .bg-gradient-card {
@@ -205,7 +207,9 @@
   }
 
   .bg-gradient-subtle {
-    background: linear-gradient(180deg, hsl(var(--secondary) / 0.3) 0%, hsl(var(--background)) 100%);
+    background:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.08), transparent 30rem),
+      linear-gradient(180deg, hsl(var(--secondary) / 0.28) 0%, hsl(var(--background)) 36rem);
   }
 
   /* ── Card accent borders ── */
@@ -252,6 +256,83 @@
     box-shadow: 0 0 20px hsl(var(--brand) / 0.15);
   }
 
+  .page-shell {
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) {
+    .page-shell {
+      padding: 1.25rem 1.5rem calc(6rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  @media (max-width: 640px) {
+    .page-header {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  }
+
+  .page-title {
+    font-size: clamp(1.5rem, 2vw, 2rem);
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .page-description {
+    max-width: 58ch;
+    margin-top: 0.35rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  .surface-panel {
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--card) / 0.92);
+    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+  }
+
+  .surface-muted {
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) - 2px);
+    background: hsl(var(--muted) / 0.28);
+  }
+
+  .interactive-surface {
+    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .interactive-surface:hover {
+    border-color: hsl(var(--primary) / 0.42);
+    background: hsl(var(--card));
+    box-shadow: 0 8px 24px hsl(var(--foreground) / 0.07);
+  }
+
+  .empty-panel {
+    display: flex;
+    min-height: 12rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--muted) / 0.18);
+    padding: 1.5rem;
+    text-align: center;
+  }
+
   /* ── Global shadcn theme overrides ──
      Every shadcn component with a data-slot inherits these.
      New components from `shadcn add` will auto-inherit these
@@ -284,10 +365,6 @@
   [data-slot="dropdown-menu-sub-content"] {
     box-shadow: 0 1px 3px 0 hsl(var(--foreground) / 0.06), 0 1px 2px -1px hsl(var(--foreground) / 0.04) !important;
     transition: box-shadow 0.2s ease;
-  }
-
-  [data-slot="card"]:hover {
-    box-shadow: 0 2px 8px 0 hsl(var(--foreground) / 0.08), 0 1px 3px -1px hsl(var(--foreground) / 0.06) !important;
   }
 
    /* Dialog panel: deeper shadow, full-screen on mobile, rounded on desktop */

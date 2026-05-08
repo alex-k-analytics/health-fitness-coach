@@ -7,7 +7,7 @@ import { useMealsQuery } from "@/features/meals/hooks";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { MealCard } from "@/components/shared/MealCard";
 import { formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
-import { UtensilsCrossed } from "lucide-react";
+import { Plus, UtensilsCrossed } from "lucide-react";
 import type { Meal } from "@/types";
 
 export function MealsPage() {
@@ -34,13 +34,20 @@ export function MealsPage() {
   ];
 
   return (
-    <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell space-y-6">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Meals</h1>
-          <p className="text-sm text-muted-foreground">Your recent meals and nutrition entries.</p>
+          <h1 className="page-title">Meals</h1>
+          <p className="page-description">Review recent meals, macro progress, and AI nutrition estimates.</p>
         </div>
-        <MealComposer />
+        <MealComposer
+          trigger={
+            <Button size="sm">
+              <Plus className="h-4 w-4" />
+              Log meal
+            </Button>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

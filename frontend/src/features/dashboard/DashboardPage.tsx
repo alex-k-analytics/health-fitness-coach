@@ -26,7 +26,7 @@ import { MealComposer } from "@/features/meals/MealComposer";
 import { WorkoutSessionModal } from "@/components/workouts/WorkoutSessionModal";
 import { MealCard } from "@/components/shared/MealCard";
 import { WorkoutCard } from "@/components/shared/WorkoutCard";
-import { UtensilsCrossed, Dumbbell, Flame, Scale } from "lucide-react";
+import { UtensilsCrossed, Dumbbell, Flame, Plus, Scale } from "lucide-react";
 import type { HealthMetric, Meal, NutritionSummary } from "@/types";
 
 export function DashboardPage() {
@@ -90,7 +90,33 @@ export function DashboardPage() {
     const anyLoading = loadingNutrition || loadingMetrics;
 
     return (
-        <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
+        <div className="page-shell space-y-6">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Today</h1>
+                    <p className="page-description">
+                        Calorie balance, training burn, and recent logs in one place.
+                    </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <MealComposer
+                        trigger={
+                            <Button size="sm">
+                                <Plus className="h-4 w-4" />
+                                Log meal
+                            </Button>
+                        }
+                    />
+                    <WorkoutSessionModal
+                        trigger={
+                            <Button size="sm" variant="outline">
+                                <Dumbbell className="h-4 w-4" />
+                                Log workout
+                            </Button>
+                        }
+                    />
+                </div>
+            </div>
             {/* ── Stats Row ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {loadingNutrition ? (
@@ -247,13 +273,18 @@ export function DashboardPage() {
                             ? "..."
                             : `${todaySummary?.mealCount ?? 0} today`}
                     </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-between mb-4">
+                    <div data-slot="card-action">
                         <MealComposer
-                            trigger={<Button size="sm">+ Log</Button>}
+                            trigger={
+                                <Button size="sm" variant="outline">
+                                    <Plus className="h-4 w-4" />
+                                    Log meal
+                                </Button>
+                            }
                         />
                     </div>
+                </CardHeader>
+                <CardContent>
                     {loadingMeals ? (
                         <div className="space-y-3">
                             <Skeleton className="h-16 w-full" />
@@ -287,13 +318,21 @@ export function DashboardPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Recent Workouts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-between mb-4">
+                    <CardDescription>
+                        {(sessions?.sessions ?? []).length} recent session{(sessions?.sessions ?? []).length !== 1 ? "s" : ""}
+                    </CardDescription>
+                    <div data-slot="card-action">
                         <WorkoutSessionModal
-                            trigger={<Button size="sm">+ Log</Button>}
+                            trigger={
+                                <Button size="sm" variant="outline">
+                                    <Plus className="h-4 w-4" />
+                                    Log workout
+                                </Button>
+                            }
                         />
                     </div>
+                </CardHeader>
+                <CardContent>
                     {loadingSessions ? (
                         <div className="space-y-3">
                             <Skeleton className="h-16 w-full" />
@@ -424,7 +463,7 @@ function CalorieTrendChart({
 
     if (!points.length || !hasMealData) {
         return (
-            <div className="flex h-[260px] items-center justify-center rounded-md border border-dashed bg-muted/20">
+            <div className="empty-panel h-[260px]">
                 <p className="text-sm text-muted-foreground">
                     No calorie data yet.
                 </p>
@@ -559,7 +598,7 @@ function CalorieTrendChart({
 function WeightTrendChart({ points }: { points: HealthMetric[] }) {
     if (points.length < 2) {
         return (
-            <div className="flex h-[260px] items-center justify-center rounded-md border border-dashed bg-muted/20">
+            <div className="empty-panel h-[260px]">
                 <p className="text-sm text-muted-foreground">
                     Need 2+ entries for trend.
                 </p>
@@ -694,10 +733,12 @@ function StatCard({
     sub?: string;
 }) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-1.5">
-                    <Icon className="h-3.5 w-3.5" />
+        <Card className="overflow-hidden">
+            <CardHeader className="pb-1">
+                <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="grid size-7 place-items-center rounded-md bg-primary/10 text-primary">
+                        <Icon className="h-3.5 w-3.5" />
+                    </span>
                     <span>{label}</span>
                 </CardTitle>
             </CardHeader>

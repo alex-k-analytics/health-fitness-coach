@@ -19,7 +19,7 @@ function LoginPage() {
   };
 
   return (
-    <main className="app-shell flex items-center justify-center min-h-screen">
+    <main className="app-shell flex min-h-screen items-center justify-center bg-gradient-subtle">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-[1.1fr_440px] gap-6 items-center">
         <div className="hidden lg:grid gap-4 self-center">
           <h1 className="text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
@@ -30,15 +30,15 @@ function LoginPage() {
             a screenshot of digital nutrition facts.
           </p>
           <div className="grid grid-cols-3 gap-3 mt-2">
-              <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
+            <div className="surface-panel p-4">
               <h2 className="text-base font-semibold mb-1">Photo-first logging</h2>
               <p className="text-sm text-muted-foreground">Upload food photos, packaging, or screenshots before you save.</p>
             </div>
-            <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
+            <div className="surface-panel p-4">
               <h2 className="text-base font-semibold mb-1">AI estimation</h2>
               <p className="text-sm text-muted-foreground">Review calories and macros from the AI estimate, then confirm and save.</p>
             </div>
-            <div className="rounded-lg border p-4 bg-gradient-to-b from-card to-secondary/40">
+            <div className="surface-panel p-4">
               <h2 className="text-base font-semibold mb-1">Private & personal</h2>
               <p className="text-sm text-muted-foreground">No public signup. Your data stays in your account.</p>
             </div>

@@ -13,14 +13,14 @@ export function MealCard({ meal }: { meal: Meal }) {
     Object.values(meal.nutritionOverrides).some((value) => value !== undefined);
 
   return (
-    <Card className="py-0">
+    <Card className="interactive-surface py-0">
       <CardContent className="flex items-center justify-between gap-3 p-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {plateImage && (
             <img
               src={apiAssetUrl(`/nutrition/images/${plateImage.id}`)}
               alt=""
-              className="h-16 w-16 shrink-0 rounded-md border object-cover"
+              className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
               loading="lazy"
             />
           )}

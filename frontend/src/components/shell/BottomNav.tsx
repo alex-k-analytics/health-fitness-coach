@@ -14,8 +14,8 @@ export function BottomNav() {
   const { pathname } = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border z-50">
-      <div className="max-w-6xl mx-auto flex">
+    <nav className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50" aria-label="Primary navigation">
+      <div className="mx-auto flex max-w-3xl rounded-lg border border-border/80 bg-card/95 p-1 shadow-lg shadow-black/10 backdrop-blur-xl">
         {TABS.map(({ path, label, icon: Icon }) => {
           const isActive = path === "/" ? (pathname === "/" || pathname === "") : pathname === path;
           return (
@@ -23,14 +23,15 @@ export function BottomNav() {
               key={path}
               to={path}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 py-2 px-1 transition-colors",
+                "flex min-h-12 flex-1 flex-col items-center justify-center rounded-md px-1 py-1.5 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary/10 text-primary dark:bg-primary/15"
+                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
               )}
+              aria-current={isActive ? "page" : undefined}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium mt-0.5">{label}</span>
+              <span className="mt-0.5 truncate">{label}</span>
             </Link>
           );
         })}

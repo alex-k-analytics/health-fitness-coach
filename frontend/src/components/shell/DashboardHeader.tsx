@@ -11,7 +11,7 @@ import { Dumbbell, Monitor, Moon, Scale, Sun, UtensilsCrossed } from "lucide-rea
 
 
 export function DashboardHeader() {
-  const { session, profileDrawerOpen, setProfileDrawerOpen } = useShellStore();
+  const { session } = useShellStore();
   const { colorMode, toggleColorMode } = useThemeStore();
   const memberName = session?.member?.displayName ?? "User";
   const memberInitials = getInitials(memberName);
@@ -23,30 +23,38 @@ export function DashboardHeader() {
   };
 
   return (
-    <header className="flex items-center justify-between px-4 py-3">
-      <Link to="/" className="hover:opacity-80">
-        <h1 className="text-xl font-bold tracking-tight">Health Coach</h1>
-      </Link>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={toggleColorMode}>
-          {modeIcons[colorMode]}
-        </Button>
-        <MealComposer trigger={<Button variant="ghost" size="icon" aria-label="Log food">
-          <UtensilsCrossed className="h-4 w-4" />
-        </Button>} />
-        <WorkoutSessionModal trigger={<Button variant="ghost" size="icon" aria-label="Log workout">
-          <Dumbbell className="h-4 w-4" />
-        </Button>} />
-        <WeightModal trigger={<Button variant="ghost" size="icon">
-          <Scale className="h-4 w-4" />
-        </Button>} />
-        <ProfileDrawer>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <span className="inline-flex items-center justify-center rounded-full w-8 h-8 text-xs font-bold text-primary bg-primary/10">
-              {memberInitials}
-            </span>
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/86 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <Link to="/" className="group inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          <span className="grid size-8 place-items-center rounded-md bg-brand/15 text-sm font-bold text-brand ring-1 ring-brand/25 transition-colors group-hover:bg-brand/20">
+            HC
+          </span>
+          <div className="leading-tight">
+            <h1 className="text-base font-bold tracking-tight sm:text-lg">Health Coach</h1>
+            <p className="hidden text-[11px] font-medium text-muted-foreground sm:block">Nutrition, training, planning</p>
+          </div>
+        </Link>
+        <div className="flex items-center gap-1.5">
+          <Button variant="ghost" size="icon-sm" onClick={toggleColorMode} aria-label={`Theme: ${colorMode}`}>
+            {modeIcons[colorMode]}
           </Button>
-        </ProfileDrawer>
+          <MealComposer trigger={<Button variant="ghost" size="icon-sm" aria-label="Log food">
+            <UtensilsCrossed className="h-4 w-4" />
+          </Button>} />
+          <WorkoutSessionModal trigger={<Button variant="ghost" size="icon-sm" aria-label="Log workout">
+            <Dumbbell className="h-4 w-4" />
+          </Button>} />
+          <WeightModal trigger={<Button variant="ghost" size="icon-sm" aria-label="Log weight">
+            <Scale className="h-4 w-4" />
+          </Button>} />
+          <ProfileDrawer>
+            <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label={`Open profile for ${memberName}`}>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-1 ring-primary/20">
+                {memberInitials}
+              </span>
+            </Button>
+          </ProfileDrawer>
+        </div>
       </div>
     </header>
   );

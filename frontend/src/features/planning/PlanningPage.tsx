@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -293,8 +294,8 @@ export function PlanningPage() {
   }
 
   return (
-    <div className="px-4 py-4 max-w-6xl mx-auto space-y-6">
-      <Card className="bg-gradient-hero border-white/70 shadow-sm shadow-cyan-950/5">
+    <div className="page-shell space-y-6">
+      <Card className="bg-gradient-hero shadow-sm">
         <CardContent className="p-6 sm:p-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-4">
@@ -321,7 +322,7 @@ export function PlanningPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/70 bg-background/85 p-4 shadow-sm backdrop-blur sm:min-w-[280px]">
+            <div className="surface-panel p-4 backdrop-blur sm:min-w-[280px]">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Sparkles className="h-4 w-4 text-primary" />
                 Planning status
@@ -395,10 +396,9 @@ export function PlanningPage() {
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={useOpenAi}
-                  onChange={(event) => setUseOpenAi(event.target.checked)}
+                  onCheckedChange={(checked) => setUseOpenAi(checked === true)}
                 />
                 Use OpenAI planning
               </label>
@@ -414,7 +414,7 @@ export function PlanningPage() {
                 </p>
               ) : null}
               {visibleStatus ? (
-                <div className="rounded-2xl border border-primary/10 bg-background/85 p-4 text-sm shadow-sm" aria-live="polite">
+                <div className="surface-panel p-4 text-sm" aria-live="polite">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       {visibleStatus.status === "COMPLETED" ? (
@@ -476,7 +476,7 @@ export function PlanningPage() {
                     </div>
                     <div className="space-y-3">
                       {activePlan.selectedMeals.map((meal) => (
-                        <div key={`${meal.title}-${meal.url}`} className="rounded-2xl border border-primary/10 bg-background/90 p-4 shadow-sm">
+                        <div key={`${meal.title}-${meal.url}`} className="surface-panel p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="font-medium text-foreground">{meal.title}</div>
@@ -534,10 +534,9 @@ export function PlanningPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold">Grocery List</h3>
                       <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={hideChecked}
-                          onChange={(event) => setHideChecked(event.target.checked)}
+                          onCheckedChange={(checked) => setHideChecked(checked === true)}
                         />
                         Hide checked
                       </label>
@@ -550,11 +549,11 @@ export function PlanningPage() {
                           const key = groceryItemKey(item);
                           const checked = activeRun ? checkedItems.has(key) : false;
                           return (
-                            <label key={key} className="flex items-start gap-3 rounded-md border p-3 text-sm">
-                              <input
-                                type="checkbox"
+                            <label key={key} className="surface-muted flex items-start gap-3 p-3 text-sm">
+                              <Checkbox
+                                className="mt-0.5"
                                 checked={checked}
-                                onChange={(event) => toggleChecked(item, event.target.checked)}
+                                onCheckedChange={(nextChecked) => toggleChecked(item, nextChecked === true)}
                               />
                               <div>
                                 <div className="font-medium">{item.item}</div>
@@ -581,7 +580,7 @@ export function PlanningPage() {
                         {activePlan.notes.map((note, index) => (
                           <div
                             key={`${index}-${note}`}
-                            className="rounded-2xl border border-info/15 bg-info/5 p-3 text-sm leading-6 text-muted-foreground"
+                            className="surface-muted border-info/20 bg-info/5 p-3 text-sm leading-6 text-muted-foreground"
                           >
                             {note}
                           </div>
@@ -594,7 +593,7 @@ export function PlanningPage() {
                     <h3 className="font-semibold">Reviewed Recipes</h3>
                     <div className="space-y-2">
                       {activePlan.reviewedRecipes.slice(0, 18).map((review) => (
-                        <div key={`${review.title}-${review.url}`} className="rounded-2xl border border-primary/10 bg-background/90 p-4 text-sm shadow-sm">
+                        <div key={`${review.title}-${review.url}`} className="surface-panel p-4 text-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <span className="font-medium text-foreground">{review.title}</span>
@@ -679,10 +678,9 @@ export function PlanningPage() {
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={preferencesDraft.defaultUseOpenAi}
-                  onChange={(event) => setPreferencesDraft((current) => ({ ...current, defaultUseOpenAi: event.target.checked }))}
+                  onCheckedChange={(checked) => setPreferencesDraft((current) => ({ ...current, defaultUseOpenAi: checked === true }))}
                 />
                 Default to OpenAI planning
               </label>
@@ -701,7 +699,7 @@ export function PlanningPage() {
               {availableSources.map((source) => {
                 const draft = sourceDrafts[source.source] ?? sourceDraftFromSource(source);
                 return (
-                  <div key={source.source} className="rounded-md border p-3 space-y-3">
+                  <div key={source.source} className="surface-muted space-y-3 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-medium">{source.label}</div>
@@ -737,18 +735,16 @@ export function PlanningPage() {
                       />
                     </div>
                     <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={draft.enabled}
-                        onChange={(event) => updateSourceDraft(source.source, { enabled: event.target.checked })}
+                        onCheckedChange={(checked) => updateSourceDraft(source.source, { enabled: checked === true })}
                       />
                       Enabled
                     </label>
                     <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={draft.clearPassword}
-                        onChange={(event) => updateSourceDraft(source.source, { clearPassword: event.target.checked })}
+                        onCheckedChange={(checked) => updateSourceDraft(source.source, { clearPassword: checked === true })}
                       />
                       Clear saved password
                     </label>
@@ -787,7 +783,7 @@ export function PlanningPage() {
                 (runs?.runs ?? []).map((run) => (
                   <div
                     key={run.id}
-                    className={`rounded-2xl border bg-background/90 p-3 shadow-sm ${run.id === selectedRunId ? "border-primary" : "border-primary/10"}`}
+                    className={`surface-panel interactive-surface p-3 ${run.id === selectedRunId ? "border-primary" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <button

@@ -342,7 +342,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       )}
 
       {exercises.length === 0 && (
-        <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+        <div className="surface-muted p-3 text-sm text-muted-foreground">
           {workoutMode === "OTHER"
             ? "Start the session to log a simple timed workout."
             : "Search for a specific exercise, or start now and fill in details later."}
