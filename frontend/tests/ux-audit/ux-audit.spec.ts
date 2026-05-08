@@ -95,6 +95,25 @@ async function verifyHeaderActionTooltips(page: Page, viewportName: string, find
   }
 }
 
+async function verifyNoDevtoolsOverlay(page: Page, viewportName: string, findings: Finding[]) {
+  const devtoolsVisible = await page
+    .getByText("TanStack Router", { exact: false })
+    .isVisible()
+    .catch(() => false);
+
+  if (!devtoolsVisible) return;
+
+  const evidence = await screenshot(page, `${viewportName} devtools overlay visible`);
+  findings.push({
+    severity: "Low",
+    page: "local development",
+    title: "Devtools overlay is visible during UX audit",
+    actual: "The TanStack Router devtools badge is visible in the review viewport.",
+    expected: "UX audit screenshots should run without development overlays unless explicitly enabled.",
+    evidence
+  });
+}
+
 function truncateEventText(text: string) {
   return text.length > 2000 ? `${text.slice(0, 2000)}...` : text;
 }
@@ -211,6 +230,7 @@ async function runViewportAudit({
 
   await page.waitForLoadState("networkidle");
   await screenshot(page, `${viewportName} dashboard empty`);
+  await verifyNoDevtoolsOverlay(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
 
   const pageChecks = [

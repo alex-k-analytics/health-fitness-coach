@@ -28,6 +28,7 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Workout modal copy now derives from the selected flow, so completed-workout logging no longer appears as a planned/live workout.
 - Meal composer now defaults new entries to the current local date/time and clarifies that the user must describe the meal, choose a saved food, or attach a photo before estimating.
 - Header icon-only actions now expose hover/focus tooltips while keeping accessible labels for assistive technology.
+- TanStack Router devtools are now opt-in via `VITE_ENABLE_ROUTER_DEVTOOLS=true`, so local UX audits run without the bottom-right devtools overlay or package warning.
 - TypeScript checks pass for both frontend and backend.
 
 ## Medium Findings
@@ -36,31 +37,7 @@ No open medium findings after the latest pass.
 
 ## Low Findings
 
-### 1. Devtools Overlay Interferes With Local UX Review
-
-Severity: `Low`
-
-Page/flow: Local development
-
-Evidence:
-
-- Many screenshots show the TanStack Router devtools badge overlapping the bottom-right UI.
-
-Actual:
-
-- The devtools badge appears over the app during local review.
-
-Expected:
-
-- Local UX audits should be able to run with the app in a clean review mode.
-
-Impact:
-
-- This is development-only, but it makes screenshots and bottom navigation review noisy.
-
-Recommended fix:
-
-- Gate router devtools behind an explicit env flag such as `VITE_ENABLE_ROUTER_DEVTOOLS=true`.
+No open low findings after the latest pass.
 
 ## Suggested Additions
 
@@ -73,6 +50,7 @@ Recommended fix:
 
 - `npm run typecheck` passed in `frontend/`.
 - `npm run ux:audit` passed in `frontend/` after adding header action tooltips and a desktop header tooltip regression check.
+- `npm run ux:audit` passed in `frontend/` after gating router devtools and adding a devtools overlay regression check.
 - `npm run typecheck` passed in `backend/`.
 - `npm run prisma:push` synced the local database schema, but Prisma Client generation hit a Windows file-lock on `query_engine-windows.dll.node`.
 - `backend/src/seed.ts` now resets the seeded account password to `password123` on rerun so future audits use deterministic credentials.

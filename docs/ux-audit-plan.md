@@ -53,6 +53,7 @@ Useful variants:
 - `npm run ux:audit:install` installs the Chromium browser bundle expected by Playwright.
 - `UX_AUDIT_BASE_URL=http://localhost:5173 npm run ux:audit` targets a custom frontend URL on macOS/Linux.
 - In PowerShell, use `$env:UX_AUDIT_BASE_URL='http://localhost:5173'; npm run ux:audit`.
+- Router devtools are disabled by default during local review. Set `VITE_ENABLE_ROUTER_DEVTOOLS=true` only when you explicitly want the TanStack Router devtools overlay while running the app.
 
 Use `localhost` rather than `127.0.0.1` unless the backend CORS config also allows the `127.0.0.1` origin.
 

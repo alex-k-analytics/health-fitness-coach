@@ -1,5 +1,5 @@
+import { lazy, Suspense } from "react";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { apiFetch, setAuthToken } from "@/api";
 import { useShellStore } from "@/stores/shellStore";
 import { GlobalBanner } from "@/components/shared/GlobalBanner";
@@ -9,6 +9,15 @@ import type { SessionData } from "@/types";
 interface RouterContext {
   authenticated: boolean;
 }
+
+const enableRouterDevtools = import.meta.env.VITE_ENABLE_ROUTER_DEVTOOLS === "true";
+const RouterDevtools = enableRouterDevtools
+  ? lazy(() =>
+      import("@tanstack/router-devtools").then((module) => ({
+        default: module.TanStackRouterDevtools
+      }))
+    )
+  : null;
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   pendingComponent: RootLoadingSkeleton,
@@ -29,16 +38,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponent() {
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    import.meta.env.MODE === "production";
-
   return (
     <>
       <GlobalBanner />
       <Outlet />
-      {!isProduction ? (
-        <TanStackRouterDevtools position="bottom-right" />
+      {RouterDevtools ? (
+        <Suspense fallback={null}>
+          <RouterDevtools position="bottom-right" />
+        </Suspense>
       ) : null}
     </>
   );
