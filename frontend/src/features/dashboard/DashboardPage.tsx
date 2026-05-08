@@ -172,6 +172,22 @@ export function DashboardPage() {
     hasPlan: Boolean(activePlan),
     groceryRemaining
   });
+  const planningNeedsSetup = !sourceReady && !activePlan && !planningStatus;
+  const planningMetricValue = planningNeedsSetup
+    ? "Setup required"
+    : planningStatus
+      ? planningStatusLabel(planningStatus.status)
+      : "Ready";
+  const planningMetricSub = planningNeedsSetup
+    ? "Connect ATK source"
+    : activePlan
+      ? `${groceryRemaining} groceries left`
+      : sourceReady
+        ? "Start this week's plan"
+        : "Connect a recipe source";
+  const planningMetricTone = planningNeedsSetup
+    ? "warning"
+    : planningStatusTone(planningStatus?.status);
 
   const todayMeals = mealHistory.filter((meal) => isTodayMeal(meal));
   const displayedMeals = todayMeals.slice(0, DASHBOARD_TODAY_MEAL_LIMIT);
@@ -270,15 +286,9 @@ export function DashboardPage() {
           <CommandMetric
             icon={ShoppingBasket}
             label="Meal plan"
-            value={planningStatus ? planningStatusLabel(planningStatus.status) : "Ready"}
-            sub={
-              activePlan
-                ? `${groceryRemaining} groceries left`
-                : sourceReady
-                  ? "Start this week's plan"
-                  : "Connect a recipe source"
-            }
-            tone={planningStatusTone(planningStatus?.status)}
+            value={planningMetricValue}
+            sub={planningMetricSub}
+            tone={planningMetricTone}
           />
         )}
         {loadingMetrics ? (

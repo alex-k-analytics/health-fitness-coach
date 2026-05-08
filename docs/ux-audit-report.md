@@ -21,49 +21,15 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Empty states are generally present and action-oriented, especially for meals, workouts, charts, and planning.
 - Mobile layout is mostly readable, with clear cards, consistent labels, and usable full-screen dialogs.
 - Planning gives a clear blocked-state warning in the New Plan tab when ATK credentials are missing.
+- Dashboard and Planning top-level status metrics now say `Setup required` with concise `Connect ATK source` copy when live planning is blocked.
 - Dialog, drawer, button, and badge primitives now forward refs cleanly; the prior Radix/Vaul ref warning no longer appears in the UX audit.
 - Desktop primary navigation now lives in the header at `lg` and above, while mobile/tablet keep the fixed bottom nav; short desktop viewport checks no longer show nav/action overlap.
 - `frontend/UI_DOCS.md` now reflects the five-route navigation and responsive header/bottom-nav behavior.
 - TypeScript checks pass for both frontend and backend.
 
-## High Findings
-
-### 1. Planning Setup State Says "Ready" When Setup Is Required
-
-Severity: `High`
-
-Page/flow: Dashboard and Planning
-
-Evidence:
-
-- `docs/ux-audit-screenshots/mobile-dashboard-empty.png`
-- `docs/ux-audit-screenshots/mobile-planning.png`
-- `docs/ux-audit-screenshots/mobile-planning-new-plan.png`
-
-Actual:
-
-- Dashboard stat card says `Meal plan Ready`, but the subtext says `Connect a recipe source`.
-- Planning status says `Ready`, while the detail says ATK credentials are required before live planning.
-- The top planning metric truncates the setup message on mobile.
-
-Expected:
-
-- If the user cannot start live planning, the state should be `Setup required` or `Recipe source needed`.
-- Truncated setup text should be replaced by a direct CTA or a shorter label.
-
-Impact:
-
-- Users get mixed signals about whether the planner is usable.
-
-Recommended fix:
-
-- Rename the status state to `Setup required` when no planning-ready recipe source exists.
-- Make the metric CTA open Planning Settings directly.
-- Use concise mobile-safe copy in metric cards.
-
 ## Medium Findings
 
-### 2. Workout Modal Copy Is Internally Inconsistent
+### 1. Workout Modal Copy Is Internally Inconsistent
 
 Severity: `Medium`
 
@@ -93,7 +59,7 @@ Recommended fix:
 - Make title/subtitle derive from `defaultIntent` or selected workout flow.
 - Use clearer labels: `Start live workout` and `Log completed workout`.
 
-### 3. Meal Composer Starts With a Blank Date/Time
+### 2. Meal Composer Starts With a Blank Date/Time
 
 Severity: `Medium`
 
@@ -123,7 +89,7 @@ Recommended fix:
 - Default Date & Time to now for new entries.
 - Add required markers or inline helper text near the meal description/photo/saved-food options.
 
-### 4. Header Icon Actions Are Hard To Interpret Visually
+### 3. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -154,7 +120,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 5. Devtools Overlay Interferes With Local UX Review
+### 4. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 

@@ -189,6 +189,15 @@ export function PlanningPage() {
   const selectedPlanningSources = sourceReadiness.readySources.map((source) => source.source);
   const sourceReady = sourceReadiness.ready;
   const runIsActive = visibleStatus?.status === "PENDING" || visibleStatus?.status === "RUNNING";
+  const planningNeedsSetup = !sourceReady && !visibleStatus;
+  const planningStatusValue = planningNeedsSetup
+    ? "Setup required"
+    : visibleStatus
+      ? planningStatusLabel(visibleStatus.status)
+      : "Ready";
+  const planningStatusSub = planningNeedsSetup
+    ? "Connect ATK source"
+    : visibleStatus?.progressDetail ?? sourceReadiness.message;
 
   const checkedItems = useMemo(
     () => (activeRun ? loadCheckedItems(activeRun.id) : new Set<string>()),
@@ -383,9 +392,10 @@ export function PlanningPage() {
         <StatusMetric
           icon={Sparkles}
           label="Status"
-          value={visibleStatus ? planningStatusLabel(visibleStatus.status) : "Ready"}
-          sub={visibleStatus?.progressDetail ?? sourceReadiness.message}
+          value={planningStatusValue}
+          sub={planningStatusSub}
           status={visibleStatus?.status}
+          tone={planningNeedsSetup ? "warning" : "brand"}
         />
       </div>
 
@@ -911,17 +921,21 @@ function StatusMetric({
   label,
   value,
   sub,
-  status
+  status,
+  tone = "brand"
 }: {
   icon: typeof ShoppingBasket;
   label: string;
   value: string;
   sub: string;
   status?: PlanningStatus;
+  tone?: "brand" | "warning";
 }) {
+  const iconClass = tone === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary";
+
   return (
     <div className="surface-panel flex min-h-24 items-start gap-3 p-4">
-      <div className="rounded-md bg-primary/10 p-2 text-primary">
+      <div className={`rounded-md p-2 ${iconClass}`}>
         <Icon className="h-4 w-4" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
