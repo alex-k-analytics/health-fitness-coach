@@ -9,7 +9,10 @@
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ux:audit": "playwright test --config=playwright.ux.config.ts",
+    "ux:audit:headed": "playwright test --config=playwright.ux.config.ts --headed",
+    "ux:audit:install": "playwright install chromium"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",
@@ -38,6 +41,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tanstack/router-devtools": "^1.166.13",
     "@tanstack/router-plugin": "^1.167.27",
     "@types/react": "^18.3.12",

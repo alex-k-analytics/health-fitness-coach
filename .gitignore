@@ -1,6 +1,10 @@
 node_modules/
 dist/
 *.tsbuildinfo
+debug.log
+frontend/debug.log
+frontend/playwright-report/
+frontend/test-results/
 .env
 .DS_Store
 backend/uploads/
