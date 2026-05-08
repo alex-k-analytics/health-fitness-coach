@@ -108,6 +108,7 @@ export function DashboardPage() {
                         }
                     />
                     <WorkoutSessionModal
+                        defaultIntent="quick"
                         trigger={
                             <Button size="sm" variant="outline">
                                 <Dumbbell className="h-4 w-4" />
@@ -323,6 +324,7 @@ export function DashboardPage() {
                     </CardDescription>
                     <div data-slot="card-action">
                         <WorkoutSessionModal
+                            defaultIntent="quick"
                             trigger={
                                 <Button size="sm" variant="outline">
                                     <Plus className="h-4 w-4" />
@@ -344,6 +346,7 @@ export function DashboardPage() {
                             message="No workouts logged yet."
                             action={
                                 <WorkoutSessionModal
+                                    defaultIntent="quick"
                                     trigger={
                                         <Button size="sm">
                                             Log your first workout

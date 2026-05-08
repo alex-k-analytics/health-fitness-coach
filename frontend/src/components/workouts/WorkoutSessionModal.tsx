@@ -1,20 +1,22 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumericInput, NumericValueInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Minus, Play, Pause, Check, Search, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Minus, Play, Pause, Check, Search, Trash2, RotateCcw, Timer, ClipboardCheck } from "lucide-react";
 import type { WorkoutActivityType, WorkoutExercise, WorkoutExerciseKind, WorkoutSession, WorkoutSet } from "@/types";
 import { useExerciseListQuery, useCreateSessionMutation, useUpdateSessionMutation } from "@/features/workouts/hooks";
 import { computeSessionCalories, fuzzyMatch } from "@/calorieEngine";
 import { formatTimer } from "@/lib/mealUtils";
 
 type WorkoutMode = "CARDIO" | "STRENGTH" | "HIIT" | "OTHER";
+type EntryIntent = "timer" | "quick";
 
 const WORKOUT_TYPES: { value: WorkoutMode; label: string; defaultActivityType: WorkoutActivityType }[] = [
   { value: "CARDIO", label: "Cardio", defaultActivityType: "RUNNING" },
@@ -36,13 +38,16 @@ const MODE_CATEGORY_KEYS: Record<WorkoutMode, WorkoutActivityType[]> = {
 interface WorkoutSessionModalProps {
   trigger?: React.ReactNode;
   session?: WorkoutSession;
+  defaultIntent?: EntryIntent;
   onClose?: () => void;
 }
 
-export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessionModalProps) {
+export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer", onClose }: WorkoutSessionModalProps) {
   const isEditing = Boolean(session);
+  const formId = useId();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"plan" | "active" | "review">("plan");
+  const [entryIntent, setEntryIntent] = useState<EntryIntent>(defaultIntent);
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>("STRENGTH");
   const [activityType, setActivityType] = useState<WorkoutActivityType>("WEIGHTLIFTING");
   const [title, setTitle] = useState("Strength");
@@ -82,6 +87,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       const mode = getWorkoutMode(session.activityType);
       const duration = session.durationSeconds ?? 0;
       setStep("plan");
+      setEntryIntent("quick");
       setWorkoutMode(mode);
       setActivityType(session.activityType);
       setTitle(session.title);
@@ -96,8 +102,8 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       return;
     }
 
-    resetDraft();
-  }, [open, session]);
+    resetDraft(defaultIntent);
+  }, [open, session, defaultIntent]);
 
   const addExercise = useCallback((name: string) => {
     const category = resolveExerciseCategory(name, workoutMode, exerciseListData?.exercises);
@@ -168,49 +174,58 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
     setElapsedSeconds(0); setTimerRunning(false);
   };
 
-  const handleStart = () => {
-    const nextExercises = exercises.length > 0
-      ? exercises
-      : [createDefaultExercise(workoutMode)];
+  const getDurationSeconds = useCallback(() => (
+    useManualTime
+      ? (parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0)
+      : elapsedSeconds
+  ), [elapsedSeconds, manualMinutes, manualSeconds, useManualTime]);
 
-    setExercises(nextExercises);
+  const withSessionDuration = useCallback((items: WorkoutExercise[], duration: number) => (
+    items.map((ex) => (
+      ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
+        ? { ...ex, durationSeconds: duration }
+        : ex
+    ))
+  ), []);
+
+  const getPlannedExercises = () => (
+    exercises.length > 0 ? exercises : [createDefaultExercise(workoutMode)]
+  );
+
+  const onEntryIntentChange = (intent: EntryIntent) => {
+    setEntryIntent(intent);
+    if (intent === "quick") {
+      setUseManualTime(true);
+      setTimerRunning(false);
+      if (elapsedSeconds === 0 && manualMinutes === "0" && manualSeconds === "0") {
+        setManualMinutes("30");
+      }
+      return;
+    }
+
+    setUseManualTime(false);
+  };
+
+  const handleStart = () => {
+    setExercises(getPlannedExercises());
     setStep("active");
     setTimerRunning(!useManualTime);
   };
-  const handleReviewChanges = () => {
-    const duration = useManualTime
-      ? (parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0)
-      : elapsedSeconds;
 
-    setExercises((prev) => prev.map((ex) => (
-      ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
-        ? { ...ex, durationSeconds: duration }
-        : ex
-    )));
+  const handleReview = () => {
+    const duration = getDurationSeconds();
+    setExercises(withSessionDuration(getPlannedExercises(), duration));
     setTimerRunning(false);
     setStep("review");
   };
-  const handleFinish = () => {
-    const duration = useManualTime
-      ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
-      : elapsedSeconds;
 
-    setExercises((prev) => prev.map((ex) => (
-      ex.kind === "CARDIO" && (!ex.durationSeconds || ex.durationSeconds === 0)
-        ? { ...ex, durationSeconds: duration }
-        : ex
-    )));
-    setTimerRunning(false);
-    setStep("review");
-  };
   const handleEdit = () => { setStep("plan"); };
 
   const handleSave = () => {
-    const duration = useManualTime
-      ? ((parseInt(manualMinutes, 10) || 0) * 60 + (parseInt(manualSeconds, 10) || 0))
-      : elapsedSeconds;
-    const result = computeSessionCalories(exercises, 70);
-    const primaryActivityType = exercises[0]?.category ?? activityType;
+    const duration = getDurationSeconds();
+    const finalizedExercises = withSessionDuration(getPlannedExercises(), duration);
+    const result = computeSessionCalories(finalizedExercises, 70);
+    const primaryActivityType = finalizedExercises[0]?.category ?? activityType;
     const endTime = session?.endTime ?? new Date().toISOString();
     const payload = {
       activityType: primaryActivityType,
@@ -220,7 +235,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       durationSeconds: duration,
       totalCalories: result.total,
       categoryCalories: result.byCategory,
-      exercises
+      exercises: finalizedExercises
     };
 
     if (session) {
@@ -239,33 +254,67 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
 
   const handleClose = () => {
     setOpen(false);
-    resetDraft();
+    resetDraft(defaultIntent);
     onClose?.();
   };
 
-  const resetDraft = () => {
+  const resetDraft = (intent: EntryIntent = defaultIntent) => {
     setStep("plan");
+    setEntryIntent(intent);
     setWorkoutMode("STRENGTH");
     setActivityType("WEIGHTLIFTING");
     setTitle("Strength");
     setElapsedSeconds(0);
     setTimerRunning(false);
     setExercises([]);
-    setUseManualTime(false);
-    setManualMinutes("0");
+    setUseManualTime(intent === "quick");
+    setManualMinutes(intent === "quick" ? "30" : "0");
     setManualSeconds("0");
     setSearchQuery("");
     setSearchResults([]);
   };
 
   const isTimedWorkout = workoutMode !== "STRENGTH";
+  const isQuickLog = entryIntent === "quick" || isEditing;
   const durationDisplay = useManualTime
     ? `${manualMinutes}:${manualSeconds.padStart(2, "0")}`
     : formatTimer(elapsedSeconds);
 
-  // ── Step 1: Plan ──
+  // Step 1: Plan
   const renderPlan = () => (
     <div className="grid gap-4">
+      {!isEditing && (
+        <div className="grid gap-2">
+          <Label>Workout flow</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={entryIntent === "timer" ? "default" : "outline"}
+              className="h-auto min-h-14 flex-col items-start justify-center gap-1 px-3 py-2"
+              onClick={() => onEntryIntentChange("timer")}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Timer className="h-4 w-4" />
+                Live timer
+              </span>
+              <span className="text-xs font-normal opacity-80">Start now</span>
+            </Button>
+            <Button
+              type="button"
+              variant={entryIntent === "quick" ? "default" : "outline"}
+              className="h-auto min-h-14 flex-col items-start justify-center gap-1 px-3 py-2"
+              onClick={() => onEntryIntentChange("quick")}
+            >
+              <span className="inline-flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                Completed
+              </span>
+              <span className="text-xs font-normal opacity-80">Log details</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-2">
         <Label>Workout Type</Label>
         <div className="flex flex-wrap gap-2">
@@ -282,30 +331,31 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         </div>
       </div>
       <div className="grid gap-2">
-        <Label>Title</Label>
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning run" />
+        <Label htmlFor={`${formId}-title`}>Title</Label>
+        <Input id={`${formId}-title`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning run" />
       </div>
 
-      {isEditing && (
+      {isQuickLog && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="grid gap-1 flex-1">
-            <Label>Minutes</Label>
-            <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
+            <Label htmlFor={`${formId}-minutes`}>Minutes</Label>
+            <NumericInput id={`${formId}-minutes`} value={manualMinutes} onValueChange={setManualMinutes} />
           </div>
           <div className="grid gap-1 flex-1">
-            <Label>Seconds</Label>
-            <NumericInput value={manualSeconds} max={59} onValueChange={setManualSeconds} />
+            <Label htmlFor={`${formId}-seconds`}>Seconds</Label>
+            <NumericInput id={`${formId}-seconds`} value={manualSeconds} max={59} onValueChange={setManualSeconds} />
           </div>
         </div>
       )}
 
       {workoutMode !== "OTHER" && (
       <div className="grid gap-2">
-        <Label>Add Exercise</Label>
+        <Label htmlFor={`${formId}-exercise-search`}>Add Exercise</Label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              id={`${formId}-exercise-search`}
               className="pl-9"
               placeholder="Search exercises..."
               value={searchQuery}
@@ -344,8 +394,8 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       {exercises.length === 0 && (
         <div className="surface-muted p-3 text-sm text-muted-foreground">
           {workoutMode === "OTHER"
-            ? "Start the session to log a simple timed workout."
-            : "Search for a specific exercise, or start now and fill in details later."}
+            ? isQuickLog ? "Add the duration and review the log." : "Start the timer to track a simple workout."
+            : isQuickLog ? "Search for an exercise, or review now to save a simple workout." : "Search for a specific exercise, or start now and fill in details later."}
         </div>
       )}
 
@@ -366,11 +416,13 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                 {ex.kind === "LIFT" ? (
                   <div className="grid gap-2">
                     {(ex.sets ?? []).map((s, i) => (
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                      <div key={`${ex.id}-set-${i}`} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                         <span className="text-xs text-muted-foreground w-8 sm:w-auto sm:mb-0">Set {i + 1}</span>
-                        <NumericValueInput className="w-20 sm:flex-1" placeholder="reps"
+                        <Label className="sr-only" htmlFor={`${formId}-${ex.id}-set-${i}-reps`}>Set {i + 1} reps</Label>
+                        <NumericValueInput id={`${formId}-${ex.id}-set-${i}-reps`} className="w-20 sm:flex-1" placeholder="reps"
                           value={s.reps} onValueChange={(reps) => updateSet(ex.id!, i, { reps })} />
-                        <NumericValueInput mode="decimal" className="w-20 sm:flex-1" placeholder="lbs"
+                        <Label className="sr-only" htmlFor={`${formId}-${ex.id}-set-${i}-lbs`}>Set {i + 1} pounds</Label>
+                        <NumericValueInput id={`${formId}-${ex.id}-set-${i}-lbs`} mode="decimal" className="w-20 sm:flex-1" placeholder="lbs"
                           value={s.weightLbs} onValueChange={(weightLbs) => updateSet(ex.id!, i, { weightLbs })} />
                         {(ex.sets?.length ?? 0) > 1 && (
                           <Button variant="ghost" size="sm" onClick={() => removeSet(ex.id!, i)}>
@@ -385,8 +437,9 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                   </div>
                 ) : (
                   <div className="grid gap-1">
-                      <Label>Distance (mi)</Label>
+                      <Label htmlFor={`${formId}-${ex.id}-distance`}>Distance (mi)</Label>
                       <NumericValueInput
+                        id={`${formId}-${ex.id}-distance`}
                         mode="decimal"
                         value={ex.distance}
                         onValueChange={(distance) => updateExercise(ex.id!, { distance })}
@@ -404,15 +457,15 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleClose}>Cancel</Button>
-        <Button onClick={isEditing ? handleReviewChanges : handleStart}>
-          {isEditing ? <Check className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-          {isEditing ? "Review Changes" : "Start Session"}
+        <Button onClick={isQuickLog ? handleReview : handleStart}>
+          {isQuickLog ? <Check className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+          {isEditing ? "Review Changes" : isQuickLog ? "Review Log" : "Start Timer"}
         </Button>
       </div>
     </div>
   );
 
-  // ── Step 2: Active ──
+  // Step 2: Active
   const renderActive = () => (
     <div className="grid gap-4">
       <div className="text-center">
@@ -427,25 +480,34 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <input type="checkbox" id="manualTime" checked={useManualTime} onChange={(e) => setUseManualTime(e.target.checked)} />
-        <Label htmlFor="manualTime" className="text-sm font-normal">Enter time manually</Label>
+        <Checkbox
+          id={`${formId}-manual-time`}
+          checked={useManualTime}
+          onCheckedChange={(checked) => {
+            const nextUseManualTime = Boolean(checked);
+            setUseManualTime(nextUseManualTime);
+            if (nextUseManualTime) setTimerRunning(false);
+          }}
+        />
+        <Label htmlFor={`${formId}-manual-time`} className="text-sm font-normal">Enter time manually</Label>
       </div>
       {useManualTime && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="grid gap-1 flex-1">
-            <Label>Minutes</Label>
-            <NumericInput value={manualMinutes} onValueChange={setManualMinutes} />
+            <Label htmlFor={`${formId}-active-minutes`}>Minutes</Label>
+            <NumericInput id={`${formId}-active-minutes`} value={manualMinutes} onValueChange={setManualMinutes} />
           </div>
           <div className="grid gap-1 flex-1">
-            <Label>Seconds</Label>
-            <NumericInput value={manualSeconds} max={59} onValueChange={setManualSeconds} />
+            <Label htmlFor={`${formId}-active-seconds`}>Seconds</Label>
+            <NumericInput id={`${formId}-active-seconds`} value={manualSeconds} max={59} onValueChange={setManualSeconds} />
           </div>
         </div>
       )}
       {isTimedWorkout && exercises[0] && workoutMode !== "OTHER" && (
         <div className="grid gap-1">
-          <Label>Distance (mi)</Label>
+          <Label htmlFor={`${formId}-active-distance`}>Distance (mi)</Label>
           <NumericValueInput
+            id={`${formId}-active-distance`}
             mode="decimal"
             value={exercises[0].distance}
             onValueChange={(distance) => updateExercise(exercises[0].id!, { distance })}
@@ -467,14 +529,14 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleEdit}>Back to Plan</Button>
-        <Button onClick={handleFinish}>
+        <Button onClick={handleReview}>
           <Check className="h-4 w-4 mr-1" /> Finish
         </Button>
       </div>
     </div>
   );
 
-  // ── Step 3: Review ──
+  // Step 3: Review
   const renderReview = () => {
     const result = computeSessionCalories(exercises, 70);
     return (
@@ -520,7 +582,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
                 {ex.kind === "LIFT" ? (
                   <div className="text-xs text-muted-foreground">
                     {(ex.sets ?? []).map((s, i) => (
-                      <span key={i}>{s.reps} reps × {s.weightLbs} lb{i < (ex.sets?.length ?? 0) - 1 ? ", " : ""}</span>
+                      <span key={i}>{s.reps} reps x {s.weightLbs} lb{i < (ex.sets?.length ?? 0) - 1 ? ", " : ""}</span>
                     ))}
                   </div>
                 ) : (
@@ -545,7 +607,7 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
     );
   };
 
-  // ── Main render ──
+  // Main render
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(o); }}>
       <DialogTrigger asChild>
@@ -558,15 +620,22 @@ export function WorkoutSessionModal({ trigger, session, onClose }: WorkoutSessio
               ? "Edit Workout"
               : step === "plan" ? "Plan Workout" : step === "active" ? "Active Workout" : "Review Workout"}
           </DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? "Update the workout details, then review before saving."
+              : entryIntent === "quick"
+                ? "Log a completed workout without starting a timer."
+                : "Plan the workout, start the timer, then save the completed session."}
+          </DialogDescription>
         </DialogHeader>
         {step === "plan" && renderPlan()}
         {step === "active" && renderActive()}
         {step === "review" && renderReview()}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className={step === "plan" ? "text-primary font-semibold" : ""}>Plan</span>
-          <span>→</span>
+          <span>/</span>
           <span className={step === "active" ? "text-primary font-semibold" : ""}>Active</span>
-          <span>→</span>
+          <span>/</span>
           <span className={step === "review" ? "text-primary font-semibold" : ""}>Review</span>
         </div>
       </DialogContent>

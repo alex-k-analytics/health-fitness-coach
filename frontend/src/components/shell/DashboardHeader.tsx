@@ -41,7 +41,7 @@ export function DashboardHeader() {
           <MealComposer trigger={<Button variant="ghost" size="icon-sm" aria-label="Log food">
             <UtensilsCrossed className="h-4 w-4" />
           </Button>} />
-          <WorkoutSessionModal trigger={<Button variant="ghost" size="icon-sm" aria-label="Log workout">
+          <WorkoutSessionModal defaultIntent="quick" trigger={<Button variant="ghost" size="icon-sm" aria-label="Log workout">
             <Dumbbell className="h-4 w-4" />
           </Button>} />
           <WeightModal trigger={<Button variant="ghost" size="icon-sm" aria-label="Log weight">
