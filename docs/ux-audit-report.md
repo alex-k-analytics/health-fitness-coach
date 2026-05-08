@@ -6,7 +6,7 @@ Date: May 8, 2026
 
 This audit used the local seeded account flow from `docs/ux-audit-plan.md` across mobile `375x812`, tablet `768x1024`, and desktop `1440x900`.
 
-Frontend and backend typechecks passed. The browser audit found repeated React/Radix console errors, desktop navigation overlap, and several UX clarity issues around planning setup, empty states, and modal copy.
+Frontend and backend typechecks passed. The browser audit found a conditional desktop navigation overlap at shorter viewport heights and several UX clarity issues around planning setup, empty states, and modal copy.
 
 Evidence lives in:
 
@@ -21,70 +21,45 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Empty states are generally present and action-oriented, especially for meals, workouts, charts, and planning.
 - Mobile layout is mostly readable, with clear cards, consistent labels, and usable full-screen dialogs.
 - Planning gives a clear blocked-state warning in the New Plan tab when ATK credentials are missing.
+- Dialog, drawer, button, and badge primitives now forward refs cleanly; the prior Radix/Vaul ref warning no longer appears in the UX audit.
 - TypeScript checks pass for both frontend and backend.
 
 ## High Findings
 
-### 1. Dialog and Drawer Triggers Emit Repeated Ref Warnings
+### 1. Bottom Navigation Can Overlap Dashboard Actions On Short Desktop Viewports
 
-Severity: `High`
+Severity: `Medium`
 
-Page/flow: App shell, meal composer, workout modal, weight modal, profile drawer
-
-Evidence:
-
-- `docs/ux-audit-screenshots/audit-events.json`
-
-Actual:
-
-- The audit recorded 222 console errors with this warning:
-  `Function components cannot be given refs. Attempts to access this ref will fail.`
-- The stack points to `Button` inside Radix `DialogTrigger`, `DrawerTrigger`, and `SlotClone`.
-
-Expected:
-
-- Shared UI primitives used with `asChild` should forward refs cleanly.
-
-Impact:
-
-- This can break focus management, trigger semantics, and accessibility behavior in dialogs/drawers.
-
-Recommended fix:
-
-- Convert `frontend/src/components/ui/button.tsx` to `React.forwardRef`.
-- Check other `asChild` primitives such as `Badge` if they are used as Radix children.
-- Re-run the browser audit and confirm the warning disappears.
-
-### 2. Fixed Bottom Navigation Obscures Desktop Dashboard Content
-
-Severity: `High`
-
-Page/flow: Dashboard on desktop
+Page/flow: Dashboard on shorter desktop browser windows
 
 Evidence:
 
 - `docs/ux-audit-screenshots/desktop-dashboard-empty.png`
+- `docs/ux-audit-screenshots/desktop-dashboard-viewport-only.png`
 
 Actual:
 
-- The fixed bottom nav floats over the dashboard content on desktop, covering the empty-state area for Today's Meals and Recent Workouts.
+- A targeted viewport check found no interactive overlap at `1440x900`.
+- The same check found overlap with the `Log food` and `View food log` actions at `1440x768` and `1280x720`.
+- The original full-page screenshot made this look more severe than it is because fixed-position elements appear in the captured viewport area.
 
 Expected:
 
-- Navigation should not cover active content.
-- On desktop, use a header/sidebar navigation pattern or reserve enough vertical space so cards never sit under the fixed nav.
+- Navigation should not cover active content at common desktop heights.
+- Desktop layouts should either reserve enough viewport space for fixed bottom navigation or use a desktop navigation pattern that does not float over content.
 
 Impact:
 
-- The app reads as mobile-only on desktop and hides important empty-state actions.
+- Users with shorter desktop windows, browser toolbars, or zoomed pages may see the bottom nav cover dashboard actions.
+- Users with taller windows may not experience this issue.
 
 Recommended fix:
 
 - Keep bottom tabs for mobile.
-- At `md`/`lg` and above, move primary navigation into the header or a left rail.
-- If bottom nav remains on larger screens, add enough bottom padding and avoid placing it over the main content column.
+- At larger breakpoints, consider moving primary navigation into the header or a left rail.
+- If bottom nav remains on desktop, reserve enough viewport space or adjust dashboard section placement so first-screen actions do not sit under the fixed nav at `1440x768` and `1280x720`.
 
-### 3. Planning Setup State Says "Ready" When Setup Is Required
+### 2. Planning Setup State Says "Ready" When Setup Is Required
 
 Severity: `High`
 
@@ -119,7 +94,7 @@ Recommended fix:
 
 ## Medium Findings
 
-### 4. Workout Modal Copy Is Internally Inconsistent
+### 3. Workout Modal Copy Is Internally Inconsistent
 
 Severity: `Medium`
 
@@ -149,7 +124,7 @@ Recommended fix:
 - Make title/subtitle derive from `defaultIntent` or selected workout flow.
 - Use clearer labels: `Start live workout` and `Log completed workout`.
 
-### 5. Meal Composer Starts With a Blank Date/Time
+### 4. Meal Composer Starts With a Blank Date/Time
 
 Severity: `Medium`
 
@@ -179,7 +154,7 @@ Recommended fix:
 - Default Date & Time to now for new entries.
 - Add required markers or inline helper text near the meal description/photo/saved-food options.
 
-### 6. Header Icon Actions Are Hard To Interpret Visually
+### 5. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -210,7 +185,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 7. Devtools Overlay Interferes With Local UX Review
+### 6. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
@@ -236,7 +211,7 @@ Recommended fix:
 
 - Gate router devtools behind an explicit env flag such as `VITE_ENABLE_ROUTER_DEVTOOLS=true`.
 
-### 8. UI Documentation Is Out Of Date
+### 7. UI Documentation Is Out Of Date
 
 Severity: `Low`
 
