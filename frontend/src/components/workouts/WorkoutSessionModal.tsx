@@ -279,6 +279,18 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
   const durationDisplay = useManualTime
     ? `${manualMinutes}:${manualSeconds.padStart(2, "0")}`
     : formatTimer(elapsedSeconds);
+  const modalTitle = getModalTitle({ isEditing, isQuickLog, step });
+  const modalDescription = getModalDescription({ isEditing, isQuickLog, step });
+  const progressSteps = isQuickLog
+    ? [
+        { key: "plan", label: "Details" },
+        { key: "review", label: "Review" }
+      ]
+    : [
+        { key: "plan", label: "Plan" },
+        { key: "active", label: "Active" },
+        { key: "review", label: "Review" }
+      ];
 
   // Step 1: Plan
   const renderPlan = () => (
@@ -295,9 +307,9 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
             >
               <span className="inline-flex items-center gap-2">
                 <Timer className="h-4 w-4" />
-                Live timer
+                Live workout
               </span>
-              <span className="text-xs font-normal opacity-80">Start now</span>
+              <span className="text-xs font-normal opacity-80">Start timer</span>
             </Button>
             <Button
               type="button"
@@ -307,9 +319,9 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
             >
               <span className="inline-flex items-center gap-2">
                 <ClipboardCheck className="h-4 w-4" />
-                Completed
+                Completed workout
               </span>
-              <span className="text-xs font-normal opacity-80">Log details</span>
+              <span className="text-xs font-normal opacity-80">Enter duration</span>
             </Button>
           </div>
         </div>
@@ -459,7 +471,7 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
         <Button variant="outline" onClick={handleClose}>Cancel</Button>
         <Button onClick={isQuickLog ? handleReview : handleStart}>
           {isQuickLog ? <Check className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-          {isEditing ? "Review Changes" : isQuickLog ? "Review Log" : "Start Timer"}
+          {isEditing ? "Review Changes" : isQuickLog ? "Review Workout" : "Start Timer"}
         </Button>
       </div>
     </div>
@@ -530,7 +542,7 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={handleEdit}>Back to Plan</Button>
         <Button onClick={handleReview}>
-          <Check className="h-4 w-4 mr-1" /> Finish
+          <Check className="h-4 w-4 mr-1" /> Finish Workout
         </Button>
       </div>
     </div>
@@ -615,28 +627,19 @@ export function WorkoutSessionModal({ trigger, session, defaultIntent = "timer",
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl sm:max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing
-              ? "Edit Workout"
-              : step === "plan" ? "Plan Workout" : step === "active" ? "Active Workout" : "Review Workout"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? "Update the workout details, then review before saving."
-              : entryIntent === "quick"
-                ? "Log a completed workout without starting a timer."
-                : "Plan the workout, start the timer, then save the completed session."}
-          </DialogDescription>
+          <DialogTitle>{modalTitle}</DialogTitle>
+          <DialogDescription>{modalDescription}</DialogDescription>
         </DialogHeader>
         {step === "plan" && renderPlan()}
         {step === "active" && renderActive()}
         {step === "review" && renderReview()}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className={step === "plan" ? "text-primary font-semibold" : ""}>Plan</span>
-          <span>/</span>
-          <span className={step === "active" ? "text-primary font-semibold" : ""}>Active</span>
-          <span>/</span>
-          <span className={step === "review" ? "text-primary font-semibold" : ""}>Review</span>
+          {progressSteps.map((item, index) => (
+            <span key={item.key} className="inline-flex items-center gap-2">
+              {index > 0 ? <span>/</span> : null}
+              <span className={step === item.key ? "font-semibold text-primary" : ""}>{item.label}</span>
+            </span>
+          ))}
         </div>
       </DialogContent>
     </Dialog>
@@ -659,6 +662,54 @@ function resolveExerciseCategory(
   }
 
   return WORKOUT_TYPES.find((item) => item.value === mode)?.defaultActivityType ?? "OTHER";
+}
+
+function getModalTitle({
+  isEditing,
+  isQuickLog,
+  step
+}: {
+  isEditing: boolean;
+  isQuickLog: boolean;
+  step: "plan" | "active" | "review";
+}) {
+  if (isEditing) return step === "review" ? "Review Workout Changes" : "Edit Workout";
+  if (isQuickLog) return step === "review" ? "Review Completed Workout" : "Log Completed Workout";
+  if (step === "active") return "Live Workout";
+  if (step === "review") return "Review Live Workout";
+  return "Start Live Workout";
+}
+
+function getModalDescription({
+  isEditing,
+  isQuickLog,
+  step
+}: {
+  isEditing: boolean;
+  isQuickLog: boolean;
+  step: "plan" | "active" | "review";
+}) {
+  if (isEditing) {
+    return step === "review"
+      ? "Check the updated workout summary before saving."
+      : "Update the workout details, then review before saving.";
+  }
+
+  if (isQuickLog) {
+    return step === "review"
+      ? "Check the completed workout summary before saving."
+      : "Enter the completed workout duration and details, then review before saving.";
+  }
+
+  if (step === "active") {
+    return "Track time, adjust details if needed, then finish to review.";
+  }
+
+  if (step === "review") {
+    return "Check the timed workout summary before saving.";
+  }
+
+  return "Choose a workout type, add exercises if helpful, then start the timer.";
 }
 
 function getWorkoutMode(activityType: WorkoutActivityType): WorkoutMode {

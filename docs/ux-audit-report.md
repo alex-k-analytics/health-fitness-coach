@@ -25,41 +25,12 @@ The initial browser audit was accidentally run against `http://127.0.0.1:5173`, 
 - Dialog, drawer, button, and badge primitives now forward refs cleanly; the prior Radix/Vaul ref warning no longer appears in the UX audit.
 - Desktop primary navigation now lives in the header at `lg` and above, while mobile/tablet keep the fixed bottom nav; short desktop viewport checks no longer show nav/action overlap.
 - `frontend/UI_DOCS.md` now reflects the five-route navigation and responsive header/bottom-nav behavior.
+- Workout modal copy now derives from the selected flow, so completed-workout logging no longer appears as a planned/live workout.
 - TypeScript checks pass for both frontend and backend.
 
 ## Medium Findings
 
-### 1. Workout Modal Copy Is Internally Inconsistent
-
-Severity: `Medium`
-
-Page/flow: Workout logging
-
-Evidence:
-
-- `docs/ux-audit-screenshots/mobile-workout-modal-initial.png`
-
-Actual:
-
-- The modal title says `Plan Workout`.
-- The selected flow is `Completed`.
-- The subtitle says `Log a completed workout without starting a timer.`
-
-Expected:
-
-- The modal title should match the selected mode, such as `Log Completed Workout`.
-- If the user switches to live timer, the title/subtitle should update to reflect that mode.
-
-Impact:
-
-- The workflow is functional but mentally heavier than needed.
-
-Recommended fix:
-
-- Make title/subtitle derive from `defaultIntent` or selected workout flow.
-- Use clearer labels: `Start live workout` and `Log completed workout`.
-
-### 2. Meal Composer Starts With a Blank Date/Time
+### 1. Meal Composer Starts With a Blank Date/Time
 
 Severity: `Medium`
 
@@ -89,7 +60,7 @@ Recommended fix:
 - Default Date & Time to now for new entries.
 - Add required markers or inline helper text near the meal description/photo/saved-food options.
 
-### 3. Header Icon Actions Are Hard To Interpret Visually
+### 2. Header Icon Actions Are Hard To Interpret Visually
 
 Severity: `Medium`
 
@@ -120,7 +91,7 @@ Recommended fix:
 
 ## Low Findings
 
-### 4. Devtools Overlay Interferes With Local UX Review
+### 3. Devtools Overlay Interferes With Local UX Review
 
 Severity: `Low`
 
