@@ -11,7 +11,17 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, FileText, Image, ChevronRight, Sparkles, Search, X } from "lucide-react";
+import {
+  BookOpen,
+  Camera,
+  FileText,
+  Image,
+  ChevronRight,
+  PencilLine,
+  Sparkles,
+  Search,
+  X
+} from "lucide-react";
 import {
   useMealEstimateMutation,
   useCreateMealMutation,
@@ -39,6 +49,7 @@ interface MealComposerProps {
 }
 
 type MealComposerStep = "input" | "estimate" | "confirm";
+type MealInputMode = "describe" | "photos" | "saved";
 
 type NutritionOverrideDrafts = Record<keyof NutritionOverrides, string>;
 
@@ -85,6 +96,9 @@ export function MealComposer({
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<MealComposerStep>(
     initialSourceAnalysis ? "confirm" : "input"
+  );
+  const [inputMode, setInputMode] = useState<MealInputMode>(
+    initialFood ? "saved" : "describe"
   );
   const [title, setTitle] = useState(initialMeal?.title ?? initialFood?.name ?? "");
   const [notes, setNotes] = useState(initialMeal?.notes ?? "");
@@ -212,12 +226,37 @@ export function MealComposer({
     []
   );
 
-  const buildFormData = useCallback(() => {
+  const getSubmitTitle = useCallback(() => {
+    const trimmedTitle = title.trim();
+    if (trimmedTitle) return trimmedTitle;
+
+    const trimmedServing = servingDescription.trim();
+    if (trimmedServing) return trimmedServing.slice(0, 160);
+
+    if (selectedSavedFood?.name) return selectedSavedFood.name;
+
+    if (plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0) {
+      return "Food photo";
+    }
+
+    return "Meal";
+  }, [
+    labelFiles.length,
+    otherFiles.length,
+    plateFiles.length,
+    selectedSavedFood,
+    servingDescription,
+    title
+  ]);
+
+  const buildFormData = useCallback((submitTitle = getSubmitTitle()) => {
     const formData = new FormData();
-    formData.append("title", title);
-    if (notes) formData.append("notes", notes);
+    formData.append("title", submitTitle);
+    if (notes.trim()) formData.append("notes", notes.trim());
     if (eatenAt) formData.append("eatenAt", new Date(eatenAt).toISOString());
-    if (servingDescription) formData.append("servingDescription", servingDescription);
+    if (servingDescription.trim()) {
+      formData.append("servingDescription", servingDescription.trim());
+    }
     if (quantity) formData.append("quantity", quantity);
     if (savedFoodId) formData.append("savedFoodId", savedFoodId);
     formData.append("saveAsReusableFood", String(saveAsReusableFood));
@@ -227,6 +266,7 @@ export function MealComposer({
     return formData;
   }, [
     eatenAt,
+    getSubmitTitle,
     labelFiles,
     notes,
     otherFiles,
@@ -257,6 +297,7 @@ export function MealComposer({
     setSourceAnalysisBaseServings(getServingCount(nextQuantity));
     resetCorrections(initialOverrideDrafts);
     setStep(initialSourceAnalysis ? "confirm" : "input");
+    setInputMode(initialFood ? "saved" : "describe");
     previousQuantityRef.current = getServingCount(nextQuantity);
   }, [
     initialFood,
@@ -280,7 +321,11 @@ export function MealComposer({
   }, [onClose, open, reset]);
 
   const handleEstimate = useCallback(() => {
-    const formData = buildFormData();
+    const submitTitle = getSubmitTitle();
+    if (!title.trim()) {
+      setTitle(submitTitle);
+    }
+    const formData = buildFormData(submitTitle);
     setStep("estimate");
     estimateMutation.mutate(formData, {
       onSuccess: (result) => {
@@ -293,12 +338,16 @@ export function MealComposer({
         setStep("input");
       }
     });
-  }, [buildFormData, estimateMutation, quantity, resetCorrections]);
+  }, [buildFormData, estimateMutation, getSubmitTitle, quantity, resetCorrections, title]);
 
   const handleSave = useCallback(() => {
     if (!displayedSourceAnalysis) return;
 
-    const formData = buildFormData();
+    const submitTitle = getSubmitTitle();
+    if (!title.trim()) {
+      setTitle(submitTitle);
+    }
+    const formData = buildFormData(submitTitle);
     formData.append("sourceAnalysis", JSON.stringify(displayedSourceAnalysis));
     formData.append("nutritionOverrides", JSON.stringify(nutritionOverrides));
 
@@ -307,7 +356,7 @@ export function MealComposer({
         {
           mealId: initialMeal!.id,
           body: {
-            title,
+            title: submitTitle,
             notes: notes || null,
             eatenAt: eatenAt ? new Date(eatenAt).toISOString() : undefined,
             servingDescription: servingDescription || null,
@@ -336,6 +385,7 @@ export function MealComposer({
     createMutation,
     displayedSourceAnalysis,
     eatenAt,
+    getSubmitTitle,
     initialMeal,
     isEdit,
     notes,
@@ -355,6 +405,7 @@ export function MealComposer({
       setSavedFoodSearch("");
       setSourceAnalysis(savedFoodAnalysis);
       setSourceAnalysisBaseServings(1);
+      setInputMode("saved");
       resetCorrections();
       previousQuantityRef.current = getServingCount(quantity);
       if (savedFoodAnalysis) {
@@ -371,6 +422,7 @@ export function MealComposer({
     setSourceAnalysisBaseServings(getServingCount(quantity));
     resetCorrections();
     setStep("input");
+    setInputMode("describe");
   }, [quantity, resetCorrections]);
 
   const handleScaleEstimatedMacros = useCallback(() => {
@@ -392,11 +444,37 @@ export function MealComposer({
     plateFiles.length > 0 || labelFiles.length > 0 || otherFiles.length > 0;
   const hasReusableFoodInput = Boolean(savedFoodId);
   const hasServingDetailsInput = Boolean(servingDescription.trim());
-  const hasInputs = hasPhotoInput || hasReusableFoodInput || hasServingDetailsInput;
-  const canEstimate = Boolean(title.trim()) && hasInputs;
+  const hasTextInput = Boolean(title.trim()) || hasServingDetailsInput;
+  const hasInputs = hasPhotoInput || hasReusableFoodInput || hasTextInput;
+  const canEstimate = hasInputs;
   const breakdownTitle = hasActiveOverrides
     ? "Original estimate breakdown"
     : "Estimate breakdown";
+  const inputModeOptions: Array<{
+    id: MealInputMode;
+    label: string;
+    detail: string;
+    icon: React.ElementType;
+  }> = [
+    {
+      id: "describe",
+      label: "Describe",
+      detail: "Type a meal",
+      icon: PencilLine
+    },
+    {
+      id: "photos",
+      label: "Photos",
+      detail: hasPhotoInput ? "Photos added" : "Snap or upload",
+      icon: Camera
+    },
+    {
+      id: "saved",
+      label: "Saved",
+      detail: savedFoodOptions.length ? `${savedFoodOptions.length} foods` : "None yet",
+      icon: BookOpen
+    }
+  ];
 
   return (
     <Dialog
@@ -452,7 +530,32 @@ export function MealComposer({
 
         {step === "input" && (
           <div className="grid gap-5">
-            {savedFoodOptions.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {inputModeOptions.map(({ id, label, detail, icon: Icon }) => {
+                const active = inputMode === id;
+
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`grid min-h-20 gap-1 rounded-md border px-2 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card hover:bg-muted/45"
+                    }`}
+                    onClick={() => setInputMode(id)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-sm font-semibold leading-tight">{label}</span>
+                    <span className="text-xs leading-tight text-muted-foreground">
+                      {detail}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {inputMode === "saved" && savedFoodOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Saved foods</Label>
                 <div className="surface-panel">
@@ -525,12 +628,12 @@ export function MealComposer({
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Search for a reusable food or add photos/details below for a new estimate.
+                  Search for a reusable food, or switch modes to estimate a new meal.
                 </p>
               </div>
             )}
 
-            {savedFoodOptions.length === 0 && (
+            {inputMode === "saved" && savedFoodOptions.length === 0 && (
               <div className="surface-muted px-3 py-2 text-sm text-muted-foreground">
                 No saved foods yet. Add a photo or serving details to estimate a new meal.
               </div>
@@ -541,8 +644,11 @@ export function MealComposer({
               <Input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="e.g. Grilled chicken salad"
-                required
+                placeholder={
+                  inputMode === "photos"
+                    ? "Optional, e.g. Chicken burrito bowl"
+                    : "e.g. Grilled chicken salad"
+                }
               />
             </div>
 
@@ -572,40 +678,44 @@ export function MealComposer({
 
             <Separator />
 
-            <div className="grid gap-3">
-              <Label>Photos (optional)</Label>
-              <div className="grid gap-2">
-                <PhotoPicker
-                  label="Plate photos"
-                  files={plateFiles}
-                  onFiles={setPlateFiles}
-                  icon={Camera}
-                />
-                <PhotoPicker
-                  label="Nutrition label"
-                  files={labelFiles}
-                  onFiles={setLabelFiles}
-                  icon={FileText}
-                />
-                <PhotoPicker
-                  label="Other photos"
-                  files={otherFiles}
-                  onFiles={setOtherFiles}
-                  icon={Image}
-                />
+            {inputMode === "photos" && (
+              <div className="grid gap-3">
+                <Label>Photos</Label>
+                <div className="grid gap-2">
+                  <PhotoPicker
+                    label="Plate photos"
+                    files={plateFiles}
+                    onFiles={setPlateFiles}
+                    icon={Camera}
+                  />
+                  <PhotoPicker
+                    label="Nutrition label"
+                    files={labelFiles}
+                    onFiles={setLabelFiles}
+                    icon={FileText}
+                  />
+                  <PhotoPicker
+                    label="Other photos"
+                    files={otherFiles}
+                    onFiles={setOtherFiles}
+                    icon={Image}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="saveAsReusable"
-                checked={saveAsReusableFood}
-                onCheckedChange={(value) => setSaveAsReusableFood(value === true)}
-              />
-              <Label htmlFor="saveAsReusable" className="text-sm font-normal">
-                Save as reusable food for next time
-              </Label>
-            </div>
+            {!hasReusableFoodInput && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="saveAsReusable"
+                  checked={saveAsReusableFood}
+                  onCheckedChange={(value) => setSaveAsReusableFood(value === true)}
+                />
+                <Label htmlFor="saveAsReusable" className="text-sm font-normal">
+                  Save as reusable food for next time
+                </Label>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={closeAndReset}>
@@ -630,9 +740,30 @@ export function MealComposer({
             </div>
             {!hasInputs && (
               <p className="text-right text-xs text-muted-foreground">
-                Choose a saved food, attach a photo, or add serving details before estimating.
+                Describe the meal, choose a saved food, or attach a photo before estimating.
               </p>
             )}
+          </div>
+        )}
+
+        {step === "estimate" && (
+          <div className="grid gap-4 py-2">
+            <div className="surface-muted flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                <Sparkles className="h-5 w-5 animate-spin" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">Estimating nutrition</p>
+                <p className="text-xs text-muted-foreground">
+                  The next screen lets you review and correct numbers before saving.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
           </div>
         )}
 

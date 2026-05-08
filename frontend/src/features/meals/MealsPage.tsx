@@ -7,7 +7,7 @@ import { useMealsQuery } from "@/features/meals/hooks";
 import { MealComposer } from "@/features/meals/MealComposer";
 import { MealCard } from "@/components/shared/MealCard";
 import { formatMacroValue, getProgressPercent } from "@/lib/mealUtils";
-import { Plus, UtensilsCrossed } from "lucide-react";
+import { Flame, Plus, UtensilsCrossed } from "lucide-react";
 import type { Meal } from "@/types";
 
 export function MealsPage() {
@@ -15,6 +15,11 @@ export function MealsPage() {
   const { data: nutritionSummary, isLoading: loadingNutrition } = useNutritionSummaryQuery();
   const today = nutritionSummary?.today;
   const goals = nutritionSummary?.goals;
+  const calorieGoal = goals?.adjustedCalorieGoal ?? goals?.calorieGoal ?? null;
+  const calorieProgress = calorieGoal ? getProgressPercent(today?.calories ?? 0, calorieGoal) : 0;
+  const caloriesRemaining = calorieGoal
+    ? Math.max(0, calorieGoal - (today?.calories ?? 0))
+    : null;
   const macroSummaries = [
     {
       label: "Protein",
@@ -50,6 +55,55 @@ export function MealsPage() {
         />
       </div>
 
+      <Card className="overflow-hidden">
+        <CardContent className="grid gap-5 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="grid size-8 place-items-center rounded-md bg-primary/10 text-primary">
+                <Flame className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">Today&apos;s food log</p>
+                <p className="text-xs text-muted-foreground">
+                  {today?.mealCount ?? 0} meal{today?.mealCount !== 1 ? "s" : ""} logged
+                </p>
+              </div>
+            </div>
+            {loadingNutrition ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-40" />
+                <Skeleton className="h-2 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-3xl font-bold leading-none">{today?.calories ?? 0}</p>
+                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                      calories logged
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {calorieGoal
+                      ? `${caloriesRemaining} cal left of ${calorieGoal}`
+                      : "Set a calorie goal in Settings"}
+                  </p>
+                </div>
+                <Progress value={calorieProgress} max={100} className="mt-4" />
+              </>
+            )}
+          </div>
+          <MealComposer
+            trigger={
+              <Button className="w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
+                Log food
+              </Button>
+            }
+          />
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {macroSummaries.map((macro) => (
           <MacroGoalCard
@@ -79,9 +133,9 @@ export function MealsPage() {
         ) : (
           <>
             <CardHeader>
-              <CardTitle>Recent Meals</CardTitle>
+              <CardTitle>Food Log</CardTitle>
               <CardDescription>
-                {meals?.meals?.length ?? 0} meal{meals?.meals?.length !== 1 ? "s" : ""}
+                Recent meals with saved estimates and corrections.
               </CardDescription>
             </CardHeader>
             <CardContent>
