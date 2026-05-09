@@ -126,6 +126,67 @@ async function verifyNoDevtoolsOverlay(page: Page, viewportName: string, finding
   });
 }
 
+async function verifyAlertFeedback(
+  page: Page,
+  viewportName: string,
+  pageLabel: string,
+  expectedText: RegExp,
+  findings: Finding[]
+) {
+  const alertVisible = await page
+    .getByRole("alert")
+    .filter({ hasText: expectedText })
+    .first()
+    .isVisible()
+    .catch(() => false);
+
+  if (alertVisible) return;
+
+  const evidence = await screenshot(page, `${viewportName} ${pageLabel} missing alert feedback`);
+  findings.push({
+    severity: "Medium",
+    page: pageLabel,
+    title: "Validation feedback is not exposed as an alert",
+    actual: `The expected feedback matching ${expectedText} was not exposed through role="alert".`,
+    expected: "Form validation and submit errors should be announced to assistive technology users.",
+    evidence
+  });
+}
+
+async function verifyDialogScreenReaderSemantics(
+  dialog: Locator,
+  page: Page,
+  viewportName: string,
+  pageLabel: string,
+  findings: Finding[]
+) {
+  const semantics = await dialog.evaluate((element) => {
+    const textForIds = (ids: string | null) =>
+      ids
+        ?.split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+        .filter(Boolean)
+        .join(" ") ?? "";
+
+    return {
+      name: element.getAttribute("aria-label") || textForIds(element.getAttribute("aria-labelledby")),
+      description: textForIds(element.getAttribute("aria-describedby"))
+    };
+  });
+
+  if (semantics.name && semantics.description) return;
+
+  const evidence = await screenshot(page, `${viewportName} ${pageLabel} dialog semantics failed`);
+  findings.push({
+    severity: "Medium",
+    page: pageLabel,
+    title: "Dialog is missing screen-reader name or description",
+    actual: `Dialog accessible name present: ${Boolean(semantics.name)}. Description present: ${Boolean(semantics.description)}.`,
+    expected: "Dialogs and drawers should expose a title and description through aria-labelledby/aria-describedby.",
+    evidence
+  });
+}
+
 async function verifyPrimaryNavDoesNotCoverContent(
   page: Page,
   viewportName: string,
@@ -358,6 +419,7 @@ async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, view
   await page.keyboard.press("Enter");
   const drawer = page.getByRole("dialog", { name: /test user/i }).first();
   await expect(drawer).toBeVisible();
+  await verifyDialogScreenReaderSemantics(drawer, page, viewportName, "profile drawer", findings);
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
 
   const reachedDisplayName = await pressTabUntil(page, async () =>
@@ -447,6 +509,7 @@ async function verifyDialogKeyboardFlow({
 
   const dialog = page.getByRole("dialog", { name: dialogName }).first();
   await expect(dialog).toBeVisible({ timeout: 15_000 });
+  await verifyDialogScreenReaderSemantics(dialog, page, viewportName, pageLabel, findings);
 
   const initialFocusInside = await dialog.evaluate((element) => {
     const activeElement = document.activeElement;
@@ -661,12 +724,14 @@ async function runViewportAudit({
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForTimeout(400);
   await screenshot(page, `${viewportName} login invalid email`);
+  await verifyAlertFeedback(page, viewportName, "login", /valid email/i, findings);
 
   await email.fill("test@example.com");
   await password.fill("wrong-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForTimeout(700);
   await screenshot(page, `${viewportName} login wrong password`);
+  await verifyAlertFeedback(page, viewportName, "login", /invalid email or password|invalid credentials|sign in failed/i, findings);
 
   await password.fill("password123");
   await page.getByRole("button", { name: "Sign in" }).click();
