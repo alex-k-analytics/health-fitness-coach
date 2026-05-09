@@ -5,18 +5,74 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
+const DrawerFocusContext = React.createContext<React.MutableRefObject<HTMLElement | null> | null>(null)
+
+function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
+  return (node: T | null) => {
+    refs.forEach((ref) => {
+      if (!ref) return
+
+      if (typeof ref === "function") {
+        ref(node)
+        return
+      }
+
+      ;(ref as React.MutableRefObject<T | null>).current = node
+    })
+  }
+}
+
 function Drawer({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+
+  const restoreTriggerFocus = React.useCallback(() => {
+    const focusTrigger = () => triggerRef.current?.focus({ preventScroll: true })
+
+    triggerRef.current?.focus({ preventScroll: true })
+    window.requestAnimationFrame(focusTrigger)
+    window.setTimeout(focusTrigger, 50)
+  }, [])
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      onOpenChange?.(open)
+      if (!open) restoreTriggerFocus()
+    },
+    [onOpenChange, restoreTriggerFocus]
+  )
+
+  return (
+    <DrawerFocusContext.Provider value={triggerRef}>
+      <DrawerPrimitive.Root data-slot="drawer" onOpenChange={handleOpenChange} {...props} />
+    </DrawerFocusContext.Provider>
+  )
 }
 
 const DrawerTrigger = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Trigger>
->(({ ...props }, ref) => (
-  <DrawerPrimitive.Trigger ref={ref} data-slot="drawer-trigger" {...props} />
-))
+>(({ ...props }, ref) => {
+  const focusContext = React.useContext(DrawerFocusContext)
+  const setFocusTriggerRef = React.useCallback(
+    (node: React.ElementRef<typeof DrawerPrimitive.Trigger> | null) => {
+      if (focusContext) {
+        focusContext.current = node as HTMLElement | null
+      }
+    },
+    [focusContext]
+  )
+
+  return (
+    <DrawerPrimitive.Trigger
+      ref={composeRefs(ref, setFocusTriggerRef)}
+      data-slot="drawer-trigger"
+      {...props}
+    />
+  )
+})
 DrawerTrigger.displayName = "DrawerTrigger"
 
 function DrawerPortal({

@@ -5,18 +5,74 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
+const DialogFocusContext = React.createContext<React.MutableRefObject<HTMLElement | null> | null>(null)
+
+function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
+  return (node: T | null) => {
+    refs.forEach((ref) => {
+      if (!ref) return
+
+      if (typeof ref === "function") {
+        ref(node)
+        return
+      }
+
+      ;(ref as React.MutableRefObject<T | null>).current = node
+    })
+  }
+}
+
 function Dialog({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+
+  const restoreTriggerFocus = React.useCallback(() => {
+    const focusTrigger = () => triggerRef.current?.focus({ preventScroll: true })
+
+    triggerRef.current?.focus({ preventScroll: true })
+    window.requestAnimationFrame(focusTrigger)
+    window.setTimeout(focusTrigger, 50)
+  }, [])
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      onOpenChange?.(open)
+      if (!open) restoreTriggerFocus()
+    },
+    [onOpenChange, restoreTriggerFocus]
+  )
+
+  return (
+    <DialogFocusContext.Provider value={triggerRef}>
+      <DialogPrimitive.Root data-slot="dialog" onOpenChange={handleOpenChange} {...props} />
+    </DialogFocusContext.Provider>
+  )
 }
 
 const DialogTrigger = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Trigger>
->(({ ...props }, ref) => (
-  <DialogPrimitive.Trigger ref={ref} data-slot="dialog-trigger" {...props} />
-))
+>(({ ...props }, ref) => {
+  const focusContext = React.useContext(DialogFocusContext)
+  const setFocusTriggerRef = React.useCallback(
+    (node: React.ElementRef<typeof DialogPrimitive.Trigger> | null) => {
+      if (focusContext) {
+        focusContext.current = node as HTMLElement | null
+      }
+    },
+    [focusContext]
+  )
+
+  return (
+    <DialogPrimitive.Trigger
+      ref={composeRefs(ref, setFocusTriggerRef)}
+      data-slot="dialog-trigger"
+      {...props}
+    />
+  )
+})
 DialogTrigger.displayName = "DialogTrigger"
 
 function DialogPortal({
