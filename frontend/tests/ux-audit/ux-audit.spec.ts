@@ -185,6 +185,64 @@ async function verifyPrimaryNavDoesNotCoverContent(
   });
 }
 
+async function captureProfileDrawer(page: Page, viewportName: string) {
+  await page.getByRole("button", { name: /open profile/i }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+  await page.mouse.move(1, 1);
+  await page.waitForTimeout(500);
+  await screenshot(page, `${viewportName} profile drawer`);
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
+}
+
+async function captureWeightModalFlow(page: Page, baseURL: string, viewportName: string) {
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /log weight/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /log weight/i })).toBeVisible();
+  await screenshot(page, `${viewportName} weight modal initial`);
+  await page.getByLabel(/weight \(lb\)/i).fill("171.5");
+  await page.getByRole("button", { name: /^log$/i }).click();
+  await expect(page.getByRole("dialog", { name: /log weight/i })).toBeHidden();
+  await screenshot(page, `${viewportName} weight logged`);
+}
+
+async function captureMealEstimateSaveFlow(page: Page, baseURL: string, viewportName: string) {
+  await page.goto(`${baseURL}/meals`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /log (food|meal)/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /log meal/i })).toBeVisible();
+  await page.getByLabel(/what did you eat/i).fill("UX audit chicken rice bowl");
+  await page.getByLabel(/serving details/i).fill("1 bowl with grilled chicken, rice, beans, and salsa");
+  await page.getByRole("button", { name: /estimate nutrition/i }).click();
+  await expect(page.getByRole("dialog", { name: /review & save/i })).toBeVisible({ timeout: 30_000 });
+  await screenshot(page, `${viewportName} meal composer review`);
+  await page.getByRole("button", { name: /^save$/i }).click();
+  await expect(page.getByRole("dialog")).toBeHidden({ timeout: 30_000 });
+  await screenshot(page, `${viewportName} meal saved`);
+}
+
+async function captureProfileSaveFlow(page: Page, baseURL: string, viewportName: string) {
+  await page.goto(`${baseURL}/settings`, { waitUntil: "networkidle" });
+  const displayName = page.getByLabel(/display name/i);
+  const originalDisplayName = await displayName.inputValue();
+
+  await displayName.fill("A very long display name intended to check wrapping and save behavior in the health coach profile settings screen");
+  await page.waitForTimeout(300);
+  await screenshot(page, `${viewportName} settings long name`);
+
+  await displayName.fill(originalDisplayName);
+  await page.getByLabel(/notes/i).fill(`UX audit profile save check ${viewportName} ${Date.now()}`);
+  await page.getByRole("button", { name: /save changes/i }).click();
+  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} settings profile saved`);
+}
+
+async function captureLogoutFlow(page: Page, viewportName: string) {
+  await page.getByRole("button", { name: /open profile/i }).click();
+  await page.getByRole("button", { name: /sign out/i }).click();
+  await page.waitForURL(/\/login$/);
+  await screenshot(page, `${viewportName} signed out`);
+}
+
 function truncateEventText(text: string) {
   return text.length > 2000 ? `${text.slice(0, 2000)}...` : text;
 }
@@ -192,6 +250,10 @@ function truncateEventText(text: string) {
 async function attachEventCapture(page: Page, viewportName: string, events: AuditEvent[]) {
   page.on("console", (msg) => {
     if (["error", "warning"].includes(msg.type())) {
+      if (msg.text().includes("Failed to load resource: the server responded with a status of 401")) {
+        return;
+      }
+
       events.push({
         viewport: viewportName,
         type: `console:${msg.type()}`,
@@ -211,6 +273,10 @@ async function attachEventCapture(page: Page, viewportName: string, events: Audi
   });
 
   page.on("requestfailed", (request) => {
+    if (request.failure()?.errorText === "net::ERR_ABORTED") {
+      return;
+    }
+
     events.push({
       viewport: viewportName,
       type: "requestfailed",
@@ -222,7 +288,11 @@ async function attachEventCapture(page: Page, viewportName: string, events: Audi
   page.on("response", (response) => {
     const status = response.status();
     const url = response.url();
-    if (status >= 400 && !url.includes("/api/auth/session")) {
+    const pagePath = new URL(page.url()).pathname;
+    const isExpectedLoginFailure = url.includes("/api/auth/login");
+    const isExpectedLoggedOutTeardown = pagePath === "/login" && !isExpectedLoginFailure;
+
+    if (status >= 400 && !url.includes("/api/auth/session") && !isExpectedLoggedOutTeardown) {
       events.push({
         viewport: viewportName,
         type: "http",
@@ -303,6 +373,7 @@ async function runViewportAudit({
   await screenshot(page, `${viewportName} dashboard empty`);
   await verifyNoDevtoolsOverlay(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
+  await captureProfileDrawer(page, viewportName);
 
   const pageChecks = [
     ["/meals", "meals"],
@@ -338,6 +409,9 @@ async function runViewportAudit({
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
   }
+  await captureMealEstimateSaveFlow(page, baseURL, viewportName);
+
+  await captureWeightModalFlow(page, baseURL, viewportName);
 
   await page.goto(`${baseURL}/workouts`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /start workout|log (a completed )?workout/i }).first().click();
@@ -356,12 +430,8 @@ async function runViewportAudit({
   await page.waitForTimeout(400);
   await screenshot(page, `${viewportName} planning settings`);
 
-  await page.goto(`${baseURL}/settings`, { waitUntil: "networkidle" });
-  await page
-    .getByLabel(/display name/i)
-    .fill("A very long display name intended to check wrapping and save behavior in the health coach profile settings screen");
-  await page.waitForTimeout(300);
-  await screenshot(page, `${viewportName} settings long name`);
+  await captureProfileSaveFlow(page, baseURL, viewportName);
+  await captureLogoutFlow(page, viewportName);
 
   await context.close();
 }

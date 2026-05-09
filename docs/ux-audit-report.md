@@ -22,6 +22,15 @@ Latest verification after fixing findings 2-7:
 - The only recorded events are expected negative-login `401 /api/auth/login` checks in mobile, tablet, and desktop.
 - The previous meal composer dialog-description warnings are no longer present.
 
+Latest verification after implementing the improvement backlog:
+
+- Ran `npm run build`.
+- Ran `npm run ux:audit`.
+- Result: Playwright audit passed, `1 passed (1.7m)`.
+- The runner now fails on structured UX findings instead of only writing them to `audit-events.json`.
+- The audit now asserts mobile/tablet primary navigation does not cover visible page controls or content.
+- Additional evidence now covers profile drawer, weight modal save, profile save, logout, and meal estimate/review/save flows.
+
 ## High Severity
 
 ### 1. Mobile bottom navigation occludes page content
@@ -100,7 +109,7 @@ Status: Fixed on 2026-05-09. Planning settings now separate the ATK planning sou
 
 ### 5. Planning tab layout competes with bottom navigation on mobile
 
-Status: Fixed on 2026-05-09. Planning tabs now stay in one horizontally scrollable row on mobile, avoiding the crowded two-row tab stack near the bottom app navigation.
+Status: Fixed on 2026-05-09. Planning tabs now stay in one compact four-column row on mobile, avoiding the crowded two-row tab stack and clipped horizontal-scroll labels near the bottom app navigation.
 
 - Page/flow: Planning tabs on mobile.
 - Steps to reproduce:
@@ -159,6 +168,7 @@ Status: Fixed on 2026-05-09. Mobile and tablet headers now show only theme and p
 - Primary CTAs are consistently styled and visible.
 - Desktop layout is stable and readable across dashboard, meals, workouts, planning, and settings.
 - Meal, workout, and weight dialogs include accessible descriptions.
+- Profile drawer, weight logging, profile saving, logout, and full meal estimate/review/save flows are covered by the UX audit evidence set.
 
 ## Improvement Backlog
 
@@ -170,8 +180,10 @@ Status: Fixed on 2026-05-09. Mobile and tablet headers now show only theme and p
 - Revisit the mobile shell structure so bottom navigation behaves more like reserved app chrome than an overlay.
 - Split Planning settings into `Planning source` and `Stored recipe sources` sections.
 - Add a small mobile discoverability strategy for header icon actions, such as fewer icons or contextual labels.
+- Add a mobile nav/content regression check that asserts important fields are not covered by fixed navigation.
+- Expand the UX audit runner to cover profile drawer, weight modal, logout, save-profile validation, and a full meal estimate/review/save loop.
+- Associate the meal composer `Serving Details` label with its input so the expanded audit can drive it by accessible name.
 
 ### Still Applicable
 
-- Add a mobile nav/content regression check that asserts important fields are not covered by fixed navigation.
-- Expand the UX audit runner to cover profile drawer, weight modal, logout, save-profile validation, and a full meal estimate/review/save loop.
+- No open improvement backlog items from this audit remain.
