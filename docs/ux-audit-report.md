@@ -21,6 +21,8 @@ The committed runner reported no structured findings in `audit-events.json`, but
 
 ### 1. Mobile bottom navigation occludes page content
 
+Status: Fixed on 2026-05-09. The mobile shell now reserves bottom navigation space as app chrome instead of layering the nav over page content. Verified with `npm run build` and `npm run ux:audit`.
+
 - Page/flow: Mobile app shell across Meals, Workouts, Settings, Planning.
 - Steps to reproduce:
   1. Sign in at `375x812`.

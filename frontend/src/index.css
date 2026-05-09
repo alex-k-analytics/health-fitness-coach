@@ -260,12 +260,12 @@
     width: 100%;
     max-width: 72rem;
     margin: 0 auto;
-    padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom));
+    padding: 1rem;
   }
 
   @media (min-width: 640px) {
     .page-shell {
-      padding: 1.25rem 1.5rem calc(6rem + env(safe-area-inset-bottom));
+      padding: 1.25rem 1.5rem;
     }
   }
 

@@ -4,9 +4,9 @@ import { BottomNav } from "./BottomNav";
 
 export function ShellLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-subtle">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-gradient-subtle">
       <DashboardHeader />
-      <main className="flex-1 overflow-y-auto">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
       </main>
       <BottomNav />
