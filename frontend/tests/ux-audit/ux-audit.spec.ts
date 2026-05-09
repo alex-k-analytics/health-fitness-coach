@@ -1,5 +1,5 @@
 import { chromium, expect, test } from "@playwright/test";
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -333,6 +333,22 @@ async function pressTabUntil(
   return predicate();
 }
 
+async function activeControlMatches(page: Page, name: RegExp) {
+  return page.evaluate(
+    ({ source, flags }) => {
+      const activeElement = document.activeElement;
+      const control = activeElement?.closest("button,[role='button']");
+      const accessibleName =
+        control?.getAttribute("aria-label") ||
+        control?.textContent ||
+        "";
+
+      return new RegExp(source, flags).test(accessibleName);
+    },
+    { source: name.source, flags: name.flags }
+  );
+}
+
 async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
   if (viewportName !== "desktop") return;
 
@@ -340,6 +356,8 @@ async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, view
   const profileButton = page.getByRole("button", { name: /open profile/i });
   await profileButton.focus();
   await page.keyboard.press("Enter");
+  const drawer = page.getByRole("dialog", { name: /test user/i }).first();
+  await expect(drawer).toBeVisible();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
 
   const reachedDisplayName = await pressTabUntil(page, async () =>
@@ -381,14 +399,14 @@ async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, view
   }
 
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible({ timeout: 15_000 });
   await screenshot(page, `${viewportName} profile drawer keyboard saved`);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
+  await expect(drawer).toBeHidden({ timeout: 15_000 });
+  await page.waitForTimeout(100);
 
-  const focusReturned = await page.evaluate(() =>
-    document.activeElement?.getAttribute("aria-label")?.toLowerCase().includes("open profile") ?? false
-  );
+  const focusReturned = await activeControlMatches(page, /open profile/i);
 
   if (!focusReturned) {
     const evidence = await screenshot(page, `${viewportName} profile drawer focus return failed`);
@@ -403,6 +421,130 @@ async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, view
   }
 
   await resetAuditProfile(page, baseURL);
+}
+
+async function verifyDialogKeyboardFlow({
+  page,
+  viewportName,
+  findings,
+  trigger,
+  dialogName,
+  pageLabel,
+  title,
+  focusReturnName
+}: {
+  page: Page;
+  viewportName: string;
+  findings: Finding[];
+  trigger: Locator;
+  dialogName: RegExp;
+  pageLabel: string;
+  title: string;
+  focusReturnName: RegExp;
+}) {
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+
+  const dialog = page.getByRole("dialog", { name: dialogName }).first();
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+
+  const initialFocusInside = await dialog.evaluate((element) => {
+    const activeElement = document.activeElement;
+    return activeElement !== null && element.contains(activeElement);
+  });
+
+  if (!initialFocusInside) {
+    const evidence = await screenshot(page, `${viewportName} ${pageLabel} initial focus failed`);
+    findings.push({
+      severity: "Medium",
+      page: pageLabel,
+      title: `${title} does not move keyboard focus inside the dialog`,
+      actual: "Opening the dialog from the keyboard did not place focus inside the dialog content.",
+      expected: "Keyboard-opened dialogs should move focus to a focusable element inside the dialog.",
+      evidence
+    });
+  }
+
+  for (let index = 0; index < 12; index += 1) {
+    await page.keyboard.press("Tab");
+  }
+
+  const loopFocusInside = await dialog.evaluate((element) => {
+    const activeElement = document.activeElement;
+    return activeElement !== null && element.contains(activeElement);
+  });
+
+  if (!loopFocusInside) {
+    const evidence = await screenshot(page, `${viewportName} ${pageLabel} tab loop failed`);
+    findings.push({
+      severity: "High",
+      page: pageLabel,
+      title: `${title} does not keep keyboard focus inside the dialog`,
+      actual: "After tabbing through dialog controls, focus moved outside the open dialog.",
+      expected: "Modal dialogs should keep keyboard focus inside the dialog until closed.",
+      evidence
+    });
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
+  await page.waitForTimeout(100);
+
+  const focusReturned = await activeControlMatches(page, focusReturnName);
+  if (!focusReturned) {
+    const evidence = await screenshot(page, `${viewportName} ${pageLabel} focus return failed`);
+    findings.push({
+      severity: "Medium",
+      page: pageLabel,
+      title: `${title} does not return focus to its trigger`,
+      actual: "After closing the dialog with Escape, focus did not return to the button that opened it.",
+      expected: "Dialogs should restore focus to the trigger that opened them.",
+      evidence
+    });
+  }
+}
+
+async function verifyDialogKeyboardFlows(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
+  if (viewportName !== "desktop") return;
+
+  const checks = [
+    {
+      triggerName: /^log food$/i,
+      dialogName: /log meal/i,
+      pageLabel: "meal composer",
+      title: "Meal composer",
+      focusReturnName: /^log food$/i
+    },
+    {
+      triggerName: /^log workout$/i,
+      dialogName: /log completed workout/i,
+      pageLabel: "workout modal",
+      title: "Workout modal",
+      focusReturnName: /^log workout$/i
+    },
+    {
+      triggerName: /^log weight$/i,
+      dialogName: /log weight/i,
+      pageLabel: "weight modal",
+      title: "Weight modal",
+      focusReturnName: /^log weight$/i
+    }
+  ];
+
+  for (const check of checks) {
+    await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+    const header = page.getByRole("banner");
+    await verifyDialogKeyboardFlow({
+      page,
+      viewportName,
+      findings,
+      trigger: header.getByRole("button", { name: check.triggerName }).first(),
+      dialogName: check.dialogName,
+      pageLabel: check.pageLabel,
+      title: check.title,
+      focusReturnName: check.focusReturnName
+    });
+  }
 }
 
 async function captureProfileSaveFlow(page: Page, baseURL: string, viewportName: string) {
@@ -564,6 +706,7 @@ async function runViewportAudit({
   await captureProfileDrawer(page, viewportName);
   await captureProfileDrawerSaveFlow(page, baseURL, viewportName);
   await verifyProfileDrawerKeyboardFlow(page, baseURL, viewportName, findings);
+  await verifyDialogKeyboardFlows(page, baseURL, viewportName, findings);
 
   const pageChecks = [
     ["/meals", "meals"],
