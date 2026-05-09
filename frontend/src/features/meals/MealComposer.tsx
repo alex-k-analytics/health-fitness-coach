@@ -1,6 +1,13 @@
 import type * as React from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -455,6 +462,13 @@ export function MealComposer({
   const breakdownTitle = hasActiveOverrides
     ? "Original estimate breakdown"
     : "Estimate breakdown";
+  const dialogDescription = isEdit
+    ? "Update meal details, servings, and saved nutrition before saving changes."
+    : step === "input"
+      ? "Describe a meal, choose a saved food, or add photos before estimating nutrition."
+      : step === "estimate"
+        ? "Nutrition is being estimated from the meal details you provided."
+        : "Review the estimated nutrition and make corrections before saving.";
   const inputModeOptions: Array<{
     id: MealInputMode;
     label: string;
@@ -505,6 +519,7 @@ export function MealComposer({
                   ? "Estimating..."
                   : "Review & Save"}
           </DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         {errors.length > 0 && (

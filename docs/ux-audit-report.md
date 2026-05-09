@@ -43,6 +43,8 @@ Status: Fixed on 2026-05-09. The mobile shell now reserves bottom navigation spa
 
 ### 2. Meal composer dialog is missing an accessible description
 
+Status: Fixed on 2026-05-09. The meal composer now renders a Radix `DialogDescription` that matches the current step, giving assistive technology users context and removing the dialog warning for this flow.
+
 - Page/flow: Meals -> Log meal.
 - Steps to reproduce:
   1. Sign in.
