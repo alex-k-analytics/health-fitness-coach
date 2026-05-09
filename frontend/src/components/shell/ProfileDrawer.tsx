@@ -1,4 +1,12 @@
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+  DrawerTrigger,
+  DrawerFooter,
+  DrawerClose
+} from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { useShellStore } from "@/stores/shellStore";
 import { getInitials } from "@/lib/mealUtils";
@@ -23,10 +31,15 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
             <span className="inline-flex items-center justify-center rounded-full w-10 h-10 text-xs font-bold text-primary bg-primary/10">
               {memberInitials}
             </span>
-            <DrawerTitle>{memberName}</DrawerTitle>
+            <div>
+              <DrawerTitle>{memberName}</DrawerTitle>
+              <DrawerDescription className="sr-only">
+                Manage profile details, health goals, and account actions.
+              </DrawerDescription>
+            </div>
           </div>
           <DrawerClose asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Close profile drawer">
               <X className="h-4 w-4" />
             </Button>
           </DrawerClose>

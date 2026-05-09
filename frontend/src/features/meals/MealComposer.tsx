@@ -701,8 +701,9 @@ export function MealComposer({
             </div>
 
             <div className="grid gap-2">
-              <Label>Serving Details</Label>
+              <Label htmlFor={`${formId}-serving-details`}>Serving Details</Label>
               <Input
+                id={`${formId}-serving-details`}
                 value={servingDescription}
                 onChange={(event) => setServingDescription(event.target.value)}
                 placeholder="e.g. 1 bowl, 2 slices"
