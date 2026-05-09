@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +40,9 @@ export function WeightModal({ trigger }: { trigger?: React.ReactNode }) {
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Log Weight</DialogTitle>
+          <DialogDescription>
+            Enter your current weight in pounds. The app stores it for your weight trend.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">

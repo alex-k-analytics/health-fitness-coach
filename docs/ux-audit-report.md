@@ -61,6 +61,8 @@ Status: Fixed on 2026-05-09. The meal composer now renders a Radix `DialogDescri
 
 ### 3. Weight modal has the same dialog-description risk
 
+Status: Fixed on 2026-05-09. The weight modal now includes a `DialogDescription` explaining the expected unit and how the entry is used.
+
 - Page/flow: Header -> Log weight.
 - Steps to reproduce:
   1. Sign in.
