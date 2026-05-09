@@ -17,6 +17,9 @@ env:
   REGION: us-central1
   SERVICE_NAME: health-fitness-coach
   SCRAPER_SERVICE_NAME: health-fitness-coach-scraper
+  SCRAPER_CPU: "2"
+  SCRAPER_MEMORY: 2Gi
+  SCRAPER_CONCURRENCY: "1"
   ARTIFACT_REPOSITORY_ID: health-fitness-coach
   WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
   DEPLOYER_SERVICE_ACCOUNT: github-actions-service-account@akalish-software.iam.gserviceaccount.com
@@ -142,6 +145,11 @@ jobs:
             --image="${SCRAPER_IMAGE_URI}" \
             --region="${REGION}" \
             --project="${PROJECT_ID}" \
+            --cpu="${SCRAPER_CPU}" \
+            --memory="${SCRAPER_MEMORY}" \
+            --concurrency="${SCRAPER_CONCURRENCY}" \
+            --timeout=300 \
+            --port=5050 \
             --quiet
 
       - name: Show service URLs

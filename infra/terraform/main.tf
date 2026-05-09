@@ -400,8 +400,9 @@ resource "google_cloud_run_v2_service" "scraper" {
   ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   template {
-    service_account = google_service_account.app_runtime.email
-    timeout         = "300s"
+    service_account                  = google_service_account.app_runtime.email
+    timeout                          = "300s"
+    max_instance_request_concurrency = var.scraper_concurrency
 
     scaling {
       min_instance_count = var.scraper_min_instances
@@ -413,6 +414,13 @@ resource "google_cloud_run_v2_service" "scraper" {
 
       ports {
         container_port = 5050
+      }
+
+      resources {
+        limits = {
+          cpu    = var.scraper_cpu
+          memory = var.scraper_memory
+        }
       }
     }
   }

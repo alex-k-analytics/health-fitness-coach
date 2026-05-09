@@ -161,6 +161,24 @@ variable "scraper_max_instances" {
   default     = 1
 }
 
+variable "scraper_cpu" {
+  description = "CPU limit for the browser-backed scraper Cloud Run service."
+  type        = string
+  default     = "2"
+}
+
+variable "scraper_memory" {
+  description = "Memory limit for the browser-backed scraper Cloud Run service."
+  type        = string
+  default     = "2Gi"
+}
+
+variable "scraper_concurrency" {
+  description = "Maximum concurrent requests per scraper instance. Keep low because each request can launch a browser."
+  type        = number
+  default     = 1
+}
+
 variable "serverless_vpc_network_name" {
   description = "Dedicated VPC network name for Cloud Run egress."
   type        = string
