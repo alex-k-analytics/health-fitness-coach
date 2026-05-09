@@ -1,189 +1,97 @@
 # Health Fitness Coach UX Audit Report
 
-Generated: 2026-05-08
-Last updated: 2026-05-09
+Generated: 2026-05-09
 
 ## Automation Run
 
-- Ran `docker compose up -d`.
-- Ran `npm run prisma:push` in `backend`.
-- Seeded `test@example.com` / `password123` with `npx tsx src\seed.ts`.
+- Used `docs/ux-audit-plan.md` as the audit plan.
+- Used `ui-ux-pro-max` to refresh the design review baseline for a health, fitness, wellness SaaS dashboard/mobile app.
 - Verified API health at `http://localhost:4000/health`.
+- Verified the frontend was available at `http://localhost:5173`.
 - Ran `npm run ux:audit` in `frontend`.
-- Result: Playwright audit passed, `1 passed (1.1m)`.
-- Evidence directory: `docs/ux-audit-screenshots/`.
-
-Latest verification after fixing findings 2-7:
-
-- Ran `npm run build`.
-- Ran `npm run ux:audit`.
-- Result: Playwright audit passed, `1 passed (1.1m)`.
-- The committed runner reported no structured findings in `audit-events.json`.
-- The only recorded events are expected negative-login `401 /api/auth/login` checks in mobile, tablet, and desktop.
-- The previous meal composer dialog-description warnings are no longer present.
-
-Latest verification after implementing the improvement backlog:
-
-- Ran `npm run build`.
-- Ran `npm run ux:audit`.
 - Result: Playwright audit passed, `1 passed (1.7m)`.
-- The runner now fails on structured UX findings instead of only writing them to `audit-events.json`.
-- The audit now asserts mobile/tablet primary navigation does not cover visible page controls or content.
-- Additional evidence now covers profile drawer, weight modal save, profile save, logout, and meal estimate/review/save flows.
+- Evidence directory: `docs/ux-audit-screenshots/`.
+- Structured findings in `audit-events.json`: none.
+- Recorded browser/network events: expected wrong-password login checks only, `401 /api/auth/login` on mobile, tablet, and desktop.
+
+Docker status could not be read from this shell because Windows denied access to the Docker engine/config, but the already-running API and frontend were healthy and the audit completed successfully.
+
+## Design Review Baseline
+
+The `ui-ux-pro-max` pass emphasized these checks for this app:
+
+- Mobile navigation should not cover content or controls.
+- Forms need visible focus states, semantic labels, and mobile-friendly numeric keyboards.
+- Icon-only actions need accessible names and, on desktop, discoverable tooltip behavior.
+- Health dashboards should stay readable and utilitarian, with clear progress states rather than decorative complexity.
+
+The current UI is broadly aligned with this baseline: it uses Lucide icons, strong focus rings, labeled inputs, responsive chrome, and restrained dashboard styling.
+
+## Critical Severity
+
+No critical findings in this audit run.
 
 ## High Severity
 
-### 1. Mobile bottom navigation occludes page content
-
-Status: Fixed on 2026-05-09. The mobile shell now reserves bottom navigation space as app chrome instead of layering the nav over page content. Verified with `npm run build` and `npm run ux:audit`.
-
-- Page/flow: Mobile app shell across Meals, Workouts, Settings, Planning.
-- Steps to reproduce:
-  1. Sign in at `375x812`.
-  2. Visit `/meals`, `/workouts`, `/settings`, or `/planning`.
-  3. Review the first viewport and full-page evidence.
-- Actual behavior: The fixed bottom nav visually sits over content instead of reserving a clear safe area. It covers the fat macro card on Meals, workout stats on Workouts, the Fat goal field on Settings, and Planning tab/card content.
-- Expected behavior: Fixed navigation should not obscure active content, form fields, tabs, stats, or CTAs. Content should remain readable and tappable above the nav.
-- Impact: Common mobile flows feel cramped and users may miss fields or read partially hidden cards. This is especially risky on Settings because macro goals affect dashboard and meal progress feedback.
-- Recommended fix: Treat the mobile nav as a layout participant or add enough scroll offset and section spacing so active content never renders beneath it. Validate at `375x812`, `390x844`, and tablet widths where the bottom nav is still active.
-- Screenshot references:
-  - `docs/ux-audit-screenshots/mobile-meals.png`
-  - `docs/ux-audit-screenshots/mobile-workouts.png`
-  - `docs/ux-audit-screenshots/mobile-settings.png`
-  - `docs/ux-audit-screenshots/mobile-planning-new-plan.png`
-  - Likely source areas: `frontend/src/components/shell/BottomNav.tsx`, `frontend/src/index.css`, `frontend/src/components/shell/Layout.tsx`.
+No high severity findings in this audit run.
 
 ## Medium Severity
 
-### 2. Meal composer dialog is missing an accessible description
+### 1. Profile drawer hides the primary save action below a long mobile form
 
-Status: Fixed on 2026-05-09. The meal composer now renders a Radix `DialogDescription` that matches the current step, giving assistive technology users context and removing the dialog warning for this flow.
-
-- Page/flow: Meals -> Log meal.
+- Page/flow: Mobile header -> profile drawer -> edit profile details.
 - Steps to reproduce:
-  1. Sign in.
-  2. Open `/meals`.
-  3. Click `Log meal`.
-  4. Check console output.
-- Actual behavior: The audit records repeated warnings: `Missing Description or aria-describedby={undefined} for {DialogContent}`.
-- Expected behavior: Dialog content should include a `DialogDescription`, or explicitly opt out with `aria-describedby={undefined}` when no description is appropriate.
-- Impact: Screen reader users get weaker dialog context, and the app emits noisy console warnings during normal flows.
-- Recommended fix: Add `DialogDescription` to the meal composer header using the already visible helper copy, or pass the Radix opt-out intentionally if the title is sufficient.
-- Screenshot/reference:
-  - `docs/ux-audit-screenshots/mobile-meal-composer-initial.png`
-  - Source: `frontend/src/features/meals/MealComposer.tsx`.
-
-### 3. Weight modal has the same dialog-description risk
-
-Status: Fixed on 2026-05-09. The weight modal now includes a `DialogDescription` explaining the expected unit and how the entry is used.
-
-- Page/flow: Header -> Log weight.
-- Steps to reproduce:
-  1. Sign in.
-  2. Click the scale icon or `Log weight`.
-  3. Inspect dialog markup and expected Radix behavior.
-- Actual behavior: `WeightModal` renders `DialogContent` and `DialogTitle` without `DialogDescription`.
-- Expected behavior: The dialog should communicate what value is expected and how it will be saved.
-- Impact: Same accessibility issue as the meal composer, but in a smaller modal.
-- Recommended fix: Add a short `DialogDescription`, for example clarifying that the user is entering pounds and the app stores the metric.
-- Source: `frontend/src/components/shell/WeightModal.tsx`.
-
-### 4. Planning source setup flow sends users into a noisy settings section
-
-Status: Fixed on 2026-05-09. Planning settings now separate the ATK planning source from stored-only recipe sources, so the source that unblocks planning appears first and has clearer copy.
-
-- Page/flow: Planning -> New plan -> Open settings.
-- Steps to reproduce:
-  1. Sign in with the seeded account.
-  2. Open `/planning`.
-  3. Click `New plan`.
-  4. Review the blocked state and settings tab.
-- Actual behavior: The blocked state says `Connect ATK before live planning`, but the settings section starts with Allrecipes, then America's Test Kitchen, then NYT Cooking. Two of those are labeled `Stored only`, while planning supports ATK only.
-- Expected behavior: The Planning settings flow should prioritize the one source that unblocks planning, or isolate planning-supported sources from stored-only sources.
-- Impact: Users can land in the right tab but still have to scan unrelated credential blocks before finding the required action.
-- Recommended fix: Move America's Test Kitchen to the top when planning is blocked, add an anchor from `Open settings`, or split `Planning source` from `Other saved sources`.
-- Screenshot references:
-  - `docs/ux-audit-screenshots/mobile-planning-new-plan.png`
-  - `docs/ux-audit-screenshots/mobile-planning-settings.png`
-  - `docs/ux-audit-screenshots/desktop-planning-settings.png`
-
-### 5. Planning tab layout competes with bottom navigation on mobile
-
-Status: Fixed on 2026-05-09. Planning tabs now stay in one compact four-column row on mobile, avoiding the crowded two-row tab stack and clipped horizontal-scroll labels near the bottom app navigation.
-
-- Page/flow: Planning tabs on mobile.
-- Steps to reproduce:
-  1. Open `/planning` at `375x812`.
-  2. Switch between `New plan` and `Settings`.
-- Actual behavior: The two-row tab list sits close to the fixed bottom nav and the next card begins underneath the nav in the captured viewport.
-- Expected behavior: Secondary navigation and primary bottom navigation should not visually collide.
-- Impact: The page feels crowded and the active planning tab is harder to parse.
-- Recommended fix: Add mobile-specific separation below the tabs, or consider a compact segmented control plus an anchored content start.
-- Screenshot references:
-  - `docs/ux-audit-screenshots/mobile-planning-new-plan.png`
-  - `docs/ux-audit-screenshots/mobile-planning-settings.png`
+  1. Sign in at `375x812`.
+  2. Open the profile drawer from the avatar button.
+  3. Edit a top-of-form field such as `Display name`.
+  4. Look for the action that saves the change.
+- Actual behavior: The visible drawer footer shows `Sign out` and `Close`, while `Save changes` belongs to the embedded profile form and sits below the long scrollable form content. On the initial mobile drawer viewport, the user sees account/close actions but not the primary save action.
+- Expected behavior: When profile fields are editable in a drawer, the primary dirty-state action should be visible or predictably anchored with the form. Account actions should not be more prominent than saving edits.
+- Impact: Users can edit a profile field, then close or sign out without realizing the save action is below the fold. This is especially likely on mobile where the drawer has limited height and many numeric fields.
+- Recommended fix: Move profile save/cancel controls into a sticky drawer form footer, or split account actions into a separate section below the editable form. When the form is dirty, prioritize `Save changes` over `Sign out`.
+- Screenshot reference: `docs/ux-audit-screenshots/mobile-profile-drawer.png`.
+- Likely source areas: `frontend/src/components/shell/ProfileDrawer.tsx`, `frontend/src/features/settings/ProfileForm.tsx`.
 
 ## Low Severity
 
-### 6. Invalid email uses native browser validation while wrong password uses app-styled validation
+### 2. Audit-created data accumulates and makes dashboard evidence less representative
 
-Status: Fixed on 2026-05-09. Login now uses app-level inline validation for empty credentials and invalid email format, so email-format errors use the same alert styling as wrong-password errors instead of native browser bubbles.
-
-- Page/flow: Login validation.
+- Page/flow: Dashboard after repeated UX audit runs.
 - Steps to reproduce:
-  1. Open `/login`.
-  2. Enter `bad-email` and a password.
-  3. Submit.
-  4. Then enter a valid email and wrong password.
-- Actual behavior: Invalid email shows a native browser validation bubble over the form; wrong password shows the app's styled alert.
-- Expected behavior: Validation feedback should be visually consistent and avoid covering the primary CTA.
-- Impact: Minor inconsistency, but it makes the login flow feel less polished.
-- Recommended fix: Use app-level inline validation for email format or add helper/error text below the field while preserving native semantics.
-- Screenshot references:
-  - `docs/ux-audit-screenshots/mobile-login-invalid-email.png`
-  - `docs/ux-audit-screenshots/mobile-login-wrong-password.png`
-
-### 7. Header quick actions are icon-only on mobile
-
-Status: Fixed on 2026-05-09. Mobile and tablet headers now show only theme and profile actions; food, workout, and weight quick actions remain available on desktop while mobile users use labeled page CTAs and bottom navigation.
-
-- Page/flow: Authenticated mobile header.
-- Steps to reproduce:
-  1. Sign in on mobile.
-  2. Inspect the icon cluster in the header.
-- Actual behavior: Theme, meal, workout, weight, and profile actions appear as icon-only controls. Desktop has more room and the audit checks tooltips there, but mobile has no visible text affordance.
-- Expected behavior: Repeated primary actions should be discoverable without relying on icon recognition alone.
-- Impact: New users may not understand the scale, workout, or theme icons. This is partly mitigated by larger labeled CTAs in page content.
-- Recommended fix: Keep the icon actions, but consider reducing the mobile cluster to profile/theme only and relying on page CTAs plus bottom nav for task entry points.
-- Screenshot references:
-  - `docs/ux-audit-screenshots/mobile-dashboard-empty.png`
-  - `docs/ux-audit-screenshots/mobile-meals.png`
+  1. Run `npm run ux:audit` multiple times against the same seeded account.
+  2. Open dashboard evidence such as `desktop-dashboard-empty.png`.
+- Actual behavior: The dashboard evidence now shows accumulated audit entries, including `17 meals logged`, `8563 calories logged`, and repeated `UX audit chicken rice bowl` meals.
+- Expected behavior: A repeatable audit should start from deterministic data, or clearly separate generated audit records from normal seeded data.
+- Impact: This is not a production UI defect, but it makes audit screenshots harder to interpret and can mask true empty-state or first-run behavior.
+- Recommended fix: Add an audit setup/teardown step that resets the seeded account, deletes records created by the audit, or uses unique disposable audit users per run.
+- Screenshot reference: `docs/ux-audit-screenshots/desktop-dashboard-empty.png`.
 
 ## What Works
 
 - Successful seeded login navigates to the dashboard.
-- Auth-protected pages load at mobile, tablet, and desktop sizes.
-- No horizontal overflow was detected by the committed runner.
-- Empty states are generally present and specific for meals, workouts, calorie trend, weight trend, and planning setup.
-- Primary CTAs are consistently styled and visible.
-- Desktop layout is stable and readable across dashboard, meals, workouts, planning, and settings.
-- Meal, workout, and weight dialogs include accessible descriptions.
-- Profile drawer, weight logging, profile saving, logout, and full meal estimate/review/save flows are covered by the UX audit evidence set.
+- Invalid email and wrong-password feedback use app-styled validation rather than native browser bubbles.
+- Auth-protected routes load at mobile, tablet, and desktop sizes.
+- The committed runner found no horizontal overflow.
+- Mobile/tablet bottom navigation no longer covers visible page content in the audited routes.
+- Meal, workout, and weight dialogs render accessible descriptions.
+- Profile drawer, weight logging, profile save from Settings, logout, and meal estimate/review/save flows are covered by refreshed screenshots.
+- Planning setup copy clearly communicates that an ATK source is required before live weekly planning.
+- Desktop layout remains stable and readable across Dashboard, Meals, Workouts, Planning, and Settings.
 
 ## Improvement Backlog
 
-### Completed
+### Quick Wins
 
-- Add missing `DialogDescription` to `MealComposer` and `WeightModal`.
-- Reorder Planning source settings so America's Test Kitchen appears first when it is required.
-- Make login email-format errors use the same alert/error language as wrong-password errors.
-- Revisit the mobile shell structure so bottom navigation behaves more like reserved app chrome than an overlay.
-- Split Planning settings into `Planning source` and `Stored recipe sources` sections.
-- Add a small mobile discoverability strategy for header icon actions, such as fewer icons or contextual labels.
-- Add a mobile nav/content regression check that asserts important fields are not covered by fixed navigation.
-- Expand the UX audit runner to cover profile drawer, weight modal, logout, save-profile validation, and a full meal estimate/review/save loop.
-- Associate the meal composer `Serving Details` label with its input so the expanded audit can drive it by accessible name.
+- Make the profile drawer's save action visible when editable fields are in view or when the form becomes dirty.
+- Move destructive/account actions in the drawer below the editable profile workflow, or visually separate them from form completion.
+- Add audit data cleanup so repeated audit runs do not inflate dashboard totals.
 
-### Still Applicable
+### Larger UX Refinements
 
-- No open improvement backlog items from this audit remain.
+- Expand the Playwright UX audit to edit and save a profile field from the profile drawer, not only from the Settings page.
+- Add a deterministic empty-state audit user or fixture so the audit can separately verify first-run and populated dashboard states.
+- Add keyboard-only checks for drawer editing, focus return, and dirty-form completion.
+
+## Residual Risk
+
+The automated audit is strong for layout, dialogs, route coverage, and common authenticated flows, but it still relies mostly on screenshot evidence for visual hierarchy. Manual review remains useful for action priority, form completion clarity, and whether audit-generated data is distorting the user's first-run experience.
