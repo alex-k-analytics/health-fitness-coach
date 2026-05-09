@@ -126,6 +126,41 @@ async function verifyNoDevtoolsOverlay(page: Page, viewportName: string, finding
   });
 }
 
+async function verifyReducedMotionPreference(page: Page, viewportName: string, findings: Finding[]) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const result = await page.evaluate(() => {
+    const sample = document.querySelector("button") ?? document.body;
+    const style = window.getComputedStyle(sample);
+    const parseDuration = (value: string) => {
+      const firstValue = value.split(",")[0]?.trim() ?? "0s";
+      return firstValue.endsWith("ms")
+        ? Number.parseFloat(firstValue)
+        : Number.parseFloat(firstValue) * 1000;
+    };
+
+    return {
+      mediaMatches: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      transitionMs: parseDuration(style.transitionDuration),
+      animationMs: parseDuration(style.animationDuration)
+    };
+  });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  if (result.mediaMatches && result.transitionMs <= 0.01 && result.animationMs <= 0.01) {
+    return;
+  }
+
+  const evidence = await screenshot(page, `${viewportName} reduced motion failed`);
+  findings.push({
+    severity: "Medium",
+    page: "app shell",
+    title: "Reduced-motion preference is not respected",
+    actual: `prefers-reduced-motion matched: ${result.mediaMatches}; transition ${result.transitionMs}ms; animation ${result.animationMs}ms.`,
+    expected: "When reduced motion is requested, UI transitions and animations should be effectively disabled.",
+    evidence
+  });
+}
+
 async function verifyAlertFeedback(
   page: Page,
   viewportName: string,
@@ -767,6 +802,7 @@ async function runViewportAudit({
   await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
   await screenshot(page, `${viewportName} dashboard empty`);
   await verifyNoDevtoolsOverlay(page, viewportName, findings);
+  await verifyReducedMotionPreference(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
   await captureProfileDrawer(page, viewportName);
   await captureProfileDrawerSaveFlow(page, baseURL, viewportName);
