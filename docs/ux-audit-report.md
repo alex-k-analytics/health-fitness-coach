@@ -1,6 +1,7 @@
 # Health Fitness Coach UX Audit Report
 
 Generated: 2026-05-08
+Last updated: 2026-05-09
 
 ## Automation Run
 
@@ -12,10 +13,14 @@ Generated: 2026-05-08
 - Result: Playwright audit passed, `1 passed (1.1m)`.
 - Evidence directory: `docs/ux-audit-screenshots/`.
 
-The committed runner reported no structured findings in `audit-events.json`, but it did record repeated warning/error events:
+Latest verification after fixing findings 2-7:
 
-- Expected negative-login events: `401 /api/auth/login` for the wrong-password check in mobile, tablet, and desktop.
-- Accessibility warnings: Radix dialog content missing a description or `aria-describedby={undefined}` on the meal composer in mobile, tablet, and desktop.
+- Ran `npm run build`.
+- Ran `npm run ux:audit`.
+- Result: Playwright audit passed, `1 passed (1.1m)`.
+- The committed runner reported no structured findings in `audit-events.json`.
+- The only recorded events are expected negative-login `401 /api/auth/login` checks in mobile, tablet, and desktop.
+- The previous meal composer dialog-description warnings are no longer present.
 
 ## High Severity
 
@@ -153,20 +158,20 @@ Status: Fixed on 2026-05-09. Mobile and tablet headers now show only theme and p
 - Empty states are generally present and specific for meals, workouts, calorie trend, weight trend, and planning setup.
 - Primary CTAs are consistently styled and visible.
 - Desktop layout is stable and readable across dashboard, meals, workouts, planning, and settings.
-- Workout modal includes a `DialogDescription` and did not emit the dialog accessibility warning.
+- Meal, workout, and weight dialogs include accessible descriptions.
 
 ## Improvement Backlog
 
-### Quick wins
+### Completed
 
 - Add missing `DialogDescription` to `MealComposer` and `WeightModal`.
-- Add a mobile nav/content regression check that asserts important fields are not covered by fixed navigation.
 - Reorder Planning source settings so America's Test Kitchen appears first when it is required.
 - Make login email-format errors use the same alert/error language as wrong-password errors.
-
-### Larger refinements
-
 - Revisit the mobile shell structure so bottom navigation behaves more like reserved app chrome than an overlay.
 - Split Planning settings into `Planning source` and `Stored recipe sources` sections.
 - Add a small mobile discoverability strategy for header icon actions, such as fewer icons or contextual labels.
+
+### Still Applicable
+
+- Add a mobile nav/content regression check that asserts important fields are not covered by fixed navigation.
 - Expand the UX audit runner to cover profile drawer, weight modal, logout, save-profile validation, and a full meal estimate/review/save loop.

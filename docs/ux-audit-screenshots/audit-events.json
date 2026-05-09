@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-09T03:18:30.495Z",
+  "generatedAt": "2026-05-09T03:50:05.930Z",
   "findings": [],
   "events": [
     {
@@ -15,18 +15,6 @@
       "url": "http://localhost:5173/login"
     },
     {
-      "viewport": "mobile",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
-    },
-    {
-      "viewport": "mobile",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
-    },
-    {
       "viewport": "tablet",
       "type": "http",
       "text": "401 http://localhost:5173/api/auth/login",
@@ -39,18 +27,6 @@
       "url": "http://localhost:5173/login"
     },
     {
-      "viewport": "tablet",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
-    },
-    {
-      "viewport": "tablet",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
-    },
-    {
       "viewport": "desktop",
       "type": "http",
       "text": "401 http://localhost:5173/api/auth/login",
@@ -61,18 +37,6 @@
       "type": "console:error",
       "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
       "url": "http://localhost:5173/login"
-    },
-    {
-      "viewport": "desktop",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
-    },
-    {
-      "viewport": "desktop",
-      "type": "console:warning",
-      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.",
-      "url": "http://localhost:5173/meals"
     }
   ]
 }
