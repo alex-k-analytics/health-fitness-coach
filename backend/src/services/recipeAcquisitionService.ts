@@ -24,6 +24,22 @@ function parseJsonPayload(value: string) {
   }
 }
 
+const scraperRetryStatuses = new Set([429, 500, 502, 503, 504]);
+const scraperMaxAttempts = 3;
+const scraperRetryBaseDelayMs = 400;
+
+function shouldRetryScraperResponse(response: Response, attempt: number) {
+  return !response.ok && attempt < scraperMaxAttempts && scraperRetryStatuses.has(response.status);
+}
+
+function scraperRetryDelayMs(attempt: number) {
+  return scraperRetryBaseDelayMs * 2 ** (attempt - 1);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function buildScraperHeaders(baseUrl: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json"
@@ -194,15 +210,40 @@ export class RecipeAcquisitionService {
 
     const scraperBaseUrl = config.mealPlanScraperUrl.replace(/\/$/, "");
     const acquireUrl = `${scraperBaseUrl}/internal/recipes/acquire`;
-    let response: Response;
+    let response: Response | null = null;
+    let responseBody = "";
+    let payload: unknown = null;
 
     try {
       const headers = await buildScraperHeaders(scraperBaseUrl);
-      response = await fetch(acquireUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(input)
-      });
+      for (let attempt = 1; attempt <= scraperMaxAttempts; attempt += 1) {
+        response = await fetch(acquireUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(input)
+        });
+        responseBody = await response.text().catch(() => "");
+        payload = parseJsonPayload(responseBody);
+
+        if (!shouldRetryScraperResponse(response, attempt)) {
+          break;
+        }
+
+        const retryDelayMs = scraperRetryDelayMs(attempt);
+        console.warn("Meal-plan scraper request returned a retryable response; retrying.", {
+          acquireUrl,
+          configuredScraperBaseUrl: scraperBaseUrl,
+          source: input.source,
+          status: response.status,
+          statusText: response.statusText,
+          attempt,
+          maxAttempts: scraperMaxAttempts,
+          retryDelayMs,
+          responsePayload: payload,
+          responseBodyPreview: payload ? null : summarizeBody(responseBody)
+        });
+        await sleep(retryDelayMs);
+      }
     } catch (error) {
       console.error("Meal-plan scraper request failed before receiving a response.", {
         acquireUrl,
@@ -214,8 +255,10 @@ export class RecipeAcquisitionService {
       throw new Error("Unable to reach the scraper service. Verify MEAL_PLAN_SCRAPER_URL and Cloud Run connectivity.");
     }
 
-    const responseBody = await response.text().catch(() => "");
-    const payload = parseJsonPayload(responseBody);
+    if (!response) {
+      throw new Error("Unable to reach the scraper service. No scraper response was received.");
+    }
+
     if (!response.ok) {
       const healthSummary = response.status === 404 ? await summarizeScraperHealth(scraperBaseUrl) : null;
       console.error("Meal-plan scraper request returned a non-OK response.", {

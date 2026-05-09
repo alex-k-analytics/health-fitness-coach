@@ -20,6 +20,8 @@ env:
   SCRAPER_CPU: "2"
   SCRAPER_MEMORY: 2Gi
   SCRAPER_CONCURRENCY: "1"
+  SCRAPER_MIN_INSTANCES: "0"
+  SCRAPER_MAX_INSTANCES: "3"
   ARTIFACT_REPOSITORY_ID: health-fitness-coach
   WIF_PROVIDER: projects/698032141114/locations/global/workloadIdentityPools/github-actions-pool/providers/github
   DEPLOYER_SERVICE_ACCOUNT: github-actions-service-account@akalish-software.iam.gserviceaccount.com
@@ -148,6 +150,8 @@ jobs:
             --cpu="${SCRAPER_CPU}" \
             --memory="${SCRAPER_MEMORY}" \
             --concurrency="${SCRAPER_CONCURRENCY}" \
+            --min-instances="${SCRAPER_MIN_INSTANCES}" \
+            --max-instances="${SCRAPER_MAX_INSTANCES}" \
             --timeout=300 \
             --port=5050 \
             --quiet

@@ -158,7 +158,7 @@ variable "scraper_min_instances" {
 variable "scraper_max_instances" {
   description = "Maximum Cloud Run instances for the scraper service."
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "scraper_cpu" {
