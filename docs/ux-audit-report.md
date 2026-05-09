@@ -131,6 +131,8 @@ Status: Fixed on 2026-05-09. Login now uses app-level inline validation for empt
 
 ### 7. Header quick actions are icon-only on mobile
 
+Status: Fixed on 2026-05-09. Mobile and tablet headers now show only theme and profile actions; food, workout, and weight quick actions remain available on desktop while mobile users use labeled page CTAs and bottom navigation.
+
 - Page/flow: Authenticated mobile header.
 - Steps to reproduce:
   1. Sign in on mobile.

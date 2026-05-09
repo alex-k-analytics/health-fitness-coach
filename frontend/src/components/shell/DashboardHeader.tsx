@@ -66,21 +66,21 @@ export function DashboardHeader() {
             </Button>
           </HeaderTooltip>
           <MealComposer trigger={
-            <HeaderTooltip label="Log food">
+            <HeaderTooltip label="Log food" className="hidden lg:inline-flex">
               <Button variant="ghost" size="icon-sm" aria-label="Log food">
                 <UtensilsCrossed className="h-4 w-4" />
               </Button>
             </HeaderTooltip>
           } />
           <WorkoutSessionModal defaultIntent="quick" trigger={
-            <HeaderTooltip label="Log workout">
+            <HeaderTooltip label="Log workout" className="hidden lg:inline-flex">
               <Button variant="ghost" size="icon-sm" aria-label="Log workout">
                 <Dumbbell className="h-4 w-4" />
               </Button>
             </HeaderTooltip>
           } />
           <WeightModal trigger={
-            <HeaderTooltip label="Log weight">
+            <HeaderTooltip label="Log weight" className="hidden lg:inline-flex">
               <Button variant="ghost" size="icon-sm" aria-label="Log weight">
                 <Scale className="h-4 w-4" />
               </Button>

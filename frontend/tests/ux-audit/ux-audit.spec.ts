@@ -259,7 +259,7 @@ async function runViewportAudit({
   }
 
   await page.goto(`${baseURL}/meals`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /log food/i }).first().click();
+  await page.getByRole("button", { name: /log (food|meal)/i }).first().click();
   await page.waitForTimeout(500);
   await screenshot(page, `${viewportName} meal composer initial`);
   if (await page.getByRole("dialog").isVisible().catch(() => false)) {
@@ -268,7 +268,7 @@ async function runViewportAudit({
   }
 
   await page.goto(`${baseURL}/workouts`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /log workout/i }).first().click();
+  await page.getByRole("button", { name: /start workout|log (a completed )?workout/i }).first().click();
   await page.waitForTimeout(500);
   await screenshot(page, `${viewportName} workout modal initial`);
   if (await page.getByRole("dialog").isVisible().catch(() => false)) {
