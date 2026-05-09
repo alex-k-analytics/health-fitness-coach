@@ -10,6 +10,7 @@ concurrency:
 permissions:
   contents: read
   id-token: write
+  actions: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -164,3 +165,8 @@ jobs:
       - name: Show Terraform outputs
         working-directory: infra/terraform
         run: terraform output
+
+      - name: Trigger Deploy workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref "${GITHUB_REF_NAME}"
