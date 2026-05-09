@@ -44,7 +44,7 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
           </DrawerClose>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <ProfileForm actionPlacement="top" />
+          <ProfileForm actionPlacement="top" autoFocusFirstField />
           <div className="mt-6 rounded-lg border border-border bg-card p-3">
             <p className="text-sm font-medium text-foreground">Account actions</p>
             <p className="mt-1 text-xs text-muted-foreground">

@@ -19,9 +19,10 @@ const ACTIVITY_LEVELS = [
 
 type ProfileFormProps = {
   actionPlacement?: "bottom" | "top";
+  autoFocusFirstField?: boolean;
 };
 
-export function ProfileForm({ actionPlacement = "bottom" }: ProfileFormProps) {
+export function ProfileForm({ actionPlacement = "bottom", autoFocusFirstField = false }: ProfileFormProps) {
   const { data: profile, isLoading } = useProfileQuery();
   const updateProfile = useProfileMutation();
   const [formData, setFormData] = useState({
@@ -114,6 +115,7 @@ export function ProfileForm({ actionPlacement = "bottom" }: ProfileFormProps) {
         <Label htmlFor="displayName">Display name</Label>
         <Input
           id="displayName"
+          autoFocus={autoFocusFirstField}
           value={formData.displayName}
           onChange={(e) => setFormData((prev) => ({ ...prev, displayName: e.target.value }))}
           placeholder="Your name"

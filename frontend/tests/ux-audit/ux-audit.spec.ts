@@ -28,6 +28,17 @@ const viewports = [
 const outDir = path.resolve(process.cwd(), "..", "docs", "ux-audit-screenshots");
 const authTokenKey = "health_fitness_auth_token";
 const auditMealTitle = "UX audit chicken rice bowl";
+const auditBaselineProfile = {
+  displayName: "Test User",
+  goalSummary: null,
+  calorieGoal: null,
+  proteinGoalGrams: null,
+  carbGoalGrams: null,
+  fatGoalGrams: null,
+  heightCm: null,
+  activityLevel: null,
+  notes: null
+};
 
 function findExistingChromium() {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -196,6 +207,25 @@ async function captureProfileDrawer(page: Page, viewportName: string) {
   await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
 }
 
+async function captureProfileDrawerSaveFlow(page: Page, baseURL: string, viewportName: string) {
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /open profile/i }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+
+  const displayName = page.getByLabel(/display name/i);
+  await displayName.fill(`Test User drawer ${viewportName}`);
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  await screenshot(page, `${viewportName} profile drawer dirty`);
+
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} profile drawer saved`);
+
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
+  await resetAuditProfile(page, baseURL);
+}
+
 async function captureWeightModalFlow(page: Page, baseURL: string, viewportName: string) {
   await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /log weight/i }).first().click();
@@ -246,6 +276,133 @@ async function cleanupAuditMeals(page: Page, baseURL: string) {
       await page.request.delete(`${baseURL}/api/nutrition/meals/${meal.id}`, { headers });
     }
   }
+}
+
+async function cleanupAuditHealthMetrics(page: Page, baseURL: string) {
+  const authToken = await page
+    .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
+    .catch(() => null);
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+  const response = await page.request.get(`${baseURL}/api/profile/me/health-metrics?limit=52`, { headers });
+  if (!response.ok()) return;
+
+  const payload = await response.json().catch(() => null);
+  const metrics = Array.isArray(payload?.metrics) ? payload.metrics : [];
+
+  for (const metric of metrics) {
+    if (typeof metric.id === "string") {
+      await page.request.delete(`${baseURL}/api/profile/me/health-metrics/${metric.id}`, { headers });
+    }
+  }
+}
+
+async function resetAuditProfile(page: Page, baseURL: string) {
+  const authToken = await page
+    .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
+    .catch(() => null);
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+
+  await page.request.patch(`${baseURL}/api/profile/me`, {
+    headers,
+    data: auditBaselineProfile
+  });
+}
+
+async function resetAuditFixture(page: Page, baseURL: string) {
+  await cleanupAuditMeals(page, baseURL);
+  await cleanupAuditHealthMetrics(page, baseURL);
+  await resetAuditProfile(page, baseURL);
+}
+
+async function captureDashboardPopulatedState(page: Page, baseURL: string, viewportName: string) {
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+  await expect(page.getByText(auditMealTitle).first()).toBeVisible({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} dashboard populated`);
+}
+
+async function pressTabUntil(
+  page: Page,
+  predicate: () => Promise<boolean>,
+  maxPresses = 12
+) {
+  for (let index = 0; index < maxPresses; index += 1) {
+    if (await predicate()) return true;
+    await page.keyboard.press("Tab");
+  }
+
+  return predicate();
+}
+
+async function verifyProfileDrawerKeyboardFlow(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
+  if (viewportName !== "desktop") return;
+
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+  const profileButton = page.getByRole("button", { name: /open profile/i });
+  await profileButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+
+  const reachedDisplayName = await pressTabUntil(page, async () =>
+    page.evaluate(() => document.activeElement?.id === "displayName")
+  );
+
+  if (!reachedDisplayName) {
+    const evidence = await screenshot(page, `${viewportName} profile drawer keyboard focus failed`);
+    findings.push({
+      severity: "Medium",
+      page: "profile drawer",
+      title: "Keyboard navigation cannot reach profile fields",
+      actual: "Tabbing through the open profile drawer did not reach the Display name field.",
+      expected: "Keyboard users should be able to reach and edit profile fields in drawer tab order.",
+      evidence
+    });
+    await page.keyboard.press("Escape");
+    return;
+  }
+
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.type("Test User keyboard");
+  await page.keyboard.press("Shift+Tab");
+
+  const saveFocused = await page.evaluate(() => document.activeElement?.textContent?.includes("Save changes") ?? false);
+  if (!saveFocused) {
+    const evidence = await screenshot(page, `${viewportName} profile drawer save focus failed`);
+    findings.push({
+      severity: "Medium",
+      page: "profile drawer",
+      title: "Keyboard navigation cannot return to the drawer save action",
+      actual: "After editing Display name, Shift+Tab did not return focus to Save changes.",
+      expected: "The visible drawer save action should be reachable immediately from the first editable field.",
+      evidence
+    });
+    await page.keyboard.press("Escape");
+    await resetAuditProfile(page, baseURL);
+    return;
+  }
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} profile drawer keyboard saved`);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
+
+  const focusReturned = await page.evaluate(() =>
+    document.activeElement?.getAttribute("aria-label")?.toLowerCase().includes("open profile") ?? false
+  );
+
+  if (!focusReturned) {
+    const evidence = await screenshot(page, `${viewportName} profile drawer focus return failed`);
+    findings.push({
+      severity: "Medium",
+      page: "profile drawer",
+      title: "Profile drawer does not return focus to its trigger",
+      actual: "After closing the profile drawer with Escape, focus did not return to the profile trigger.",
+      expected: "Drawer focus should return to the control that opened it.",
+      evidence
+    });
+  }
+
+  await resetAuditProfile(page, baseURL);
 }
 
 async function captureProfileSaveFlow(page: Page, baseURL: string, viewportName: string) {
@@ -399,11 +556,14 @@ async function runViewportAudit({
   }
 
   await page.waitForLoadState("networkidle");
-  await cleanupAuditMeals(page, baseURL);
+  await resetAuditFixture(page, baseURL);
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
   await screenshot(page, `${viewportName} dashboard empty`);
   await verifyNoDevtoolsOverlay(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
   await captureProfileDrawer(page, viewportName);
+  await captureProfileDrawerSaveFlow(page, baseURL, viewportName);
+  await verifyProfileDrawerKeyboardFlow(page, baseURL, viewportName, findings);
 
   const pageChecks = [
     ["/meals", "meals"],
@@ -440,6 +600,7 @@ async function runViewportAudit({
     await page.waitForTimeout(250);
   }
   await captureMealEstimateSaveFlow(page, baseURL, viewportName);
+  await captureDashboardPopulatedState(page, baseURL, viewportName);
   await cleanupAuditMeals(page, baseURL);
 
   await captureWeightModalFlow(page, baseURL, viewportName);

@@ -160,3 +160,28 @@ profileRoutes.post("/me/health-metrics", async (req: AuthenticatedRequest, res) 
 
   return res.status(201).json({ metric });
 });
+
+profileRoutes.delete("/me/health-metrics/:metricId", async (req: AuthenticatedRequest, res) => {
+  const auth = getRequiredAuth(req);
+  const metric = await prisma.healthMetric.findFirst({
+    where: {
+      id: req.params.metricId,
+      accountId: auth.accountId
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!metric) {
+    return res.status(404).json({ error: "Health metric was not found" });
+  }
+
+  await prisma.healthMetric.delete({
+    where: {
+      id: metric.id
+    }
+  });
+
+  return res.json({ deleted: true, id: metric.id });
+});

@@ -9,7 +9,7 @@ Generated: 2026-05-09
 - Verified API health at `http://localhost:4000/health`.
 - Verified the frontend was available at `http://localhost:5173`.
 - Ran `npm run ux:audit` in `frontend`.
-- Result: Playwright audit passed, `1 passed (1.7m)`.
+- Result: Playwright audit passed, `1 passed (2.1m)`.
 - Evidence directory: `docs/ux-audit-screenshots/`.
 - Structured findings in `audit-events.json`: none.
 - Recorded browser/network events: expected wrong-password login checks only, `401 /api/auth/login` on mobile, tablet, and desktop.
@@ -58,7 +58,7 @@ Status: Fixed on 2026-05-09. The drawer now places a sticky `Profile changes` sa
 
 ### 2. Audit-created data accumulates and makes dashboard evidence less representative
 
-Status: Fixed on 2026-05-09. The audit runner now deletes prior `UX audit chicken rice bowl` meals after sign-in and deletes the meal it creates after capturing the save evidence. The backend now supports authenticated meal deletion for the cleanup path. Verified with `npm run ux:audit`.
+Status: Fixed on 2026-05-09. The audit runner now resets the audit fixture, deletes prior `UX audit chicken rice bowl` meals after sign-in, clears audit health metrics, and deletes the meal it creates after capturing the save evidence. The backend now supports authenticated meal and health-metric deletion for the cleanup path. Verified with `npm run ux:audit`.
 
 - Page/flow: Dashboard after repeated UX audit runs.
 - Steps to reproduce:
@@ -78,7 +78,7 @@ Status: Fixed on 2026-05-09. The audit runner now deletes prior `UX audit chicke
 - The committed runner found no horizontal overflow.
 - Mobile/tablet bottom navigation no longer covers visible page content in the audited routes.
 - Meal, workout, and weight dialogs render accessible descriptions.
-- Profile drawer, weight logging, profile save from Settings, logout, and meal estimate/review/save flows are covered by refreshed screenshots.
+- Profile drawer, drawer-based profile save, keyboard drawer editing, focus return, weight logging, profile save from Settings, logout, and meal estimate/review/save flows are covered by refreshed screenshots.
 - Planning setup copy clearly communicates that an ATK source is required before live weekly planning.
 - Desktop layout remains stable and readable across Dashboard, Meals, Workouts, Planning, and Settings.
 
@@ -92,10 +92,10 @@ Status: Fixed on 2026-05-09. The audit runner now deletes prior `UX audit chicke
 
 ### Larger UX Refinements
 
-- Expand the Playwright UX audit to edit and save a profile field from the profile drawer, not only from the Settings page.
-- Add a deterministic empty-state audit user or fixture so the audit can separately verify first-run and populated dashboard states.
-- Add keyboard-only checks for drawer editing, focus return, and dirty-form completion.
+- Fixed: Expand the Playwright UX audit to edit and save a profile field from the profile drawer, not only from the Settings page.
+- Fixed: Add a deterministic empty-state audit user or fixture so the audit can separately verify first-run and populated dashboard states.
+- Fixed: Add keyboard-only checks for drawer editing, focus return, and dirty-form completion.
 
 ## Residual Risk
 
-The automated audit is strong for layout, dialogs, route coverage, and common authenticated flows, but it still relies mostly on screenshot evidence for visual hierarchy. Manual review remains useful for action priority, form completion clarity, and whether audit-generated data is distorting the user's first-run experience.
+The automated audit is strong for layout, dialogs, route coverage, profile drawer completion, keyboard drawer access, empty dashboard evidence, and populated dashboard evidence. Manual review remains useful for visual hierarchy and nuanced action priority decisions.
