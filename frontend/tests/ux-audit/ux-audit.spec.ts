@@ -66,8 +66,42 @@ function safeName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+async function applyAuditScreenshotLabel(page: Page, name: string) {
+  const label = name.replace(/\s+/g, " ").trim();
+
+  await page.evaluate((text) => {
+    let labelElement = document.getElementById("ux-audit-screenshot-label");
+    if (!labelElement) {
+      labelElement = document.createElement("div");
+      labelElement.id = "ux-audit-screenshot-label";
+      labelElement.setAttribute("aria-hidden", "true");
+      Object.assign(labelElement.style, {
+        position: "fixed",
+        right: "8px",
+        bottom: "8px",
+        zIndex: "2147483647",
+        maxWidth: "calc(100vw - 16px)",
+        border: "1px solid rgba(15, 23, 42, 0.22)",
+        borderRadius: "6px",
+        background: "rgba(255, 255, 255, 0.92)",
+        color: "rgb(15, 23, 42)",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        fontSize: "11px",
+        lineHeight: "1.3",
+        padding: "4px 6px",
+        pointerEvents: "none",
+        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.12)"
+      });
+      document.body.appendChild(labelElement);
+    }
+
+    labelElement.textContent = `UX audit: ${text}`;
+  }, label);
+}
+
 async function screenshot(page: Page, name: string) {
   const file = `${safeName(name)}.png`;
+  await applyAuditScreenshotLabel(page, name);
   await page.screenshot({ path: path.join(outDir, file), fullPage: true });
   return `docs/ux-audit-screenshots/${file}`;
 }
