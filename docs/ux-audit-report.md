@@ -76,6 +76,8 @@ Status: Fixed on 2026-05-09. The weight modal now includes a `DialogDescription`
 
 ### 4. Planning source setup flow sends users into a noisy settings section
 
+Status: Fixed on 2026-05-09. Planning settings now separate the ATK planning source from stored-only recipe sources, so the source that unblocks planning appears first and has clearer copy.
+
 - Page/flow: Planning -> New plan -> Open settings.
 - Steps to reproduce:
   1. Sign in with the seeded account.

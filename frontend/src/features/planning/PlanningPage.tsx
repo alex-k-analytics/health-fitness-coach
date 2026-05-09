@@ -185,6 +185,8 @@ export function PlanningPage() {
   const activePlan = activeRun?.plan ?? null;
   const visibleStatus = currentStatus ?? activeRun;
   const availableSources = sources?.sources ?? [];
+  const planningSources = availableSources.filter((source) => source.supportedForPlanning);
+  const storedOnlySources = availableSources.filter((source) => !source.supportedForPlanning);
   const sourceReadiness = getPlanningSourceReadiness(availableSources);
   const selectedPlanningSources = sourceReadiness.readySources.map((source) => source.source);
   const sourceReady = sourceReadiness.ready;
@@ -350,6 +352,90 @@ export function PlanningPage() {
     if (!activeRun) return;
     clearCheckedItems(activeRun.id);
     setCheckedVersion((current) => current + 1);
+  }
+
+  function renderSourceEditor(source: RecipeSourceCredential) {
+    const draft = sourceDrafts[source.source] ?? sourceDraftFromSource(source);
+    const usernameId = `source-${source.source}-username`;
+    const loginUrlId = `source-${source.source}-login-url`;
+    const passwordId = `source-${source.source}-password`;
+
+    return (
+      <div key={source.source} className="surface-muted space-y-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-medium">{source.label}</div>
+            <div className="text-sm text-muted-foreground">
+              {source.planningReady
+                ? "Ready for planning"
+                : source.supportedForPlanning
+                  ? formatReadinessIssues(source.planningReadinessIssues)
+                  : "Stored only"}
+            </div>
+          </div>
+          <Badge variant={source.planningReady ? "success" : source.configured ? "outline" : "secondary"}>
+            {source.planningReady ? "ready" : source.configured ? "configured" : "not configured"}
+          </Badge>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={usernameId}>Username or email</Label>
+          <Input
+            id={usernameId}
+            value={draft.username}
+            onChange={(event) => updateSourceDraft(source.source, { username: event.target.value })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={loginUrlId}>Login URL</Label>
+          <Input
+            id={loginUrlId}
+            value={draft.loginUrl}
+            onChange={(event) => updateSourceDraft(source.source, { loginUrl: event.target.value })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={passwordId}>Password</Label>
+          <Input
+            id={passwordId}
+            type="password"
+            value={draft.password}
+            onChange={(event) => updateSourceDraft(source.source, { password: event.target.value })}
+            placeholder={source.hasPassword ? "Saved password unchanged" : "Password"}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={draft.enabled}
+            onCheckedChange={(checked) => updateSourceDraft(source.source, { enabled: checked === true })}
+          />
+          Enabled
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={draft.clearPassword}
+            onCheckedChange={(checked) => updateSourceDraft(source.source, { clearPassword: checked === true })}
+          />
+          Clear saved password
+        </label>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => saveSourceForm(source)}
+            disabled={saveSource.isPending}
+          >
+            Save source
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => deleteSource.mutate(source.source)}
+            disabled={deleteSource.isPending}
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -822,94 +908,35 @@ export function PlanningPage() {
 
           <Card className="bg-gradient-card card-accent-info shadow-sm">
             <CardHeader>
-              <CardTitle>Recipe Sources</CardTitle>
-              <CardDescription>Save source credentials per account. Planning supports ATK only for now.</CardDescription>
+              <CardTitle>Planning Source</CardTitle>
+              <CardDescription>
+                Connect America's Test Kitchen to unlock live weekly planning.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {availableSources.map((source) => {
-                const draft = sourceDrafts[source.source] ?? sourceDraftFromSource(source);
-                const usernameId = `source-${source.source}-username`;
-                const loginUrlId = `source-${source.source}-login-url`;
-                const passwordId = `source-${source.source}-password`;
-                return (
-                  <div key={source.source} className="surface-muted space-y-3 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{source.label}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {source.planningReady
-                            ? "Ready for planning"
-                            : source.supportedForPlanning
-                              ? formatReadinessIssues(source.planningReadinessIssues)
-                              : "Stored only"}
-                        </div>
-                      </div>
-                      <Badge variant={source.planningReady ? "success" : source.configured ? "outline" : "secondary"}>
-                        {source.planningReady ? "ready" : source.configured ? "configured" : "not configured"}
-                      </Badge>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor={usernameId}>Username or email</Label>
-                      <Input
-                        id={usernameId}
-                        value={draft.username}
-                        onChange={(event) => updateSourceDraft(source.source, { username: event.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor={loginUrlId}>Login URL</Label>
-                      <Input
-                        id={loginUrlId}
-                        value={draft.loginUrl}
-                        onChange={(event) => updateSourceDraft(source.source, { loginUrl: event.target.value })}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor={passwordId}>Password</Label>
-                      <Input
-                        id={passwordId}
-                        type="password"
-                        value={draft.password}
-                        onChange={(event) => updateSourceDraft(source.source, { password: event.target.value })}
-                        placeholder={source.hasPassword ? "Saved password unchanged" : "Password"}
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={draft.enabled}
-                        onCheckedChange={(checked) => updateSourceDraft(source.source, { enabled: checked === true })}
-                      />
-                      Enabled
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={draft.clearPassword}
-                        onCheckedChange={(checked) => updateSourceDraft(source.source, { clearPassword: checked === true })}
-                      />
-                      Clear saved password
-                    </label>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => saveSourceForm(source)}
-                        disabled={saveSource.isPending}
-                      >
-                        Save source
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => deleteSource.mutate(source.source)}
-                        disabled={deleteSource.isPending}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+              {planningSources.length > 0 ? (
+                planningSources.map(renderSourceEditor)
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No planning-supported recipe source is available.
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {storedOnlySources.length > 0 ? (
+            <Card className="bg-gradient-card shadow-sm">
+              <CardHeader>
+                <CardTitle>Stored Recipe Sources</CardTitle>
+                <CardDescription>
+                  Optional saved credentials. These do not currently unlock weekly planning.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {storedOnlySources.map(renderSourceEditor)}
+              </CardContent>
+            </Card>
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
