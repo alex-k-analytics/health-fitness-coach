@@ -59,6 +59,10 @@ Use `localhost` rather than `127.0.0.1` unless the backend CORS config also allo
 
 The audit writes screenshots and browser/network events to `docs/ux-audit-screenshots/`.
 
+## Fast Agent Inspection
+
+For quick exploratory UX checks, use the optional Playwright CLI workflow in `docs/playwright-cli-inspection.md`. This is intended for faster agent/manual inspection while implementing fixes. It does not replace `npm run ux:audit`, which remains the regression and report-evidence runner.
+
 ## Navigation Coverage
 
 ### Login

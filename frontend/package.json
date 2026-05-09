@@ -12,7 +12,16 @@
     "typecheck": "tsc --noEmit",
     "ux:audit": "playwright test --config=playwright.ux.config.ts",
     "ux:audit:headed": "playwright test --config=playwright.ux.config.ts --headed",
-    "ux:audit:install": "playwright install chromium"
+    "ux:audit:install": "playwright install chromium",
+    "ux:inspect": "playwright-cli -s=health-fitness-coach open http://localhost:5173 --headed",
+    "ux:inspect:mobile": "playwright-cli -s=health-fitness-coach resize 375 812",
+    "ux:inspect:tablet": "playwright-cli -s=health-fitness-coach resize 768 1024",
+    "ux:inspect:desktop": "playwright-cli -s=health-fitness-coach resize 1440 900",
+    "ux:inspect:screenshot": "playwright-cli -s=health-fitness-coach screenshot --full-page --filename=../docs/ux-audit-screenshots/cli-inspection.png",
+    "ux:inspect:show": "playwright-cli show",
+    "ux:inspect:close": "playwright-cli -s=health-fitness-coach close",
+    "ux:inspect:install": "playwright-cli install-browser chromium",
+    "ux:inspect:help": "playwright-cli --help"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",
@@ -41,6 +50,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/cli": "^0.1.13",
     "@playwright/test": "^1.59.1",
     "@tanstack/router-devtools": "^1.166.13",
     "@tanstack/router-plugin": "^1.167.27",
