@@ -113,6 +113,8 @@ Status: Fixed on 2026-05-09. Planning tabs now stay in one horizontally scrollab
 
 ### 6. Invalid email uses native browser validation while wrong password uses app-styled validation
 
+Status: Fixed on 2026-05-09. Login now uses app-level inline validation for empty credentials and invalid email format, so email-format errors use the same alert styling as wrong-password errors instead of native browser bubbles.
+
 - Page/flow: Login validation.
 - Steps to reproduce:
   1. Open `/login`.
