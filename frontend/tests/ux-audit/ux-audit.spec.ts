@@ -1,4 +1,4 @@
-import { chromium, test } from "@playwright/test";
+import { chromium, expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
@@ -110,6 +110,77 @@ async function verifyNoDevtoolsOverlay(page: Page, viewportName: string, finding
     title: "Devtools overlay is visible during UX audit",
     actual: "The TanStack Router devtools badge is visible in the review viewport.",
     expected: "UX audit screenshots should run without development overlays unless explicitly enabled.",
+    evidence
+  });
+}
+
+async function verifyPrimaryNavDoesNotCoverContent(
+  page: Page,
+  viewportName: string,
+  pageLabel: string,
+  findings: Finding[]
+) {
+  if (viewportName === "desktop") return;
+
+  const overlaps = await page.evaluate(() => {
+    const nav = document.querySelector('nav[aria-label="Primary navigation"]');
+    const main = document.querySelector("main");
+    if (!nav || !main) return [];
+
+    const navRect = nav.getBoundingClientRect();
+    const selectors = [
+      "button",
+      "a[href]",
+      "input",
+      "textarea",
+      "select",
+      '[role="button"]',
+      '[role="tab"]',
+      '[data-slot="card"]',
+      '[data-slot="tabs-list"]'
+    ].join(",");
+
+    return Array.from(main.querySelectorAll<HTMLElement>(selectors))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        const width = Math.max(0, Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0));
+        const height = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+        const visible = width > 1 && height > 1 && style.visibility !== "hidden" && style.display !== "none";
+        const overlapsNav =
+          rect.bottom > navRect.top + 1 &&
+          rect.top < navRect.bottom - 1 &&
+          rect.right > navRect.left + 1 &&
+          rect.left < navRect.right - 1;
+
+        return {
+          text: (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().slice(0, 80),
+          tag: element.tagName.toLowerCase(),
+          rect: {
+            top: Math.round(rect.top),
+            bottom: Math.round(rect.bottom),
+            left: Math.round(rect.left),
+            right: Math.round(rect.right)
+          },
+          visible,
+          overlapsNav
+        };
+      })
+      .filter((entry) => entry.visible && entry.overlapsNav)
+      .slice(0, 6);
+  });
+
+  if (overlaps.length === 0) return;
+
+  const evidence = await screenshot(page, `${viewportName} ${pageLabel} primary nav overlap`);
+  findings.push({
+    severity: "High",
+    page: pageLabel,
+    title: "Primary navigation covers page content",
+    actual: `Visible content overlaps the bottom primary navigation: ${overlaps
+      .map((entry) => `${entry.tag} "${entry.text || "unlabeled"}"`)
+      .join(", ")}.`,
+    expected: "Mobile and tablet content should remain readable and tappable above the primary navigation.",
     evidence
   });
 }
@@ -245,6 +316,7 @@ async function runViewportAudit({
     await page.goto(`${baseURL}${route}`, { waitUntil: "networkidle" });
     await page.waitForTimeout(500);
     const evidence = await screenshot(page, `${viewportName} ${label}`);
+    await verifyPrimaryNavDoesNotCoverContent(page, viewportName, label, findings);
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     if (hasHorizontalOverflow) {
       findings.push({
@@ -321,4 +393,6 @@ test("captures UX audit evidence for the local seeded app", async ({ baseURL }) 
     path.join(outDir, "audit-events.json"),
     JSON.stringify({ generatedAt: new Date().toISOString(), findings, events }, null, 2)
   );
+
+  expect(findings, JSON.stringify(findings, null, 2)).toEqual([]);
 });
