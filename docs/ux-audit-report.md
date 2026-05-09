@@ -95,6 +95,8 @@ Status: Fixed on 2026-05-09. Planning settings now separate the ATK planning sou
 
 ### 5. Planning tab layout competes with bottom navigation on mobile
 
+Status: Fixed on 2026-05-09. Planning tabs now stay in one horizontally scrollable row on mobile, avoiding the crowded two-row tab stack near the bottom app navigation.
+
 - Page/flow: Planning tabs on mobile.
 - Steps to reproduce:
   1. Open `/planning` at `375x812`.

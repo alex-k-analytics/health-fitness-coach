@@ -486,20 +486,20 @@ export function PlanningPage() {
       </div>
 
       <Tabs value={activeView} onValueChange={(value) => setActiveView(value as PlannerView)} className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4">
-          <TabsTrigger value="this-week">
+        <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto p-1 sm:grid sm:grid-cols-4">
+          <TabsTrigger value="this-week" className="min-w-32 sm:min-w-0">
             <ShoppingBasket className="h-4 w-4" />
             This week
           </TabsTrigger>
-          <TabsTrigger value="new-plan">
+          <TabsTrigger value="new-plan" className="min-w-32 sm:min-w-0">
             <ClipboardList className="h-4 w-4" />
             New plan
           </TabsTrigger>
-          <TabsTrigger value="history">
+          <TabsTrigger value="history" className="min-w-32 sm:min-w-0">
             <History className="h-4 w-4" />
             History
           </TabsTrigger>
-          <TabsTrigger value="settings">
+          <TabsTrigger value="settings" className="min-w-32 sm:min-w-0">
             <Settings2 className="h-4 w-4" />
             Settings
           </TabsTrigger>
