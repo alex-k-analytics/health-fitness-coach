@@ -17,7 +17,11 @@ const ACTIVITY_LEVELS = [
   { value: "extremely_active", label: "Extremely active" }
 ];
 
-export function ProfileForm() {
+type ProfileFormProps = {
+  actionPlacement?: "bottom" | "top";
+};
+
+export function ProfileForm({ actionPlacement = "bottom" }: ProfileFormProps) {
   const { data: profile, isLoading } = useProfileQuery();
   const updateProfile = useProfileMutation();
   const [formData, setFormData] = useState({
@@ -87,8 +91,25 @@ export function ProfileForm() {
     });
   };
 
+  const saveButton = (
+    <Button type="submit" disabled={!isDirty || updateProfile.isPending} className={actionPlacement === "top" ? "w-full" : undefined}>
+      {updateProfile.isPending ? "Saving..." : "Save changes"}
+    </Button>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
+      {actionPlacement === "top" ? (
+        <div className="sticky top-0 z-10 rounded-lg border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
+          <div className="mb-2">
+            <p className="text-sm font-medium text-foreground">Profile changes</p>
+            <p className="text-xs text-muted-foreground">
+              Save edits before closing the drawer.
+            </p>
+          </div>
+          {saveButton}
+        </div>
+      ) : null}
       <div className="grid gap-2">
         <Label htmlFor="displayName">Display name</Label>
         <Input
@@ -186,9 +207,11 @@ export function ProfileForm() {
           rows={3}
         />
       </div>
-      <Button type="submit" disabled={!isDirty || updateProfile.isPending}>
-        {updateProfile.isPending ? "Saving..." : "Save changes"}
-      </Button>
+      {actionPlacement === "bottom" ? (
+        <div>
+          {saveButton}
+        </div>
+      ) : null}
     </form>
   );
 }

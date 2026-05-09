@@ -39,6 +39,8 @@ No high severity findings in this audit run.
 
 ### 1. Profile drawer hides the primary save action below a long mobile form
 
+Status: Fixed on 2026-05-09. The drawer now places a sticky `Profile changes` save action at the top of the editable profile form, and account actions are separated below the form instead of occupying the persistent drawer footer. Verified with `npm run ux:audit`.
+
 - Page/flow: Mobile header -> profile drawer -> edit profile details.
 - Steps to reproduce:
   1. Sign in at `375x812`.
@@ -55,6 +57,8 @@ No high severity findings in this audit run.
 ## Low Severity
 
 ### 2. Audit-created data accumulates and makes dashboard evidence less representative
+
+Status: Fixed on 2026-05-09. The audit runner now deletes prior `UX audit chicken rice bowl` meals after sign-in and deletes the meal it creates after capturing the save evidence. The backend now supports authenticated meal deletion for the cleanup path. Verified with `npm run ux:audit`.
 
 - Page/flow: Dashboard after repeated UX audit runs.
 - Steps to reproduce:
@@ -82,9 +86,9 @@ No high severity findings in this audit run.
 
 ### Quick Wins
 
-- Make the profile drawer's save action visible when editable fields are in view or when the form becomes dirty.
-- Move destructive/account actions in the drawer below the editable profile workflow, or visually separate them from form completion.
-- Add audit data cleanup so repeated audit runs do not inflate dashboard totals.
+- Fixed: Make the profile drawer's save action visible when editable fields are in view or when the form becomes dirty.
+- Fixed: Move destructive/account actions in the drawer below the editable profile workflow, or visually separate them from form completion.
+- Fixed: Add audit data cleanup so repeated audit runs do not inflate dashboard totals.
 
 ### Larger UX Refinements
 

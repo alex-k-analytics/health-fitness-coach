@@ -607,6 +607,31 @@ nutritionRoutes.patch("/meals/:mealId", async (req: AuthenticatedRequest, res) =
   return res.json({ meal: serializeMeal(meal) });
 });
 
+nutritionRoutes.delete("/meals/:mealId", async (req: AuthenticatedRequest, res) => {
+  const auth = getRequiredAuth(req);
+  const existingMeal = await prisma.mealEntry.findFirst({
+    where: {
+      id: req.params.mealId,
+      accountId: auth.accountId
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!existingMeal) {
+    return res.status(404).json({ error: "Meal was not found" });
+  }
+
+  await prisma.mealEntry.delete({
+    where: {
+      id: existingMeal.id
+    }
+  });
+
+  return res.json({ deleted: true, id: existingMeal.id });
+});
+
 nutritionRoutes.get("/summary", async (req: AuthenticatedRequest, res) => {
   const parsed = summaryQuerySchema.safeParse(req.query);
   if (!parsed.success) {

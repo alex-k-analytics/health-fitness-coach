@@ -4,7 +4,6 @@ import {
   DrawerDescription,
   DrawerTitle,
   DrawerTrigger,
-  DrawerFooter,
   DrawerClose
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -44,24 +43,30 @@ export function ProfileDrawer({ children }: { children?: React.ReactNode }) {
             </Button>
           </DrawerClose>
         </div>
-        <div className="overflow-y-auto p-4">
-          <ProfileForm />
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <ProfileForm actionPlacement="top" />
+          <div className="mt-6 rounded-lg border border-border bg-card p-3">
+            <p className="text-sm font-medium text-foreground">Account actions</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Closing keeps unsaved edits on this screen until you leave or reload.
+            </p>
+            <div className="mt-3 grid gap-2">
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={() => { logout.mutate(); setProfileDrawerOpen(false); }}
+                disabled={logout.isPending}
+              >
+                {logout.isPending ? "Signing out..." : "Sign out"}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" className="w-full">
+                  Close
+                </Button>
+              </DrawerClose>
+            </div>
+          </div>
         </div>
-        <DrawerFooter className="p-4 border-t border-border">
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={() => { logout.mutate(); setProfileDrawerOpen(false); }}
-            disabled={logout.isPending}
-          >
-            {logout.isPending ? "Signing out..." : "Sign out"}
-          </Button>
-          <DrawerClose asChild>
-            <Button variant="outline" className="w-full">
-              Close
-            </Button>
-          </DrawerClose>
-        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   );

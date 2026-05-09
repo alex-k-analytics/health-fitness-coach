@@ -27,6 +27,7 @@ const viewports = [
 
 const outDir = path.resolve(process.cwd(), "..", "docs", "ux-audit-screenshots");
 const authTokenKey = "health_fitness_auth_token";
+const auditMealTitle = "UX audit chicken rice bowl";
 
 function findExistingChromium() {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -210,7 +211,7 @@ async function captureMealEstimateSaveFlow(page: Page, baseURL: string, viewport
   await page.goto(`${baseURL}/meals`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /log (food|meal)/i }).first().click();
   await expect(page.getByRole("dialog", { name: /log meal/i })).toBeVisible();
-  await page.getByLabel(/what did you eat/i).fill("UX audit chicken rice bowl");
+  await page.getByLabel(/what did you eat/i).fill(auditMealTitle);
   await page.getByLabel(/serving details/i).fill("1 bowl with grilled chicken, rice, beans, and salsa");
   await page.getByRole("button", { name: /estimate nutrition/i }).click();
   await expect(page.getByRole("dialog", { name: /review & save/i })).toBeVisible({ timeout: 30_000 });
@@ -218,6 +219,33 @@ async function captureMealEstimateSaveFlow(page: Page, baseURL: string, viewport
   await page.getByRole("button", { name: /^save$/i }).click();
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 30_000 });
   await screenshot(page, `${viewportName} meal saved`);
+}
+
+async function cleanupAuditMeals(page: Page, baseURL: string) {
+  const authToken = await page
+    .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
+    .catch(() => null);
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+
+  for (let pageIndex = 0; pageIndex < 5; pageIndex += 1) {
+    const response = await page.request.get(`${baseURL}/api/nutrition/meals?limit=50`, { headers });
+    if (!response.ok()) return;
+
+    const payload = await response.json().catch(() => null);
+    const meals = Array.isArray(payload?.meals) ? payload.meals : [];
+    const auditMeals = meals.filter(
+      (meal: { id?: unknown; title?: unknown }) =>
+        typeof meal.id === "string" &&
+        typeof meal.title === "string" &&
+        meal.title.startsWith(auditMealTitle)
+    );
+
+    if (auditMeals.length === 0) return;
+
+    for (const meal of auditMeals) {
+      await page.request.delete(`${baseURL}/api/nutrition/meals/${meal.id}`, { headers });
+    }
+  }
 }
 
 async function captureProfileSaveFlow(page: Page, baseURL: string, viewportName: string) {
@@ -371,6 +399,7 @@ async function runViewportAudit({
   }
 
   await page.waitForLoadState("networkidle");
+  await cleanupAuditMeals(page, baseURL);
   await screenshot(page, `${viewportName} dashboard empty`);
   await verifyNoDevtoolsOverlay(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
@@ -411,6 +440,7 @@ async function runViewportAudit({
     await page.waitForTimeout(250);
   }
   await captureMealEstimateSaveFlow(page, baseURL, viewportName);
+  await cleanupAuditMeals(page, baseURL);
 
   await captureWeightModalFlow(page, baseURL, viewportName);
 
