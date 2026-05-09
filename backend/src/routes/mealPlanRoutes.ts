@@ -142,8 +142,13 @@ async function acquirePlanningRecipes(input: {
     input.maxRecipes
   );
   const budgetBySource = new Map(budgets.map((budget) => [budget.source, budget.maxRecipes]));
-  const settled = await Promise.allSettled(
-    input.sourceLogins.map(async (login) => {
+  const recipes: PlanningRecipeCandidate[] = [];
+  const warnings: string[] = [];
+  const failures: string[] = [];
+  let scannedCount = 0;
+
+  for (const login of input.sourceLogins) {
+    try {
       const response = await recipeAcquisitionService.acquireRecipes({
         source: login.source,
         login,
@@ -151,24 +156,13 @@ async function acquirePlanningRecipes(input: {
         maxRecipes: budgetBySource.get(login.source) ?? input.maxRecipes,
         options: { headless: true }
       });
-      return { source: login.source, response };
-    })
-  );
-
-  const recipes: PlanningRecipeCandidate[] = [];
-  const warnings: string[] = [];
-  const failures: string[] = [];
-  let scannedCount = 0;
-
-  for (const result of settled) {
-    if (result.status === "fulfilled") {
-      const label = planningSourceLabelById[result.value.source] ?? result.value.source;
-      recipes.push(...result.value.response.recipes);
-      scannedCount += result.value.response.scrapedCount;
-      warnings.push(...result.value.response.warnings.map((warning) => `${label}: ${warning}`));
-      continue;
+      const label = planningSourceLabelById[login.source] ?? login.source;
+      recipes.push(...response.recipes);
+      scannedCount += response.scrapedCount;
+      warnings.push(...response.warnings.map((warning) => `${label}: ${warning}`));
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : "Unknown recipe acquisition error.");
     }
-    failures.push(result.reason instanceof Error ? result.reason.message : "Unknown recipe acquisition error.");
   }
 
   const dedupedRecipes = dedupeRecipes(recipes, input.maxRecipes);

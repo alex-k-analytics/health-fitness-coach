@@ -10,6 +10,20 @@ function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function summarizeBody(value: string) {
+  const normalized = normalizeWhitespace(value);
+  return normalized.length > 800 ? `${normalized.slice(0, 800)}...` : normalized;
+}
+
+function parseJsonPayload(value: string) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 async function buildScraperHeaders(baseUrl: string): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json"
@@ -200,7 +214,8 @@ export class RecipeAcquisitionService {
       throw new Error("Unable to reach the scraper service. Verify MEAL_PLAN_SCRAPER_URL and Cloud Run connectivity.");
     }
 
-    const payload = await response.json().catch(() => null);
+    const responseBody = await response.text().catch(() => "");
+    const payload = parseJsonPayload(responseBody);
     if (!response.ok) {
       const healthSummary = response.status === 404 ? await summarizeScraperHealth(scraperBaseUrl) : null;
       console.error("Meal-plan scraper request returned a non-OK response.", {
@@ -210,6 +225,7 @@ export class RecipeAcquisitionService {
         status: response.status,
         statusText: response.statusText,
         responsePayload: payload,
+        responseBodyPreview: payload ? null : summarizeBody(responseBody),
         healthSummary
       });
       const errorMessage =
@@ -217,7 +233,7 @@ export class RecipeAcquisitionService {
           ? (payload as { error: string }).error
           : response.status === 404
             ? "Scraper request failed with status 404. Verify MEAL_PLAN_SCRAPER_URL points to the scraper service and that /internal/recipes/acquire is deployed."
-            : `Scraper request failed with status ${response.status}.`;
+            : `Scraper request failed with status ${response.status}${responseBody ? `: ${summarizeBody(responseBody)}` : ""}.`;
       throw new Error(healthSummary ? `${errorMessage} ${healthSummary}` : errorMessage);
     }
 

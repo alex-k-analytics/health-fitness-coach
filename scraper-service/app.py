@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import traceback
 from collections.abc import Iterable
 from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
 
@@ -12,6 +13,12 @@ from playwright.sync_api import sync_playwright
 
 
 app = Flask(__name__)
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    app.logger.error("Unhandled scraper error: %s\n%s", error, traceback.format_exc())
+    return jsonify({"error": f"Unhandled scraper error: {error}"}), 500
 
 
 def normalize_whitespace(value: str) -> str:
@@ -403,12 +410,30 @@ def acquire_nyt_recipes(payload: dict, pantry_ingredients: list[str], max_recipe
     recipes: list[dict] = []
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=bool(options.get("headless", True)))
+        browser = playwright.chromium.launch(
+            headless=bool(options.get("headless", True)),
+            chromium_sandbox=False,
+            args=[
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--no-first-run",
+                "--no-sandbox",
+            ],
+        )
         context = browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
+        )
+        context.route(
+            "**/*",
+            lambda route: route.abort()
+            if route.request.resource_type in {"font", "image", "media"}
+            else route.continue_(),
         )
         page = context.new_page()
         try:
@@ -464,6 +489,7 @@ def acquire():
         try:
             return jsonify(acquire_nyt_recipes(payload, pantry_ingredients, max_recipes))
         except Exception as error:
+            app.logger.error("NYT Cooking acquisition failed: %s\n%s", error, traceback.format_exc())
             return jsonify({"error": f"NYT Cooking acquisition failed: {error}"}), 400
 
     if source != "atk":
