@@ -240,6 +240,7 @@ async function captureLogoutFlow(page: Page, viewportName: string) {
   await page.getByRole("button", { name: /open profile/i }).click();
   await page.getByRole("button", { name: /sign out/i }).click();
   await page.waitForURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible({ timeout: 15_000 });
   await screenshot(page, `${viewportName} signed out`);
 }
 
