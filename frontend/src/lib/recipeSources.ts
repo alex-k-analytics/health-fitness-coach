@@ -25,14 +25,14 @@ export function getPlanningSourceReadiness(sources: RecipeSourceCredential[]) {
     return {
       readySources,
       ready: false,
-      message: `${configuredUnsupportedSource.label} is configured, but live planning currently supports America's Test Kitchen.`
+      message: `${configuredUnsupportedSource.label} is configured, but it is not available for live planning yet.`
     };
   }
 
   return {
     readySources,
     ready: false,
-    message: "Connect and enable America's Test Kitchen with a username and saved password before live planning."
+    message: "Connect and enable a planning source with a username and saved password before live planning."
   };
 }
 

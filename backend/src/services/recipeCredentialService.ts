@@ -246,11 +246,12 @@ export class RecipeCredentialService {
   }
 
   isPlanningSource(source: string) {
-    return source.trim().toLowerCase() === "atk";
+    const key = source.trim().toLowerCase() as RecipeSourceId;
+    return key in SOURCE_BY_ID && SOURCE_BY_ID[key].supportedForPlanning;
   }
 
   assertPlanningSources(sourceIds: string[]) {
-    const normalized = sourceIds.map((source) => assertSource(source));
+    const normalized = Array.from(new Set(sourceIds.map((source) => assertSource(source))));
     const unsupported = normalized.filter((source) => !SOURCE_BY_ID[source].supportedForPlanning);
     if (unsupported.length > 0) {
       const labels = unsupported.map((source) => SOURCE_BY_ID[source].label).join(", ");

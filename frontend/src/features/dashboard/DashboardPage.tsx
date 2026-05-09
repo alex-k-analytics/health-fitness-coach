@@ -179,7 +179,7 @@ export function DashboardPage() {
       ? planningStatusLabel(planningStatus.status)
       : "Ready";
   const planningMetricSub = planningNeedsSetup
-    ? "Connect ATK source"
+    ? "Connect a planning source"
     : activePlan
       ? `${groceryRemaining} groceries left`
       : sourceReady

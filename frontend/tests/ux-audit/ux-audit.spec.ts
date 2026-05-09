@@ -1,5 +1,5 @@
 import { chromium, expect, test } from "@playwright/test";
-import type { Browser, Locator, Page } from "@playwright/test";
+import type { Browser, Locator, Page, Route } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -17,6 +17,21 @@ type AuditEvent = {
   type: string;
   text: string;
   url: string;
+};
+
+type AuditRecipeSource = {
+  source: "atk" | "allrecipes" | "nytimes";
+  label: string;
+  defaultLoginUrl: string;
+  supportedForPlanning: boolean;
+  planningReady: boolean;
+  planningReadinessIssues: string[];
+  configured: boolean;
+  enabled: boolean;
+  username: string;
+  loginUrl: string;
+  hasPassword: boolean;
+  updatedAt: string | null;
 };
 
 const viewports = [
@@ -39,6 +54,30 @@ const auditBaselineProfile = {
   activityLevel: null,
   notes: null
 };
+const recipeSourcesRoutePattern = "**/api/meal-plans/sources";
+
+function auditRecipeSource(patch: Partial<AuditRecipeSource> & Pick<AuditRecipeSource, "source" | "label">): AuditRecipeSource {
+  const defaultLoginUrlBySource = {
+    allrecipes: "https://www.allrecipes.com/account/sign-in",
+    atk: "https://www.americastestkitchen.com/sign_in",
+    nytimes: "https://cooking.nytimes.com/login"
+  };
+
+  return {
+    source: patch.source,
+    label: patch.label,
+    defaultLoginUrl: patch.defaultLoginUrl ?? defaultLoginUrlBySource[patch.source],
+    supportedForPlanning: patch.supportedForPlanning ?? false,
+    planningReady: patch.planningReady ?? false,
+    planningReadinessIssues: patch.planningReadinessIssues ?? ["Planning is not supported for this source yet."],
+    configured: patch.configured ?? false,
+    enabled: patch.enabled ?? false,
+    username: patch.username ?? "",
+    loginUrl: patch.loginUrl ?? patch.defaultLoginUrl ?? defaultLoginUrlBySource[patch.source],
+    hasPassword: patch.hasPassword ?? false,
+    updatedAt: patch.updatedAt ?? null
+  };
+}
 
 function findExistingChromium() {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -695,6 +734,110 @@ async function captureProfileSaveFlow(page: Page, baseURL: string, viewportName:
   await screenshot(page, `${viewportName} settings profile saved`);
 }
 
+async function withMockedRecipeSources(
+  page: Page,
+  sources: AuditRecipeSource[],
+  callback: () => Promise<void>
+) {
+  const handler = async (route: Route) => {
+    if (route.request().method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ sources })
+    });
+  };
+
+  await page.route(recipeSourcesRoutePattern, handler);
+  try {
+    await callback();
+  } finally {
+    await page.unroute(recipeSourcesRoutePattern, handler);
+  }
+}
+
+async function captureNytPlanningSourceStates(page: Page, baseURL: string, viewportName: string) {
+  const unsupportedSource = auditRecipeSource({
+    source: "allrecipes",
+    label: "Allrecipes"
+  });
+  const atkNotConfigured = auditRecipeSource({
+    source: "atk",
+    label: "America's Test Kitchen",
+    supportedForPlanning: true,
+    planningReadinessIssues: [
+      "Source is disabled.",
+      "Username or email is missing.",
+      "Saved password is missing."
+    ]
+  });
+  const nytNeedsPassword = auditRecipeSource({
+    source: "nytimes",
+    label: "NYT Cooking",
+    supportedForPlanning: true,
+    configured: true,
+    enabled: true,
+    username: "nyt-audit@example.com",
+    hasPassword: false,
+    planningReadinessIssues: ["Saved password is missing."]
+  });
+  const atkReady = auditRecipeSource({
+    source: "atk",
+    label: "America's Test Kitchen",
+    supportedForPlanning: true,
+    planningReady: true,
+    configured: true,
+    enabled: true,
+    username: "atk-audit@example.com",
+    hasPassword: true,
+    planningReadinessIssues: []
+  });
+  const nytReady = auditRecipeSource({
+    source: "nytimes",
+    label: "NYT Cooking",
+    supportedForPlanning: true,
+    planningReady: true,
+    configured: true,
+    enabled: true,
+    username: "nyt-audit@example.com",
+    hasPassword: true,
+    planningReadinessIssues: []
+  });
+
+  await withMockedRecipeSources(page, [unsupportedSource, atkNotConfigured, nytNeedsPassword], async () => {
+    await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+    await expect(page.getByText(/NYT Cooking is configured but not ready/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/live planning currently supports America's Test Kitchen/i)).toHaveCount(0);
+    await screenshot(page, `${viewportName} dashboard nyt source needed`);
+
+    await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
+    await page.getByRole("tab", { name: /settings/i }).click();
+    await expect(page.getByText("NYT Cooking").first()).toBeVisible();
+    await expect(page.getByText("America's Test Kitchen").first()).toBeVisible();
+    await expect(page.getByText(/saved password is missing/i).first()).toBeVisible();
+    await screenshot(page, `${viewportName} planning settings nyt not ready`);
+  });
+
+  await withMockedRecipeSources(page, [unsupportedSource, atkReady, nytReady], async () => {
+    await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
+    await page.getByRole("tab", { name: /new plan/i }).click();
+    await page.getByLabel(/pantry ingredients/i).fill("chicken\nrice\ngarlic");
+    await expect(page.getByText(/America's Test Kitchen, NYT Cooking connected/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: /start planning run/i })).toBeEnabled();
+    await screenshot(page, `${viewportName} planning new plan atk nyt ready`);
+
+    await page.getByRole("tab", { name: /settings/i }).click();
+    await expect(page.getByText("NYT Cooking").first()).toBeVisible();
+    await expect(page.getByText("America's Test Kitchen").first()).toBeVisible();
+    await expect(page.getByText("Ready for planning")).toHaveCount(2);
+    await screenshot(page, `${viewportName} planning settings atk nyt ready`);
+  });
+}
+
 async function captureLogoutFlow(page: Page, viewportName: string) {
   await page.getByRole("button", { name: /open profile/i }).click();
   await page.getByRole("button", { name: /sign out/i }).click();
@@ -899,6 +1042,7 @@ async function runViewportAudit({
   await page.getByRole("tab", { name: /settings/i }).click();
   await page.waitForTimeout(400);
   await screenshot(page, `${viewportName} planning settings`);
+  await captureNytPlanningSourceStates(page, baseURL, viewportName);
 
   await captureProfileSaveFlow(page, baseURL, viewportName);
   await captureLogoutFlow(page, viewportName);

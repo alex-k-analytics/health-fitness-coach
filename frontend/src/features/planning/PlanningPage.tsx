@@ -198,7 +198,7 @@ export function PlanningPage() {
       ? planningStatusLabel(visibleStatus.status)
       : "Ready";
   const planningStatusSub = planningNeedsSetup
-    ? "Connect ATK source"
+    ? "Connect a planning source"
     : visibleStatus?.progressDetail ?? sourceReadiness.message;
 
   const checkedItems = useMemo(
@@ -709,7 +709,7 @@ export function PlanningPage() {
                 <div className="surface-muted border-warning/30 bg-warning/10 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Connect ATK before live planning</p>
+                      <p className="text-sm font-semibold text-foreground">Connect a recipe source before live planning</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {sourceReadiness.message}
                       </p>
@@ -910,7 +910,7 @@ export function PlanningPage() {
             <CardHeader>
               <CardTitle>Planning Source</CardTitle>
               <CardDescription>
-                Connect America's Test Kitchen to unlock live weekly planning.
+                Connect America's Test Kitchen or NYT Cooking to unlock live weekly planning.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

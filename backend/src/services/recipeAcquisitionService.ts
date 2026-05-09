@@ -167,6 +167,9 @@ function normalizeRecipe(raw: any): PlanningRecipeCandidate | null {
 export class RecipeAcquisitionService {
   async acquireRecipes(input: ScraperAcquireRequest): Promise<ScraperAcquireResponse> {
     if (!config.mealPlanScraperUrl.trim()) {
+      if (input.source !== "atk") {
+        throw new Error(`${input.source} recipe acquisition requires MEAL_PLAN_SCRAPER_URL to point to the scraper service.`);
+      }
       const recipes = buildMockRecipes(input.pantryIngredients, input.maxRecipes);
       return {
         recipes,

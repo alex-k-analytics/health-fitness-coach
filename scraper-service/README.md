@@ -9,10 +9,11 @@ Current contract:
 Current implementation:
 
 - mock normalized ATK-style recipe candidates for local integration
+- Playwright-based NYT Cooking login, search, and recipe-page normalization
 
 Intended future implementation:
 
 - Playwright-based ATK login and recipe acquisition
-- normalized recipe parsing for HFC meal planning
+- broader normalized recipe parsing for HFC meal planning
 
 The frontend should never talk to this service directly. `health-fitness-coach` remains the only user-facing application.

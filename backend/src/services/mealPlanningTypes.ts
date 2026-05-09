@@ -165,6 +165,6 @@ export const RECIPE_SOURCE_DEFINITIONS: RecipeSourceDefinition[] = [
     id: "nytimes",
     label: "NYT Cooking",
     loginUrl: "https://cooking.nytimes.com/login",
-    supportedForPlanning: false
+    supportedForPlanning: true
   }
 ];

@@ -11,6 +11,7 @@ import {
   type MealPlanRunSummary,
   type PlanningRecipeCandidate,
   type RecipeSourceId,
+  type RecipeSourceLogin,
   type WeeklyMealPlan
 } from "../services/mealPlanningTypes.js";
 import { recipeCredentialService } from "../services/recipeCredentialService.js";
@@ -89,6 +90,102 @@ function parseRecipeSources(value: Prisma.JsonValue | null | undefined): RecipeS
 
 function formatRecipeSourceLabels(recipeSources: RecipeSourceId[]) {
   return recipeSources.map((source) => planningSourceLabelById[source] ?? source).join(", ");
+}
+
+function validatePlanningLogin(login: RecipeSourceLogin) {
+  const label = planningSourceLabelById[login.source] ?? login.source;
+  const missing: string[] = [];
+  if (!login.enabled) missing.push("source is disabled");
+  if (!login.username.trim()) missing.push("username or email is missing");
+  if (!login.password.trim()) missing.push("saved password is missing");
+  if (missing.length > 0) {
+    throw new Error(`${label} is not ready for planning: ${missing.join(", ")}.`);
+  }
+}
+
+function allocateRecipeBudgets(recipeSources: RecipeSourceId[], maxRecipes: number) {
+  const sourceCount = Math.max(1, recipeSources.length);
+  const base = Math.floor(maxRecipes / sourceCount);
+  const remainder = maxRecipes % sourceCount;
+  return recipeSources.map((source, index) => ({
+    source,
+    maxRecipes: Math.max(1, base + (index < remainder ? 1 : 0))
+  }));
+}
+
+function recipeDedupKey(recipe: PlanningRecipeCandidate) {
+  const url = recipe.url.trim().toLowerCase().replace(/[?#].*$/, "").replace(/\/$/, "");
+  if (url) return `url:${url}`;
+  return `title:${recipe.title.trim().toLowerCase().replace(/\s+/g, " ")}`;
+}
+
+function dedupeRecipes(recipes: PlanningRecipeCandidate[], maxRecipes: number) {
+  const seen = new Set<string>();
+  const deduped: PlanningRecipeCandidate[] = [];
+  for (const recipe of recipes) {
+    const key = recipeDedupKey(recipe);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(recipe);
+    if (deduped.length >= maxRecipes) break;
+  }
+  return deduped;
+}
+
+async function acquirePlanningRecipes(input: {
+  sourceLogins: RecipeSourceLogin[];
+  pantryIngredients: string[];
+  maxRecipes: number;
+}) {
+  const budgets = allocateRecipeBudgets(
+    input.sourceLogins.map((login) => login.source),
+    input.maxRecipes
+  );
+  const budgetBySource = new Map(budgets.map((budget) => [budget.source, budget.maxRecipes]));
+  const settled = await Promise.allSettled(
+    input.sourceLogins.map(async (login) => {
+      const response = await recipeAcquisitionService.acquireRecipes({
+        source: login.source,
+        login,
+        pantryIngredients: input.pantryIngredients,
+        maxRecipes: budgetBySource.get(login.source) ?? input.maxRecipes,
+        options: { headless: true }
+      });
+      return { source: login.source, response };
+    })
+  );
+
+  const recipes: PlanningRecipeCandidate[] = [];
+  const warnings: string[] = [];
+  const failures: string[] = [];
+  let scannedCount = 0;
+
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      const label = planningSourceLabelById[result.value.source] ?? result.value.source;
+      recipes.push(...result.value.response.recipes);
+      scannedCount += result.value.response.scrapedCount;
+      warnings.push(...result.value.response.warnings.map((warning) => `${label}: ${warning}`));
+      continue;
+    }
+    failures.push(result.reason instanceof Error ? result.reason.message : "Unknown recipe acquisition error.");
+  }
+
+  const dedupedRecipes = dedupeRecipes(recipes, input.maxRecipes);
+  if (dedupedRecipes.length === 0) {
+    throw new Error(failures.length > 0 ? failures.join(" ") : "No recipe candidates were returned by the configured sources.");
+  }
+
+  warnings.push(...failures.map((failure) => `A recipe source was skipped after acquisition failed: ${failure}`));
+  if (recipes.length !== dedupedRecipes.length) {
+    warnings.push(`Merged ${recipes.length} source candidates into ${dedupedRecipes.length} unique recipe candidates.`);
+  }
+
+  return {
+    recipes: dedupedRecipes,
+    scrapedCount: scannedCount,
+    warnings
+  };
 }
 
 function parsePlan(run: {
@@ -266,20 +363,18 @@ async function processMealPlanRun(input: {
     const sourceLogins = await Promise.all(
       input.recipeSources.map((source) => recipeCredentialService.resolvePlanningSourceLogin(input.accountId, source))
     );
-    const atkLogin = sourceLogins[0];
+    sourceLogins.forEach(validatePlanningLogin);
 
     await updateRunProgress(
       input.runId,
       "Acquiring recipe candidates",
       28,
-      `Requesting up to ${input.maxRecipes} normalized recipes from ${planningSourceLabelById[input.recipeSources[0]] ?? input.recipeSources[0]}.`
+      `Requesting up to ${input.maxRecipes} normalized recipes from ${formatRecipeSourceLabels(input.recipeSources)}.`
     );
-    const acquisition = await recipeAcquisitionService.acquireRecipes({
-      source: input.recipeSources[0],
-      login: atkLogin,
+    const acquisition = await acquirePlanningRecipes({
+      sourceLogins,
       pantryIngredients,
-      maxRecipes: input.maxRecipes,
-      options: { headless: true }
+      maxRecipes: input.maxRecipes
     });
 
     await updateRunProgress(

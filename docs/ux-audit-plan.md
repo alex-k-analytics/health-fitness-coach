@@ -119,6 +119,9 @@ For quick exploratory UX checks, use the optional Playwright CLI workflow in `do
 
 - This Week, New Plan, History, and Settings tabs
 - Source readiness
+- ATK and NYT Cooking both appear as planning-capable sources
+- NYT configured but not ready states, including missing saved password
+- Combined ATK + NYT ready state with planning unblocked
 - Blocked planning state
 - Grocery checklist
 - Run history delete/confirm
