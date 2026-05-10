@@ -33,6 +33,7 @@ export function NumericInput({
       inputMode={mode === "decimal" ? "decimal" : "numeric"}
       pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
       step={mode === "decimal" ? "any" : "1"}
+      max={max}
       value={value}
       onChange={(event) => onValueChange(cleanNumericDraft(event.target.value, { mode, max, allowEmpty }))}
       onBlur={(event) => {
@@ -68,6 +69,7 @@ export function NumericValueInput({
       inputMode={mode === "decimal" ? "decimal" : "numeric"}
       pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
       step={mode === "decimal" ? "any" : "1"}
+      max={max}
       value={draft}
       onFocus={(event) => {
         setIsFocused(true);

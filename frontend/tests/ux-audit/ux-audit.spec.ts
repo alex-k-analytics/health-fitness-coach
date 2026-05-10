@@ -56,6 +56,7 @@ const auditBaselineProfile = {
   notes: null
 };
 const recipeSourcesRoutePattern = "**/api/meal-plans/sources";
+const mealPlanRunsRoutePattern = "**/api/meal-plans/runs";
 
 function auditRecipeSource(patch: Partial<AuditRecipeSource> & Pick<AuditRecipeSource, "source" | "label">): AuditRecipeSource {
   const defaultLoginUrlBySource = {
@@ -371,7 +372,13 @@ async function measureNavigationLayoutWithBanner(page: Page) {
   return page.evaluate(() => {
     const header = document.querySelector("header");
     const bottomNav = document.querySelector('nav[aria-label="Primary navigation"]');
-    const alert = document.querySelector('[role="alert"]');
+    const alert = document.querySelector('[role="alert"], [role="status"]');
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const primaryAction = Array.from(document.querySelectorAll("button")).find((button) => {
+      const text = button.textContent?.trim() ?? "";
+      const rect = button.getBoundingClientRect();
+      return /save changes|start planning run/i.test(text) && rect.width > 0 && rect.height > 0;
+    }) ?? null;
 
     const rectsOverlap = (first: DOMRect, second: DOMRect) =>
       first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
@@ -386,6 +393,8 @@ async function measureNavigationLayoutWithBanner(page: Page) {
         alertVisible: false,
         alertOverlapsHeader: false,
         alertOverlapsBottomNav: false,
+        alertOverlapsFocusedControl: false,
+        alertOverlapsPrimaryAction: false,
         alertTop: null,
         alertBottom: null
       };
@@ -394,6 +403,8 @@ async function measureNavigationLayoutWithBanner(page: Page) {
     const headerRect = header.getBoundingClientRect();
     const bottomNavRect = bottomNav?.getBoundingClientRect() ?? null;
     const alertRect = alert?.getBoundingClientRect() ?? null;
+    const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
+    const primaryActionRect = primaryAction?.getBoundingClientRect() ?? null;
     const alertVisible = alertRect ? isVisibleRect(alertRect) : false;
     const headerTop = Math.round(headerRect.top);
     const bottomNavHasScrollbar = bottomNav
@@ -409,6 +420,12 @@ async function measureNavigationLayoutWithBanner(page: Page) {
       alertVisible,
       alertOverlapsHeader: alertRect && alertVisible ? rectsOverlap(alertRect, headerRect) : false,
       alertOverlapsBottomNav: alertRect && alertVisible && bottomNavRect ? rectsOverlap(alertRect, bottomNavRect) : false,
+      alertOverlapsFocusedControl: alertRect && alertVisible && activeElementRect && isVisibleRect(activeElementRect)
+        ? rectsOverlap(alertRect, activeElementRect)
+        : false,
+      alertOverlapsPrimaryAction: alertRect && alertVisible && primaryActionRect && isVisibleRect(primaryActionRect)
+        ? rectsOverlap(alertRect, primaryActionRect)
+        : false,
       alertTop: alertVisible ? Math.round(alertRect.top) : null,
       alertBottom: alertVisible ? Math.round(alertRect.bottom) : null
     };
@@ -417,7 +434,7 @@ async function measureNavigationLayoutWithBanner(page: Page) {
 
 async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
   await page.goto(`${baseURL}/settings`, { waitUntil: "networkidle" });
-  const existingAlert = page.getByRole("alert").first();
+  const existingAlert = page.locator('[role="alert"], [role="status"]').first();
   if (await existingAlert.isVisible().catch(() => false)) {
     await existingAlert.click();
     await page.waitForTimeout(150);
@@ -427,10 +444,12 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
   await page.getByLabel(/notes/i).fill(`UX audit toast layout check ${viewportName} ${Date.now()}`);
   await page.getByRole("button", { name: /save changes/i }).click();
   await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
-  const profileUpdatedAlert = page.getByRole("alert").filter({ hasText: /profile updated/i });
+  const profileUpdatedAlert = page.getByRole("status").filter({ hasText: /profile updated/i });
   await expect(profileUpdatedAlert).toBeVisible({ timeout: 15_000 });
+  await expect(profileUpdatedAlert).toHaveAttribute("aria-live", "polite");
+  await page.getByLabel(/notes/i).focus();
   const after = await measureNavigationLayoutWithBanner(page);
-  await screenshot(page, `${viewportName} global banner toast visible`);
+  await screenshot(page, `${viewportName} global banner toast visible on scrolled form`);
   const dismissButton = profileUpdatedAlert.getByRole("button", { name: /dismiss notification/i });
   const hasDismissButton = await dismissButton.isVisible().catch(() => false);
 
@@ -443,6 +462,8 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
     after.alertVisible &&
     !after.alertOverlapsHeader &&
     !after.alertOverlapsBottomNav &&
+    !after.alertOverlapsFocusedControl &&
+    !after.alertOverlapsPrimaryAction &&
     hasDismissButton
   ) {
     await dismissButton.click();
@@ -457,8 +478,8 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
     severity: "Medium",
     page: "app shell",
     title: "Global toast/banner shifts navigation or creates overflow",
-    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}. Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps header: ${after.alertOverlapsHeader}. Alert overlaps bottom nav: ${after.alertOverlapsBottomNav}. Dismiss button visible: ${hasDismissButton}.`,
-    expected: "Transient toast feedback should overlay without pushing sticky navigation, overlapping primary nav regions, creating scrollbars, or hiding dismissal behind pointer-only behavior.",
+    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}. Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps header: ${after.alertOverlapsHeader}. Alert overlaps bottom nav: ${after.alertOverlapsBottomNav}. Alert overlaps focused control: ${after.alertOverlapsFocusedControl}. Alert overlaps primary action: ${after.alertOverlapsPrimaryAction}. Dismiss button visible: ${hasDismissButton}.`,
+    expected: "Transient toast feedback should overlay without pushing sticky navigation, overlapping primary nav regions, covering active content, creating scrollbars, or hiding dismissal behind pointer-only behavior.",
     evidence
   });
   await resetAuditProfile(page, baseURL);
@@ -1000,9 +1021,11 @@ async function captureNytPlanningSourceStates(page: Page, baseURL: string, viewp
     await screenshot(page, `${viewportName} dashboard nyt source needed`);
 
     await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
+    await expect(page.getByText(/planning source setup required/i)).toBeVisible({ timeout: 15_000 });
+    await screenshot(page, `${viewportName} planning source setup required`);
     await page.getByRole("tab", { name: /settings/i }).click();
-    await expect(page.getByText("NYT Cooking").first()).toBeVisible();
-    await expect(page.getByText("America's Test Kitchen").first()).toBeVisible();
+    await expect(page.locator("#source-nytimes-username")).toBeVisible();
+    await expect(page.locator("#source-atk-username")).toBeVisible();
     await expect(page.getByText(/saved password is missing/i).first()).toBeVisible();
     await screenshot(page, `${viewportName} planning settings nyt not ready`);
   });
@@ -1011,15 +1034,78 @@ async function captureNytPlanningSourceStates(page: Page, baseURL: string, viewp
     await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
     await page.getByRole("tab", { name: /new plan/i }).click();
     await page.getByLabel(/pantry ingredients/i).fill("chicken\nrice\ngarlic");
-    await expect(page.getByText(/America's Test Kitchen, NYT Cooking connected/i).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: /start planning run/i })).toBeEnabled();
     await screenshot(page, `${viewportName} planning new plan atk nyt ready`);
 
     await page.getByRole("tab", { name: /settings/i }).click();
-    await expect(page.getByText("NYT Cooking").first()).toBeVisible();
-    await expect(page.getByText("America's Test Kitchen").first()).toBeVisible();
-    await expect(page.getByText("Ready for planning")).toHaveCount(2);
+    await expect(page.locator("#source-nytimes-username")).toBeVisible();
+    await expect(page.locator("#source-atk-username")).toBeVisible();
     await screenshot(page, `${viewportName} planning settings atk nyt ready`);
+  });
+}
+
+async function verifyPlanningNumericSanitization(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
+  const atkReady = auditRecipeSource({
+    source: "atk",
+    label: "America's Test Kitchen",
+    supportedForPlanning: true,
+    planningReady: true,
+    configured: true,
+    enabled: true,
+    username: "atk-audit@example.com",
+    hasPassword: true,
+    planningReadinessIssues: []
+  });
+  let capturedBody: { maxRecipes?: unknown; maxMeals?: unknown } | null = null;
+
+  const handler = async (route: Route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+
+    capturedBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        runId: "ux-audit-sanitized-run",
+        status: "PENDING",
+        progressStage: "Queued",
+        progressPercent: 0
+      })
+    });
+  };
+
+  await withMockedRecipeSources(page, [atkReady], async () => {
+    await page.route(mealPlanRunsRoutePattern, handler);
+    try {
+      await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
+      await page.getByRole("tab", { name: /new plan/i }).click();
+      await page.getByLabel(/pantry ingredients/i).fill("chicken\nrice\ngarlic");
+      await page.locator("#planning-max-recipes").fill("");
+      await page.locator("#planning-max-meals").fill("999");
+      await page.getByRole("button", { name: /start planning run/i }).click();
+
+      await expect.poll(() => capturedBody).not.toBeNull();
+      await screenshot(page, `${viewportName} planning numeric sanitize submit`);
+
+      const maxRecipes = Number(capturedBody?.maxRecipes);
+      const maxMeals = Number(capturedBody?.maxMeals);
+      if (!Number.isFinite(maxRecipes) || !Number.isFinite(maxMeals) || maxRecipes !== 20 || maxMeals !== 10) {
+        const evidence = await screenshot(page, `${viewportName} planning numeric sanitize failed`);
+        findings.push({
+          severity: "High",
+          page: "planning",
+          title: "Planning numeric fields submit invalid limits",
+          actual: `Submitted maxRecipes=${String(capturedBody?.maxRecipes)} and maxMeals=${String(capturedBody?.maxMeals)} after blank and oversized drafts.`,
+          expected: "Planning limits should sanitize to finite numbers before submit, defaulting blank recipes to 20 and clamping meals to 10.",
+          evidence
+        });
+      }
+    } finally {
+      await page.unroute(mealPlanRunsRoutePattern, handler);
+    }
   });
 }
 
@@ -1222,6 +1308,7 @@ async function runViewportAudit({
   await page.waitForTimeout(400);
   await screenshot(page, `${viewportName} planning settings`);
   await captureNytPlanningSourceStates(page, baseURL, viewportName);
+  await verifyPlanningNumericSanitization(page, baseURL, viewportName, findings);
 
   await captureProfileSaveFlow(page, baseURL, viewportName);
   await captureLogoutFlow(page, viewportName);

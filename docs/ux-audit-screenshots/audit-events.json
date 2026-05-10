@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-10T04:18:40.641Z",
+  "generatedAt": "2026-05-10T04:40:49.353Z",
   "findings": [],
   "events": [
     {
@@ -9,7 +9,37 @@
       "url": "http://localhost:5173/login"
     },
     {
+      "viewport": "mobile",
+      "type": "http",
+      "text": "404 http://localhost:5173/api/meal-plans/runs/ux-audit-sanitized-run/status",
+      "url": "http://localhost:5173/planning"
+    },
+    {
+      "viewport": "mobile",
+      "type": "console:error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://localhost:5173/planning"
+    },
+    {
       "viewport": "tablet",
+      "type": "http",
+      "text": "401 http://localhost:5173/api/auth/login",
+      "url": "http://localhost:5173/login"
+    },
+    {
+      "viewport": "tablet",
+      "type": "http",
+      "text": "404 http://localhost:5173/api/meal-plans/runs/ux-audit-sanitized-run/status",
+      "url": "http://localhost:5173/planning"
+    },
+    {
+      "viewport": "tablet",
+      "type": "console:error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://localhost:5173/planning"
+    },
+    {
+      "viewport": "desktop",
       "type": "http",
       "text": "401 http://localhost:5173/api/auth/login",
       "url": "http://localhost:5173/login"
@@ -17,8 +47,14 @@
     {
       "viewport": "desktop",
       "type": "http",
-      "text": "401 http://localhost:5173/api/auth/login",
-      "url": "http://localhost:5173/login"
+      "text": "404 http://localhost:5173/api/meal-plans/runs/ux-audit-sanitized-run/status",
+      "url": "http://localhost:5173/planning"
+    },
+    {
+      "viewport": "desktop",
+      "type": "console:error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://localhost:5173/planning"
     }
   ]
 }

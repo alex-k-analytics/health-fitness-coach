@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +21,7 @@ import {
   Settings2,
   ShoppingBasket,
   Sparkles,
+  type LucideIcon,
   UtensilsCrossed
 } from "lucide-react";
 import type {
@@ -53,6 +55,13 @@ type SourceDraft = {
 };
 
 type PlannerView = "this-week" | "new-plan" | "history" | "settings";
+
+const DEFAULT_MAX_RECIPES = 20;
+const DEFAULT_MAX_MEALS = 5;
+const MIN_MAX_RECIPES = 5;
+const MAX_MAX_RECIPES = 120;
+const MIN_MAX_MEALS = 1;
+const MAX_MAX_MEALS = 10;
 
 function sourceDraftFromSource(source: RecipeSourceCredential): SourceDraft {
   return {
@@ -91,6 +100,14 @@ function groceryItemKey(item: GroceryListItem) {
 }
 
 type PlanningStatus = MealPlanRunSummary["status"];
+type PlanningMetric = {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  sub: string;
+  status?: PlanningStatus;
+  tone?: "brand" | "warning";
+};
 
 function planningStatusVariant(status: PlanningStatus) {
   if (status === "COMPLETED") return "success";
@@ -104,6 +121,19 @@ function planningStatusLabel(status: PlanningStatus) {
   if (status === "FAILED") return "Needs attention";
   if (status === "RUNNING") return "Planning in progress";
   return "Queued";
+}
+
+function sanitizeIntegerLimit(value: string, fallback: number, min: number, max: number) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sanitizeNullableIntegerLimit(value: string, min: number, max: number) {
+  if (!value.trim()) return null;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export function PlanningPage() {
@@ -120,8 +150,8 @@ export function PlanningPage() {
   const [activeView, setActiveView] = useState<PlannerView>("this-week");
   const [ingredients, setIngredients] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [maxRecipes, setMaxRecipes] = useState("20");
-  const [maxMeals, setMaxMeals] = useState("5");
+  const [maxRecipes, setMaxRecipes] = useState(String(DEFAULT_MAX_RECIPES));
+  const [maxMeals, setMaxMeals] = useState(String(DEFAULT_MAX_MEALS));
   const [useOpenAi, setUseOpenAi] = useState(true);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [sourceDrafts, setSourceDrafts] = useState<Record<string, SourceDraft>>({});
@@ -147,8 +177,8 @@ export function PlanningPage() {
       defaultMaxMeals: valueToInput(preferences.defaultMaxMeals),
       defaultUseOpenAi: preferences.defaultUseOpenAi ?? true
     });
-    setMaxRecipes(valueToInput(preferences.defaultMaxRecipes ?? 20));
-    setMaxMeals(valueToInput(preferences.defaultMaxMeals ?? 5));
+    setMaxRecipes(valueToInput(preferences.defaultMaxRecipes ?? DEFAULT_MAX_RECIPES));
+    setMaxMeals(valueToInput(preferences.defaultMaxMeals ?? DEFAULT_MAX_MEALS));
     setUseOpenAi(preferences.defaultUseOpenAi ?? true);
   }, [preferences]);
 
@@ -209,6 +239,28 @@ export function PlanningPage() {
   const groceryTotal = activePlan?.groceryList.length ?? 0;
   const groceryChecked = activePlan?.groceryList.filter((item) => checkedItems.has(groceryItemKey(item))).length ?? 0;
   const groceryRemaining = Math.max(0, groceryTotal - groceryChecked);
+  const planningMetrics: PlanningMetric[] = [
+    {
+      icon: ShoppingBasket,
+      label: "Groceries left",
+      value: activePlan ? String(groceryRemaining) : "-",
+      sub: activePlan ? `${groceryChecked} of ${groceryTotal} checked` : "No completed plan selected"
+    },
+    {
+      icon: UtensilsCrossed,
+      label: "Meals",
+      value: activePlan ? String(activePlan.selectedMeals.length) : "-",
+      sub: activeRun ? `${activeRun.scrapedCount} recipes scanned` : "Start or open a plan"
+    },
+    {
+      icon: Sparkles,
+      label: "Status",
+      value: planningStatusValue,
+      sub: planningStatusSub,
+      status: visibleStatus?.status,
+      tone: planningNeedsSetup ? "warning" : "brand"
+    }
+  ];
 
   const visibleGroceryItems = useMemo(() => {
     const items = activePlan?.groceryList ?? [];
@@ -244,13 +296,23 @@ export function PlanningPage() {
   }
 
   function submitPlan() {
+    const sanitizedMaxRecipes = sanitizeIntegerLimit(
+      maxRecipes,
+      DEFAULT_MAX_RECIPES,
+      MIN_MAX_RECIPES,
+      MAX_MAX_RECIPES
+    );
+    const sanitizedMaxMeals = sanitizeIntegerLimit(maxMeals, DEFAULT_MAX_MEALS, MIN_MAX_MEALS, MAX_MAX_MEALS);
+    setMaxRecipes(String(sanitizedMaxRecipes));
+    setMaxMeals(String(sanitizedMaxMeals));
+
     createRun.mutate(
       {
         ingredients,
         instructions,
         recipeSources: selectedPlanningSources,
-        maxRecipes: Number(maxRecipes || 20),
-        maxMeals: Number(maxMeals || 5),
+        maxRecipes: sanitizedMaxRecipes,
+        maxMeals: sanitizedMaxMeals,
         useOpenAi
       },
       {
@@ -263,11 +325,27 @@ export function PlanningPage() {
   }
 
   function savePreferencesForm() {
+    const sanitizedDefaultMaxRecipes = sanitizeNullableIntegerLimit(
+      preferencesDraft.defaultMaxRecipes,
+      MIN_MAX_RECIPES,
+      MAX_MAX_RECIPES
+    );
+    const sanitizedDefaultMaxMeals = sanitizeNullableIntegerLimit(
+      preferencesDraft.defaultMaxMeals,
+      MIN_MAX_MEALS,
+      MAX_MAX_MEALS
+    );
+    setPreferencesDraft((current) => ({
+      ...current,
+      defaultMaxRecipes: sanitizedDefaultMaxRecipes === null ? "" : String(sanitizedDefaultMaxRecipes),
+      defaultMaxMeals: sanitizedDefaultMaxMeals === null ? "" : String(sanitizedDefaultMaxMeals)
+    }));
+
     savePreferences.mutate({
       dietaryRestrictions: preferencesDraft.dietaryRestrictions,
       plannerContext: preferencesDraft.plannerContext,
-      defaultMaxRecipes: preferencesDraft.defaultMaxRecipes ? Number(preferencesDraft.defaultMaxRecipes) : null,
-      defaultMaxMeals: preferencesDraft.defaultMaxMeals ? Number(preferencesDraft.defaultMaxMeals) : null,
+      defaultMaxRecipes: sanitizedDefaultMaxRecipes,
+      defaultMaxMeals: sanitizedDefaultMaxMeals,
       defaultUseOpenAi: preferencesDraft.defaultUseOpenAi
     });
   }
@@ -285,6 +363,14 @@ export function PlanningPage() {
         clearPassword: draft.clearPassword
       }
     });
+  }
+
+  function deleteSourceForm(source: RecipeSourceCredential) {
+    const confirmed = window.confirm(
+      `Delete ${source.label} credentials? Saved login details for this source will be removed.`
+    );
+    if (!confirmed) return;
+    deleteSource.mutate(source.source);
   }
 
   function openRun(run: MealPlanRunSummary) {
@@ -359,6 +445,8 @@ export function PlanningPage() {
     const usernameId = `source-${source.source}-username`;
     const loginUrlId = `source-${source.source}-login-url`;
     const passwordId = `source-${source.source}-password`;
+    const isSavingSource = saveSource.isPending && saveSource.variables?.source === source.source;
+    const isDeletingSource = deleteSource.isPending && deleteSource.variables === source.source;
 
     return (
       <div key={source.source} className="surface-muted space-y-3 p-3">
@@ -421,17 +509,17 @@ export function PlanningPage() {
           <Button
             size="sm"
             onClick={() => saveSourceForm(source)}
-            disabled={saveSource.isPending}
+            disabled={saveSource.isPending || deleteSource.isPending}
           >
-            Save source
+            {isSavingSource ? "Saving source..." : "Save source"}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => deleteSource.mutate(source.source)}
-            disabled={deleteSource.isPending}
+            onClick={() => deleteSourceForm(source)}
+            disabled={saveSource.isPending || deleteSource.isPending}
           >
-            Delete
+            {isDeletingSource ? "Deleting..." : "Delete"}
           </Button>
         </div>
       </div>
@@ -462,29 +550,6 @@ export function PlanningPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <StatusMetric
-          icon={ShoppingBasket}
-          label="Groceries left"
-          value={activePlan ? String(groceryRemaining) : "-"}
-          sub={activePlan ? `${groceryChecked} of ${groceryTotal} checked` : "No completed plan selected"}
-        />
-        <StatusMetric
-          icon={UtensilsCrossed}
-          label="Meals"
-          value={activePlan ? String(activePlan.selectedMeals.length) : "-"}
-          sub={activeRun ? `${activeRun.scrapedCount} recipes scanned` : "Start or open a plan"}
-        />
-        <StatusMetric
-          icon={Sparkles}
-          label="Status"
-          value={planningStatusValue}
-          sub={planningStatusSub}
-          status={visibleStatus?.status}
-          tone={planningNeedsSetup ? "warning" : "brand"}
-        />
-      </div>
-
       <Tabs value={activeView} onValueChange={(value) => setActiveView(value as PlannerView)} className="space-y-4">
         <TabsList className="grid h-auto w-full grid-cols-4 gap-1 p-1">
           <TabsTrigger value="this-week" className="min-w-0 px-1 text-xs sm:px-2 sm:text-sm">
@@ -505,6 +570,14 @@ export function PlanningPage() {
           </TabsTrigger>
         </TabsList>
 
+        <StatusStrip metrics={planningMetrics} />
+
+        <div className="hidden gap-3 md:grid md:grid-cols-3">
+          {planningMetrics.map((metric) => (
+            <StatusMetric key={metric.label} {...metric} />
+          ))}
+        </div>
+
         <TabsContent value="this-week" className="space-y-4">
           {visibleStatus ? (
             <PlanningProgressPanel status={visibleStatus} activeRun={activeRun} />
@@ -515,14 +588,24 @@ export function PlanningPage() {
               <div className="max-w-md space-y-3">
                 <ShoppingBasket className="mx-auto h-8 w-8 text-primary" aria-hidden="true" />
                 <div>
-                  <h2 className="text-base font-semibold">No weekly plan selected</h2>
+                  <h2 className="text-base font-semibold">
+                    {sourceReady ? "No weekly plan selected" : "Planning source setup required"}
+                  </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Start a new plan or open a saved run to see meals and grocery items here.
+                    {sourceReady
+                      ? "Start a new plan or open a saved run to see meals and grocery items here."
+                      : sourceReadiness.message}
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Button size="sm" onClick={() => setActiveView("new-plan")}>Start new plan</Button>
-                  <Button size="sm" variant="outline" onClick={() => setActiveView("history")}>Open history</Button>
+                  {sourceReady ? (
+                    <Button size="sm" onClick={() => setActiveView("new-plan")}>Start new plan</Button>
+                  ) : (
+                    <Button size="sm" onClick={() => setActiveView("settings")}>Open settings</Button>
+                  )}
+                  {(runs?.runs ?? []).length > 0 ? (
+                    <Button size="sm" variant="outline" onClick={() => setActiveView("history")}>Open history</Button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -744,20 +827,24 @@ export function PlanningPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="planning-max-recipes">Recipe results to scan</Label>
-                  <Input
+                  <NumericInput
                     id="planning-max-recipes"
                     value={maxRecipes}
-                    onChange={(event) => setMaxRecipes(event.target.value)}
-                    inputMode="numeric"
+                    min={MIN_MAX_RECIPES}
+                    max={MAX_MAX_RECIPES}
+                    allowEmpty
+                    onValueChange={setMaxRecipes}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="planning-max-meals">Meals for week</Label>
-                  <Input
+                  <NumericInput
                     id="planning-max-meals"
                     value={maxMeals}
-                    onChange={(event) => setMaxMeals(event.target.value)}
-                    inputMode="numeric"
+                    min={MIN_MAX_MEALS}
+                    max={MAX_MAX_MEALS}
+                    allowEmpty
+                    onValueChange={setMaxMeals}
                   />
                 </div>
               </div>
@@ -876,20 +963,24 @@ export function PlanningPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="planning-default-max-recipes">Default max recipes</Label>
-                  <Input
+                  <NumericInput
                     id="planning-default-max-recipes"
                     value={preferencesDraft.defaultMaxRecipes}
-                    onChange={(event) => setPreferencesDraft((current) => ({ ...current, defaultMaxRecipes: event.target.value }))}
-                    inputMode="numeric"
+                    min={MIN_MAX_RECIPES}
+                    max={MAX_MAX_RECIPES}
+                    allowEmpty
+                    onValueChange={(value) => setPreferencesDraft((current) => ({ ...current, defaultMaxRecipes: value }))}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="planning-default-max-meals">Default max meals</Label>
-                  <Input
+                  <NumericInput
                     id="planning-default-max-meals"
                     value={preferencesDraft.defaultMaxMeals}
-                    onChange={(event) => setPreferencesDraft((current) => ({ ...current, defaultMaxMeals: event.target.value }))}
-                    inputMode="numeric"
+                    min={MIN_MAX_MEALS}
+                    max={MAX_MAX_MEALS}
+                    allowEmpty
+                    onValueChange={(value) => setPreferencesDraft((current) => ({ ...current, defaultMaxMeals: value }))}
                   />
                 </div>
               </div>
@@ -943,6 +1034,34 @@ export function PlanningPage() {
   );
 }
 
+function StatusStrip({ metrics }: { metrics: PlanningMetric[] }) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5 md:hidden" aria-label="Planning status summary">
+      {metrics.map(({ icon: Icon, label, value, status, tone = "brand" }) => {
+        const iconClass = tone === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary";
+        return (
+          <div key={label} className="surface-panel min-w-0 p-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className={`grid size-6 shrink-0 place-items-center rounded-md ${iconClass}`}>
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
+              <span className="truncate text-[11px] font-medium text-muted-foreground">{label}</span>
+            </div>
+            <div className="mt-1 flex min-h-5 min-w-0 items-center gap-1">
+              <span className="truncate text-sm font-semibold text-foreground">{value}</span>
+              {status ? (
+                <Badge variant={planningStatusVariant(status)} className="hidden shrink-0 px-1.5 py-0 text-[10px] sm:inline-flex">
+                  {status.toLowerCase()}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StatusMetric({
   icon: Icon,
   label,
@@ -951,7 +1070,7 @@ function StatusMetric({
   status,
   tone = "brand"
 }: {
-  icon: typeof ShoppingBasket;
+  icon: LucideIcon;
   label: string;
   value: string;
   sub: string;
