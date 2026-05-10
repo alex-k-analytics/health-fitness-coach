@@ -395,6 +395,7 @@ async function measureNavigationLayoutWithBanner(page: Page) {
         alertOverlapsBottomNav: false,
         alertOverlapsFocusedControl: false,
         alertOverlapsPrimaryAction: false,
+        alertPaintsOnTop: false,
         alertTop: null,
         alertBottom: null
       };
@@ -406,6 +407,11 @@ async function measureNavigationLayoutWithBanner(page: Page) {
     const activeElementRect = activeElement?.getBoundingClientRect() ?? null;
     const primaryActionRect = primaryAction?.getBoundingClientRect() ?? null;
     const alertVisible = alertRect ? isVisibleRect(alertRect) : false;
+    const alertPaintsOnTop = alert && alertRect && alertVisible
+      ? document
+          .elementsFromPoint(alertRect.left + alertRect.width / 2, alertRect.top + alertRect.height / 2)
+          .some((element) => element === alert || element.closest('[role="alert"], [role="status"]') === alert)
+      : false;
     const headerTop = Math.round(headerRect.top);
     const bottomNavHasScrollbar = bottomNav
       ? bottomNav.scrollHeight > bottomNav.clientHeight + 1 || bottomNav.scrollWidth > bottomNav.clientWidth + 1
@@ -426,6 +432,7 @@ async function measureNavigationLayoutWithBanner(page: Page) {
       alertOverlapsPrimaryAction: alertRect && alertVisible && primaryActionRect && isVisibleRect(primaryActionRect)
         ? rectsOverlap(alertRect, primaryActionRect)
         : false,
+      alertPaintsOnTop,
       alertTop: alertVisible ? Math.round(alertRect.top) : null,
       alertBottom: alertVisible ? Math.round(alertRect.bottom) : null
     };
@@ -464,6 +471,7 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
     !after.alertOverlapsBottomNav &&
     !after.alertOverlapsFocusedControl &&
     !after.alertOverlapsPrimaryAction &&
+    after.alertPaintsOnTop &&
     hasDismissButton
   ) {
     await dismissButton.click();
@@ -478,8 +486,8 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
     severity: "Medium",
     page: "app shell",
     title: "Global toast/banner shifts navigation or creates overflow",
-    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}. Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps header: ${after.alertOverlapsHeader}. Alert overlaps bottom nav: ${after.alertOverlapsBottomNav}. Alert overlaps focused control: ${after.alertOverlapsFocusedControl}. Alert overlaps primary action: ${after.alertOverlapsPrimaryAction}. Dismiss button visible: ${hasDismissButton}.`,
-    expected: "Transient toast feedback should overlay without pushing sticky navigation, overlapping primary nav regions, covering active content, creating scrollbars, or hiding dismissal behind pointer-only behavior.",
+    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}. Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps header: ${after.alertOverlapsHeader}. Alert overlaps bottom nav: ${after.alertOverlapsBottomNav}. Alert overlaps focused control: ${after.alertOverlapsFocusedControl}. Alert overlaps primary action: ${after.alertOverlapsPrimaryAction}. Alert paints on top: ${after.alertPaintsOnTop}. Dismiss button visible: ${hasDismissButton}.`,
+    expected: "Transient toast feedback should overlay above page controls without pushing sticky navigation, overlapping primary nav regions, covering active content, creating scrollbars, or hiding dismissal behind pointer-only behavior.",
     evidence
   });
   await resetAuditProfile(page, baseURL);

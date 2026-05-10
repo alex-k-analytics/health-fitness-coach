@@ -40,8 +40,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootComponent() {
   return (
     <>
-      <GlobalBanner />
       <Outlet />
+      <GlobalBanner />
       {RouterDevtools ? (
         <Suspense fallback={null}>
           <RouterDevtools position="bottom-right" />
