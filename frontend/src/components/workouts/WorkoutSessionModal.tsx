@@ -186,6 +186,7 @@ export function WorkoutSessionModal({
     : formatTimer(elapsedSeconds);
   const hasCardio = exercises.some((exercise) => exercise.kind === "CARDIO");
   const hasLift = exercises.some((exercise) => exercise.kind === "LIFT");
+  const timingIsStrengthFocused = (hasLift && !hasCardio) || (exercises.length === 0 && !CARDIO_TYPES.has(addCategory));
   const workoutLabel = getWorkoutDisplayLabel(exercises);
   const modalTitle = getModalTitle({ isEditing, isRepeating, entryIntent, step });
 
@@ -277,7 +278,7 @@ export function WorkoutSessionModal({
     setUseManualTime(intent === "quick");
     setTimerRunning(false);
     if (intent === "quick" && manualMinutes === "0" && manualSeconds === "0") {
-      setManualMinutes(hasLift && !hasCardio ? "0" : "30");
+      setManualMinutes(timingIsStrengthFocused ? "0" : "30");
     }
   };
 
@@ -309,9 +310,9 @@ export function WorkoutSessionModal({
     const payload = {
       activityType: primaryActivityType,
       title: title.trim() || workoutLabel,
-      startTime: shouldSaveDuration ? new Date(new Date(endTime).getTime() - durationSeconds * 1000).toISOString() : null,
+      ...(shouldSaveDuration ? { startTime: new Date(new Date(endTime).getTime() - durationSeconds * 1000).toISOString() } : {}),
       endTime,
-      durationSeconds: shouldSaveDuration ? durationSeconds : undefined,
+      ...(shouldSaveDuration ? { durationSeconds } : {}),
       totalCalories: result.total,
       categoryCalories: result.byCategory,
       exercises: finalizedExercises
@@ -346,7 +347,7 @@ export function WorkoutSessionModal({
     setTimerRunning(false);
     setExercises([]);
     setUseManualTime(intent === "quick");
-    setManualMinutes(intent === "quick" ? "30" : "0");
+    setManualMinutes("0");
     setManualSeconds("0");
     setSearchQuery("");
     setSearchResults([]);
@@ -391,9 +392,13 @@ export function WorkoutSessionModal({
     <div className="surface-muted grid gap-3 p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Session time</p>
+          <p className="text-sm font-semibold text-foreground">
+            {timingIsStrengthFocused ? "Session time (optional)" : "Session time"}
+          </p>
           <p className="text-xs text-muted-foreground">
-            {hasLift && !hasCardio ? "Optional for strength sessions" : "Used for cardio pace and calories"}
+            {timingIsStrengthFocused
+              ? "Leave this at 0 for strength-only logs; sets, reps, and weight drive the entry."
+              : "Used for cardio pace and calories"}
           </p>
         </div>
         <span className="font-mono text-xl font-bold">{durationDisplay}</span>

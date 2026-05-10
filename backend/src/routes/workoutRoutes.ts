@@ -46,9 +46,9 @@ const exerciseDataSchema = z.object({
 const createSessionSchema = z.object({
   activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]),
   title: z.string().min(1).max(200),
-  startTime: z.string().datetime().optional(),
-  endTime: z.string().datetime().optional(),
-  durationSeconds: z.number().int().nonnegative().optional(),
+  startTime: z.string().datetime().nullable().optional(),
+  endTime: z.string().datetime().nullable().optional(),
+  durationSeconds: z.number().int().nonnegative().nullable().optional(),
   totalCalories: z.number().int().nonnegative().max(10000).optional(),
   categoryCalories: z.record(z.string(), z.number().int().nonnegative()).optional(),
   exercises: z.array(exerciseDataSchema).default([])
@@ -58,9 +58,9 @@ const updateSessionSchema = z.object({
   activityType: z.enum(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "WEIGHTLIFTING", "CALISTHENICS", "HIIT", "OTHER"]).optional(),
   title: z.string().min(1).max(200).optional(),
   status: z.enum(["PLANNING", "RUNNING", "COMPLETED"]).optional(),
-  startTime: z.string().datetime().optional(),
-  endTime: z.string().datetime().optional(),
-  durationSeconds: z.number().int().nonnegative().optional(),
+  startTime: z.string().datetime().nullable().optional(),
+  endTime: z.string().datetime().nullable().optional(),
+  durationSeconds: z.number().int().nonnegative().nullable().optional(),
   totalCalories: z.number().int().nonnegative().max(10000).optional(),
   categoryCalories: z.record(z.string(), z.number().int().nonnegative()).optional(),
   performedAt: z.string().datetime().optional(),
@@ -402,8 +402,8 @@ workoutRoutes.patch("/sessions/:id", async (req: AuthenticatedRequest, res) => {
   if (data.activityType) updateData.activityType = data.activityType;
   if (data.title) updateData.title = data.title.trim();
   if (data.status) updateData.status = data.status;
-  if (data.startTime) updateData.startTime = new Date(data.startTime);
-  if (data.endTime) updateData.endTime = new Date(data.endTime);
+  if (data.startTime !== undefined) updateData.startTime = data.startTime ? new Date(data.startTime) : null;
+  if (data.endTime !== undefined) updateData.endTime = data.endTime ? new Date(data.endTime) : null;
   if (data.durationSeconds !== undefined) updateData.durationSeconds = data.durationSeconds;
   if (data.performedAt) updateData.performedAt = new Date(data.performedAt);
   if (recalculatedCalories) {
