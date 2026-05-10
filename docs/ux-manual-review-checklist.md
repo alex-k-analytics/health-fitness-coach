@@ -26,11 +26,22 @@ Use this checklist after `npm run ux:audit` passes. The automated audit catches 
 - Long forms keep the save action discoverable.
 - Closing a surface does not surprise the user or discard changes silently.
 
+## Workout Logging Review
+
+- Recent workout cards make `Repeat` and `Edit` feel distinct and hard to confuse.
+- Repeating a workout opens a new unsaved session with prior exercises and full set sequences visible.
+- Strength rows show current reps/weight and prior full-set context clearly enough to judge warmups, working sets, top sets, and warm-downs.
+- `Copy all` and per-set copy controls are understandable without reading documentation.
+- Adding cardio after strength feels like extending the same workout, not starting a second workout.
+- Strength duration reads as optional/secondary; cardio duration/distance remain prominent enough for cardio blocks.
+- Editing a saved workout feels like correction, while repeating feels like today's new workout.
+
 ## Responsive Review
 
 - Check `375x812`, `768x1024`, and `1440x900`.
 - Confirm bottom navigation and sticky headers do not cover content.
 - Confirm long names, long meal titles, and dense workout entries wrap cleanly.
+- Confirm strength set rows, previous set summaries, and `Repeat`/`Edit` actions do not create horizontal scroll at 375px.
 - Confirm touch targets remain comfortable on mobile.
 - Confirm screenshot labels do not hide the evidence being reviewed.
 

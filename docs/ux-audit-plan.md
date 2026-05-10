@@ -109,11 +109,16 @@ For quick exploratory UX checks, use the optional Playwright CLI workflow in `do
 
 - Empty history
 - Workout list
-- Quick entries
+- `Start workout`, `Log completed workout`, and `Repeat` entry points
+- Mixed session builder with strength and cardio blocks in one workout
+- Strength set rows for reps/weight, including add/remove/copy controls
+- Full previous set sequence display for repeated or comparable exercises
+- Cardio block duration/distance fields added after strength
 - Session modal plan/active/review steps
-- Timer controls
+- Timer controls with strength duration treated as optional/secondary
 - Validation
 - Save behavior
+- Edit behavior does not create a duplicate workout
 
 ### Planning
 
@@ -208,4 +213,5 @@ Add a final improvement backlog:
 - The audit uses local seeded data, not production or personal health data.
 - This pass produces a report only; it does not change application code.
 - If the seeded account has little data, the audit still covers empty and blocked states, then uses controlled inputs to create meals/workouts where practical.
+- Workout audit setup may create and then clean up `UX audit...` workout sessions so Repeat and previous-set comparison states can be reviewed deterministically.
 - Planning is included because the current route tree and bottom navigation expose `/planning`, even though `frontend/UI_DOCS.md` is partially outdated and still describes a four-tab app.

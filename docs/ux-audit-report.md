@@ -1,6 +1,8 @@
 # Health Fitness Coach UX Audit Report
 
-Generated: 2026-05-09
+Generated: 2026-05-10
+
+Update: after the workout logging rescope, the audit scope and runner were updated for mixed sessions, Repeat vs Edit, full previous set comparison, and adding cardio after strength. A fresh full `npm run ux:audit` pass completed successfully with the updated workout scenarios.
 
 ## Automation Run
 
@@ -9,7 +11,7 @@ Generated: 2026-05-09
 - Backend health check: `http://localhost:4000/health` returned `{"ok":true,"service":"health-fitness-coach-api"}`.
 - Frontend check: `http://localhost:5173` returned `200`.
 - Audit command: `npm run ux:audit` from `frontend`.
-- Result: Playwright audit passed, `1 passed (2.3m)`.
+- Result: Playwright audit passed, `1 passed (2.5m)`.
 - Evidence directory: `docs/ux-audit-screenshots/`.
 - Structured events: `docs/ux-audit-screenshots/audit-events.json`.
 - Structured findings: none.
@@ -57,9 +59,21 @@ No low severity findings in this audit run.
 - Reduced-motion preference is emulated and verified in the audit runner.
 - Evidence screenshots now include deterministic viewport/state labels.
 - Meal logging covered composer opening, nutrition estimate review, save, dashboard populated state, and audit cleanup.
+- Workout logging now covers a seeded mixed workout, Repeat opening a new editable session, full prior set sequence visibility, `Copy all`, and adding strength plus cardio blocks in one builder.
 - Weight logging opened, accepted a decimal value, saved, and returned to the dashboard evidence state.
 - Settings profile editing handled long display-name input and save feedback.
 - Planning exposed the expected blocked/source-readiness state and tabbed settings/new-plan views.
+
+## Workout Rescope Audit Addendum
+
+The audit runner now seeds a deterministic mixed workout and captures:
+
+- Recent workout history with a repeat source.
+- `Repeat` opening a new workout with full prior set sequence visible.
+- `Copy all` availability for previous strength sets.
+- Mixed builder state after adding strength and cardio blocks to the same workout.
+
+Manual review should additionally verify that strength duration feels optional, previous warmup/working/top/warm-down sets are readable on mobile, and `Repeat` cannot be mistaken for editing the saved source workout.
 
 ## Improvement Backlog
 
@@ -82,4 +96,4 @@ No low severity findings in this audit run.
 
 ## Residual Risk
 
-This audit is strong for route coverage, core logging flows, responsive layout, bottom navigation spacing, drawer/profile workflows, and structured browser/network event capture. Manual review is still useful for nuanced hierarchy, tone, and whether health-planning copy feels clear to a real user.
+This audit is strong for route coverage, core logging flows, responsive layout, bottom navigation spacing, drawer/profile workflows, workout rescope evidence, and structured browser/network event capture. Manual review is still useful for nuanced hierarchy, tone, and whether health-planning copy feels clear to a real user.

@@ -43,6 +43,7 @@ const viewports = [
 const outDir = path.resolve(process.cwd(), "..", "docs", "ux-audit-screenshots");
 const authTokenKey = "health_fitness_auth_token";
 const auditMealTitle = "UX audit chicken rice bowl";
+const auditWorkoutTitle = "UX audit upper plus treadmill";
 const auditBaselineProfile = {
   displayName: "Test User",
   goalSummary: null,
@@ -151,7 +152,7 @@ async function verifyHeaderActionTooltips(page: Page, viewportName: string, find
   const checks = [
     { buttonName: /theme:/i, tooltipName: /theme:/i },
     { buttonName: /log food/i, tooltipName: /log food/i },
-    { buttonName: /log workout/i, tooltipName: /log workout/i },
+    { buttonName: /log completed workout/i, tooltipName: /log completed workout/i },
     { buttonName: /log weight/i, tooltipName: /log weight/i },
     { buttonName: /open profile/i, tooltipName: /open profile/i }
   ];
@@ -420,6 +421,33 @@ async function captureMealEstimateSaveFlow(page: Page, baseURL: string, viewport
   await screenshot(page, `${viewportName} meal saved`);
 }
 
+async function captureWorkoutRescopeFlow(page: Page, baseURL: string, viewportName: string) {
+  await createAuditWorkoutSession(page, baseURL);
+  await page.goto(`${baseURL}/workouts`, { waitUntil: "networkidle" });
+  await expect(page.getByText(auditWorkoutTitle).first()).toBeVisible({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} workouts seeded repeat source`);
+
+  await page.getByRole("button", { name: /repeat/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /repeat workout/i })).toBeVisible();
+  await expect(page.getByText(/previous: 1: 10 x 95 lb/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /copy all/i })).toBeVisible();
+  await screenshot(page, `${viewportName} workout repeat comparison`);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: /repeat workout/i })).toBeHidden();
+
+  await page.getByRole("button", { name: /^start workout$/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /start workout/i })).toBeVisible();
+  await page.getByLabel(/exercise/i).fill("Bench");
+  await page.getByRole("button", { name: /^bench press$/i }).click();
+  await page.getByRole("button", { name: /^run$/i }).click();
+  await page.getByLabel(/exercise/i).fill("Running");
+  await page.getByRole("button", { name: /^running$/i }).click();
+  await expect(page.getByText(/mixed/i).first()).toBeVisible();
+  await screenshot(page, `${viewportName} workout mixed builder`);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+}
+
 async function cleanupAuditMeals(page: Page, baseURL: string) {
   const authToken = await page
     .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
@@ -465,6 +493,64 @@ async function cleanupAuditHealthMetrics(page: Page, baseURL: string) {
   }
 }
 
+async function cleanupAuditWorkouts(page: Page, baseURL: string) {
+  const authToken = await page
+    .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
+    .catch(() => null);
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+  const response = await page.request.get(`${baseURL}/api/workouts/sessions?limit=50&status=COMPLETED`, { headers });
+  if (!response.ok()) return;
+
+  const payload = await response.json().catch(() => null);
+  const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+  const auditSessions = sessions.filter((session) => String(session?.title ?? "").startsWith("UX audit"));
+
+  for (const session of auditSessions) {
+    if (typeof session.id === "string") {
+      await page.request.delete(`${baseURL}/api/workouts/sessions/${session.id}`, { headers });
+    }
+  }
+}
+
+async function createAuditWorkoutSession(page: Page, baseURL: string) {
+  const authToken = await page
+    .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
+    .catch(() => null);
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+
+  await page.request.post(`${baseURL}/api/workouts/sessions`, {
+    headers,
+    data: {
+      activityType: "WEIGHTLIFTING",
+      title: auditWorkoutTitle,
+      startTime: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      endTime: new Date().toISOString(),
+      durationSeconds: 2700,
+      exercises: [
+        {
+          name: "Bench Press",
+          kind: "LIFT",
+          category: "WEIGHTLIFTING",
+          sets: [
+            { reps: 10, weightLbs: 95 },
+            { reps: 8, weightLbs: 135 },
+            { reps: 5, weightLbs: 155 },
+            { reps: 8, weightLbs: 115 }
+          ]
+        },
+        {
+          name: "Running",
+          kind: "CARDIO",
+          category: "RUNNING",
+          durationSeconds: 600,
+          distance: 1,
+          distanceUnit: "mi"
+        }
+      ]
+    }
+  });
+}
+
 async function resetAuditProfile(page: Page, baseURL: string) {
   const authToken = await page
     .evaluate((key) => window.localStorage.getItem(key), authTokenKey)
@@ -480,6 +566,7 @@ async function resetAuditProfile(page: Page, baseURL: string) {
 async function resetAuditFixture(page: Page, baseURL: string) {
   await cleanupAuditMeals(page, baseURL);
   await cleanupAuditHealthMetrics(page, baseURL);
+  await cleanupAuditWorkouts(page, baseURL);
   await resetAuditProfile(page, baseURL);
 }
 
@@ -687,11 +774,11 @@ async function verifyDialogKeyboardFlows(page: Page, baseURL: string, viewportNa
       focusReturnName: /^log food$/i
     },
     {
-      triggerName: /^log workout$/i,
+      triggerName: /^log completed workout$/i,
       dialogName: /log completed workout/i,
       pageLabel: "workout modal",
       title: "Workout modal",
-      focusReturnName: /^log workout$/i
+      focusReturnName: /^log completed workout$/i
     },
     {
       triggerName: /^log weight$/i,
@@ -1026,14 +1113,7 @@ async function runViewportAudit({
 
   await captureWeightModalFlow(page, baseURL, viewportName);
 
-  await page.goto(`${baseURL}/workouts`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /start workout|log (a completed )?workout/i }).first().click();
-  await page.waitForTimeout(500);
-  await screenshot(page, `${viewportName} workout modal initial`);
-  if (await page.getByRole("dialog").isVisible().catch(() => false)) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(250);
-  }
+  await captureWorkoutRescopeFlow(page, baseURL, viewportName);
 
   await page.goto(`${baseURL}/planning`, { waitUntil: "networkidle" });
   await page.getByRole("tab", { name: /new plan/i }).click();
