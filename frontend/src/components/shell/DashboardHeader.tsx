@@ -73,8 +73,8 @@ export function DashboardHeader() {
             </HeaderTooltip>
           } />
           <WorkoutSessionModal defaultIntent="quick" trigger={
-            <HeaderTooltip label="Log workout" className="hidden lg:inline-flex">
-              <Button variant="ghost" size="icon-sm" aria-label="Log workout">
+            <HeaderTooltip label="Log completed workout" className="hidden lg:inline-flex">
+              <Button variant="ghost" size="icon-sm" aria-label="Log completed workout">
                 <Dumbbell className="h-4 w-4" />
               </Button>
             </HeaderTooltip>

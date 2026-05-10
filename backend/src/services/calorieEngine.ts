@@ -135,10 +135,10 @@ export function calculateExerciseCalories(exercise: ExerciseCalorieInput, weight
     case "CYCLING":
     case "SWIMMING":
     case "ROWING":
+    case "HIIT":
       return calculateCardioCalories(exercise, weightKg);
     case "WEIGHTLIFTING":
     case "CALISTHENICS":
-    case "HIIT":
       return calculateStrengthCalories(exercise, weightKg);
     default:
       return 0;

@@ -241,7 +241,7 @@ export function DashboardPage() {
             trigger={
               <Button size="sm" variant="outline">
                 <Dumbbell className="h-4 w-4" />
-                Log workout
+                Log completed workout
               </Button>
             }
           />
@@ -451,7 +451,7 @@ export function DashboardPage() {
               trigger={
                 <Button size="sm" variant="outline">
                   <Plus className="h-4 w-4" />
-                  Log workout
+                  Log completed workout
                 </Button>
               }
             />

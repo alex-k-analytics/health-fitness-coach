@@ -18,7 +18,7 @@ export function WorkoutsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Training</h1>
-          <p className="page-description">Start a live session, log a completed workout, and review recent training volume.</p>
+          <p className="page-description">Build mixed sessions, repeat recent workouts, and compare training volume.</p>
         </div>
         <WorkoutSessionModal
           defaultIntent="timer"
@@ -35,7 +35,7 @@ export function WorkoutsPage() {
         <Card className="card-accent-brand">
           <CardHeader>
             <CardTitle>Log Training</CardTitle>
-            <CardDescription>Choose the path that matches what you are doing now.</CardDescription>
+            <CardDescription>Track strength and cardio together in one session.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
             <WorkoutSessionModal
@@ -43,7 +43,7 @@ export function WorkoutsPage() {
               trigger={
                 <Button className="min-h-12 justify-start" size="lg">
                   <Timer className="h-5 w-5" />
-                  Start a timed session
+                  Start workout
                 </Button>
               }
             />
@@ -52,13 +52,13 @@ export function WorkoutsPage() {
               trigger={
                 <Button className="min-h-12 justify-start" size="lg" variant="outline">
                   <Dumbbell className="h-5 w-5" />
-                  Log a completed workout
+                  Log completed workout
                 </Button>
               }
             />
             <div className="surface-muted flex items-start gap-3 p-3 text-sm text-muted-foreground">
               <Activity className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-              <p>Use timed sessions while training. Use completed logs for workouts from earlier today or imported notes.</p>
+              <p>Use Repeat on a recent session to clone exercises and compare every prior set while lifting.</p>
             </div>
           </CardContent>
         </Card>

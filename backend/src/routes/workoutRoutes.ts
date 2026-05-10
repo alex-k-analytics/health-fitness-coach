@@ -72,6 +72,11 @@ const listSessionsQuerySchema = z.object({
   status: z.enum(["PLANNING", "RUNNING", "COMPLETED"]).optional()
 });
 
+const exerciseHistoryQuerySchema = z.object({
+  names: z.string().min(1).max(2000),
+  excludeSessionId: z.string().optional()
+});
+
 const serializeWorkout = (workout: {
   id: string;
   title: string;
@@ -145,6 +150,82 @@ workoutRoutes.get("/log", (_req, res) => {
 
 workoutRoutes.get("/exercises", (_req, res) => {
   res.json({ exercises: EXERCISE_CATEGORIES });
+});
+
+workoutRoutes.get("/exercise-history", async (req: AuthenticatedRequest, res) => {
+  const parsed = exerciseHistoryQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const auth = getRequiredAuth(req);
+  const requestedNames = Array.from(
+    new Set(
+      parsed.data.names
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 25);
+  const normalizedNameSet = new Set(requestedNames.map((name) => name.toLowerCase()));
+
+  if (requestedNames.length === 0) {
+    return res.json({ history: {} });
+  }
+
+  const exercises = await prisma.workoutExercise.findMany({
+    where: {
+      accountId: auth.accountId,
+      name: {
+        in: requestedNames,
+        mode: "insensitive"
+      },
+      workoutSession: {
+        accountId: auth.accountId,
+        status: "COMPLETED",
+        ...(parsed.data.excludeSessionId ? { id: { not: parsed.data.excludeSessionId } } : {})
+      }
+    },
+    include: {
+      workoutSession: true
+    },
+    orderBy: [
+      {
+        workoutSession: {
+          performedAt: "desc"
+        }
+      },
+      {
+        order: "asc"
+      }
+    ]
+  });
+
+  const byName = new Map<string, (typeof exercises)[number]>();
+  for (const exercise of exercises) {
+    const key = exercise.name.toLowerCase();
+    if (!normalizedNameSet.has(key) || byName.has(key)) continue;
+    byName.set(key, exercise);
+  }
+
+  const history = Object.fromEntries(
+    requestedNames.map((name) => {
+      const exercise = byName.get(name.toLowerCase());
+      return [
+        name,
+        exercise
+          ? {
+              sessionId: exercise.workoutSession.id,
+              sessionTitle: exercise.workoutSession.title,
+              performedAt: exercise.workoutSession.performedAt.toISOString(),
+              exercise: serializeExercise(exercise)
+            }
+          : null
+      ];
+    })
+  );
+
+  return res.json({ history });
 });
 
 workoutRoutes.get("/", async (req: AuthenticatedRequest, res) => {

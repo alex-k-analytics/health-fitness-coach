@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/api";
 import { useShellStore } from "@/stores/shellStore";
-import type { WorkoutSession } from "@/types";
+import type { WorkoutExerciseHistoryEntry, WorkoutSession } from "@/types";
 
 export function useWorkoutSessionsQuery(limit = 3) {
   return useQuery({
@@ -14,6 +14,21 @@ export function useExerciseListQuery() {
   return useQuery({
     queryKey: ["exerciseList"],
     queryFn: () => apiFetch<{ exercises: Record<string, string[]> }>("/workouts/exercises")
+  });
+}
+
+export function useExerciseHistoryQuery(names: string[], excludeSessionId?: string) {
+  const uniqueNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean))).sort();
+  const namesKey = uniqueNames.join("|");
+
+  return useQuery({
+    queryKey: ["exerciseHistory", namesKey, excludeSessionId ?? ""],
+    enabled: uniqueNames.length > 0,
+    queryFn: () => {
+      const params = new URLSearchParams({ names: uniqueNames.join(",") });
+      if (excludeSessionId) params.set("excludeSessionId", excludeSessionId);
+      return apiFetch<{ history: Record<string, WorkoutExerciseHistoryEntry | null> }>(`/workouts/exercise-history?${params.toString()}`);
+    }
   });
 }
 

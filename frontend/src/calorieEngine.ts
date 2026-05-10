@@ -30,7 +30,7 @@ export const LIFT_FACTORS: Record<string, number> = {
   "Lateral Raise": 0.010
 };
 
-const CARDIO_CATEGORIES = new Set(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING"]);
+const CARDIO_CATEGORIES = new Set(["RUNNING", "WALKING", "CYCLING", "SWIMMING", "ROWING", "HIIT"]);
 
 function resolveMet(category: string, distance?: number, durationSeconds?: number): number {
   const table = MET_TABLE[category];

@@ -166,6 +166,13 @@ export interface WorkoutSession {
   exercises: WorkoutExercise[];
 }
 
+export interface WorkoutExerciseHistoryEntry {
+  sessionId: string;
+  sessionTitle: string;
+  performedAt: string;
+  exercise: WorkoutExercise;
+}
+
 export interface WorkoutSessionDraft {
   activityType: WorkoutActivityType;
   title: string;
