@@ -408,9 +408,19 @@ async function measureNavigationLayoutWithBanner(page: Page) {
     const primaryActionRect = primaryAction?.getBoundingClientRect() ?? null;
     const alertVisible = alertRect ? isVisibleRect(alertRect) : false;
     const alertPaintsOnTop = alert && alertRect && alertVisible
-      ? document
-          .elementsFromPoint(alertRect.left + alertRect.width / 2, alertRect.top + alertRect.height / 2)
-          .some((element) => element === alert || element.closest('[role="alert"], [role="status"]') === alert)
+      ? [
+          [0.5, 0.5],
+          [0.2, 0.35],
+          [0.8, 0.35],
+          [0.2, 0.7],
+          [0.8, 0.7]
+        ].every(([xRatio, yRatio]) => {
+          const topElement = document.elementsFromPoint(
+            alertRect.left + alertRect.width * xRatio,
+            alertRect.top + alertRect.height * yRatio
+          )[0];
+          return topElement === alert || topElement?.closest('[role="alert"], [role="status"]') === alert;
+        })
       : false;
     const headerTop = Math.round(headerRect.top);
     const bottomNavHasScrollbar = bottomNav
@@ -494,6 +504,76 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
   await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
 }
 
+async function verifyGlobalFeedbackDoesNotCoverDialog(page: Page, viewportName: string, pageLabel: string, findings: Finding[]) {
+  const result = await page.evaluate(() => {
+    const alert = document.querySelector('[role="alert"], [role="status"]');
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!alert || !dialog) {
+      return {
+        hasAlert: Boolean(alert),
+        hasDialog: Boolean(dialog),
+        alertPaintsOverDialog: false,
+        overlap: false
+      };
+    }
+
+    const alertRect = alert.getBoundingClientRect();
+    const dialogRect = dialog.getBoundingClientRect();
+    const visible = (rect: DOMRect) => rect.width > 0 && rect.height > 0;
+    const overlap =
+      visible(alertRect) &&
+      visible(dialogRect) &&
+      alertRect.left < dialogRect.right &&
+      alertRect.right > dialogRect.left &&
+      alertRect.top < dialogRect.bottom &&
+      alertRect.bottom > dialogRect.top;
+
+    if (!overlap) {
+      return {
+        hasAlert: true,
+        hasDialog: true,
+        alertPaintsOverDialog: false,
+        overlap: false
+      };
+    }
+
+    const left = Math.max(alertRect.left, dialogRect.left);
+    const right = Math.min(alertRect.right, dialogRect.right);
+    const top = Math.max(alertRect.top, dialogRect.top);
+    const bottom = Math.min(alertRect.bottom, dialogRect.bottom);
+    const alertPaintsOverDialog = [
+      [0.5, 0.5],
+      [0.25, 0.35],
+      [0.75, 0.65]
+    ].some(([xRatio, yRatio]) => {
+      const topElement = document.elementsFromPoint(
+        left + (right - left) * xRatio,
+        top + (bottom - top) * yRatio
+      )[0];
+      return topElement === alert || topElement?.closest('[role="alert"], [role="status"]') === alert;
+    });
+
+    return {
+      hasAlert: true,
+      hasDialog: true,
+      alertPaintsOverDialog,
+      overlap: true
+    };
+  });
+
+  if (!result.alertPaintsOverDialog) return;
+
+  const evidence = await screenshot(page, `${viewportName} ${pageLabel} toast covers dialog`);
+  findings.push({
+    severity: "High",
+    page: pageLabel,
+    title: "Global toast covers an open dialog or drawer",
+    actual: `Alert visible: ${result.hasAlert}. Dialog visible: ${result.hasDialog}. Rectangles overlap: ${result.overlap}. The alert paints above the dialog in the overlap area.`,
+    expected: "Global feedback may appear over page content, but it should not cover active modal or drawer workflows.",
+    evidence
+  });
+}
+
 async function captureProfileDrawer(page: Page, viewportName: string) {
   await page.getByRole("button", { name: /open profile/i }).click();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
@@ -504,7 +584,7 @@ async function captureProfileDrawer(page: Page, viewportName: string) {
   await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden();
 }
 
-async function captureProfileDrawerSaveFlow(page: Page, baseURL: string, viewportName: string) {
+async function captureProfileDrawerSaveFlow(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
   await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /open profile/i }).click();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
@@ -516,6 +596,7 @@ async function captureProfileDrawerSaveFlow(page: Page, baseURL: string, viewpor
 
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await verifyGlobalFeedbackDoesNotCoverDialog(page, viewportName, "profile drawer saved", findings);
   await screenshot(page, `${viewportName} profile drawer saved`);
 
   await page.getByRole("button", { name: "Close", exact: true }).click();
@@ -1276,7 +1357,7 @@ async function runViewportAudit({
   await verifyHeaderActionTooltips(page, viewportName, findings);
   await verifyGlobalBannerDoesNotShiftNavigation(page, baseURL, viewportName, findings);
   await captureProfileDrawer(page, viewportName);
-  await captureProfileDrawerSaveFlow(page, baseURL, viewportName);
+  await captureProfileDrawerSaveFlow(page, baseURL, viewportName, findings);
   await verifyProfileDrawerKeyboardFlow(page, baseURL, viewportName, findings);
   await verifyDialogKeyboardFlows(page, baseURL, viewportName, findings);
 
