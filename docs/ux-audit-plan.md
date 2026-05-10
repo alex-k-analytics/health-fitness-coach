@@ -80,7 +80,8 @@ For quick exploratory UX checks, use the optional Playwright CLI workflow in `do
 - Header
 - Profile drawer
 - Weight modal
-- Global banners
+- Global banners/toasts
+- Toast/banner feedback should not push sticky navigation down or create nav/document scrollbars
 - Bottom navigation
 - Active states
 - Safe-area and bottom-nav spacing

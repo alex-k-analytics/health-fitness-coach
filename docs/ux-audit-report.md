@@ -2,12 +2,12 @@
 
 Generated: 2026-05-10
 
-Latest rerun: 2026-05-10T03:53:03.803Z. The audit scope and runner include the workout logging rescope scenarios for mixed sessions, Repeat vs Edit, full previous set comparison, and adding cardio after strength. A fresh full `npm run ux:audit` pass completed successfully with no structured findings.
+Latest rerun: 2026-05-10T04:07:21.148Z. The audit scope and runner include the workout logging rescope scenarios plus global toast/banner navigation stability checks. A fresh full `npm run ux:audit` pass completed successfully with no structured findings.
 
 ## Automation Run
 
 - Source plan: `docs/ux-audit-plan.md`.
-- Design baseline: refreshed with `ui-ux-pro-max` for a health, fitness, wellness dashboard/mobile app, with extra UX guidance for workout logging forms and set comparison.
+- Design baseline: refreshed with `ui-ux-pro-max` for a health, fitness, wellness dashboard/mobile app, with extra UX guidance for workout logging forms, set comparison, and stable toast/banner feedback.
 - Backend health check: `http://localhost:4000/health` returned `{"ok":true,"service":"health-fitness-coach-api"}`.
 - Frontend check: `http://localhost:5173` returned `200`.
 - Audit command: `npm run ux:audit` from `frontend`.
@@ -15,8 +15,9 @@ Latest rerun: 2026-05-10T03:53:03.803Z. The audit scope and runner include the w
 - Evidence directory: `docs/ux-audit-screenshots/`.
 - Structured events: `docs/ux-audit-screenshots/audit-events.json`.
 - Structured findings: none.
-- Structured event timestamp: `2026-05-10T03:53:03.803Z`.
+- Structured event timestamp: `2026-05-10T04:07:21.148Z`.
 - Expected network events: `401 /api/auth/login` on mobile, tablet, and desktop during the wrong-password login checks.
+- Observed non-finding event: one tablet `GET /api/meal-plans/sources` timeout was recorded in browser events during the passing run.
 - Manual review checklist: `docs/ux-manual-review-checklist.md`.
 
 ## Design Review Baseline
@@ -27,6 +28,7 @@ The `ui-ux-pro-max` pass emphasized accessibility and interaction basics that ma
 - Dialogs and drawers should trap focus while open and return focus to the trigger on close.
 - Health dashboard UI should stay functional and readable, with action priority clear on small screens.
 - Mobile and tablet layouts should avoid bottom-navigation occlusion, horizontal overflow, and hidden primary actions.
+- Toasts and global feedback banners should not push sticky navigation down, cause page jump, or create scrollbars in navigation.
 - Numeric health inputs should remain labeled and use mobile-friendly input behavior.
 - Workout logging forms should use explicit labels rather than placeholder-only fields, especially for reps, weight, distance, and duration.
 - Mobile numeric entry should keep appropriate numeric input behavior for set rows and cardio metrics.
@@ -56,6 +58,7 @@ No low severity findings in this audit run.
 - The app shell rendered without recorded horizontal overflow across Dashboard, Meals, Planning, Workouts, and Settings.
 - Mobile and tablet bottom navigation did not trigger overlap findings.
 - Header icon actions exposed desktop hover/focus tooltips during the audit.
+- App-shell audit coverage now checks that transient global feedback does not shift sticky navigation or create nav/document overflow.
 - The profile drawer save flow worked by pointer/touch across mobile, tablet, and desktop.
 - Desktop keyboard checks now cover profile drawer, meal composer, workout modal, and weight modal open/close/focus-return behavior.
 - Dialog and drawer title/description semantics are smoke-checked for screen-reader users.

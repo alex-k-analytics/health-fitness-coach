@@ -17,6 +17,7 @@ Use this checklist after `npm run ux:audit` passes. The automated audit catches 
 - Success and error messages describe the result in user language.
 - Health, nutrition, and workout copy avoids ambiguity around units and saved values.
 - Repeated labels mean the same thing across Dashboard, Meals, Workouts, Planning, and Settings.
+- Toasts/global banners should not push sticky navigation down, create page jump, or add scrollbars to header/bottom navigation.
 
 ## Interaction Quality
 
@@ -25,6 +26,7 @@ Use this checklist after `npm run ux:audit` passes. The automated audit catches 
 - Dialogs and drawers feel like short tasks, not dead ends.
 - Long forms keep the save action discoverable.
 - Closing a surface does not surprise the user or discard changes silently.
+- Feedback toasts are dismissible/disappearable and do not obscure primary actions for long-running workflows.
 
 ## Workout Logging Review
 

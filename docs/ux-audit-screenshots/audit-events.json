@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-10T03:53:03.803Z",
+  "generatedAt": "2026-05-10T04:07:21.148Z",
   "findings": [],
   "events": [
     {
@@ -13,6 +13,18 @@
       "type": "http",
       "text": "401 http://localhost:5173/api/auth/login",
       "url": "http://localhost:5173/login"
+    },
+    {
+      "viewport": "tablet",
+      "type": "requestfailed",
+      "text": "GET http://localhost:5173/api/meal-plans/sources net::ERR_CONNECTION_TIMED_OUT",
+      "url": "http://localhost:5173/"
+    },
+    {
+      "viewport": "tablet",
+      "type": "console:error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_TIMED_OUT",
+      "url": "http://localhost:5173/"
     },
     {
       "viewport": "desktop",

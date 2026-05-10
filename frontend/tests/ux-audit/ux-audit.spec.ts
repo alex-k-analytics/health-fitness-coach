@@ -367,6 +367,75 @@ async function verifyPrimaryNavDoesNotCoverContent(
   });
 }
 
+async function measureNavigationLayoutWithBanner(page: Page) {
+  return page.evaluate(() => {
+    const header = document.querySelector("header");
+    const bottomNav = document.querySelector('nav[aria-label="Primary navigation"]');
+    if (!header) {
+      return {
+        hasHeader: false,
+        headerTop: null,
+        bottomNavHasScrollbar: false,
+        horizontalOverflow: false
+      };
+    }
+
+    const headerTop = Math.round(header.getBoundingClientRect().top);
+    const bottomNavHasScrollbar = bottomNav
+      ? bottomNav.scrollHeight > bottomNav.clientHeight + 1 || bottomNav.scrollWidth > bottomNav.clientWidth + 1
+      : false;
+    const horizontalOverflow = document.documentElement.scrollWidth > window.innerWidth + 1;
+
+    return {
+      hasHeader: true,
+      headerTop,
+      bottomNavHasScrollbar,
+      horizontalOverflow
+    };
+  });
+}
+
+async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
+  await page.goto(`${baseURL}/settings`, { waitUntil: "networkidle" });
+  const existingAlert = page.getByRole("alert").first();
+  if (await existingAlert.isVisible().catch(() => false)) {
+    await existingAlert.click();
+    await page.waitForTimeout(150);
+  }
+
+  const before = await measureNavigationLayoutWithBanner(page);
+  await page.getByLabel(/notes/i).fill(`UX audit toast layout check ${viewportName} ${Date.now()}`);
+  await page.getByRole("button", { name: /save changes/i }).click();
+  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByRole("alert").filter({ hasText: /profile updated/i })).toBeVisible({ timeout: 15_000 });
+  const after = await measureNavigationLayoutWithBanner(page);
+
+  if (
+    before.hasHeader &&
+    after.hasHeader &&
+    before.headerTop === after.headerTop &&
+    !after.bottomNavHasScrollbar &&
+    !after.horizontalOverflow
+  ) {
+    await page.getByRole("alert").filter({ hasText: /profile updated/i }).click().catch(() => undefined);
+    await resetAuditProfile(page, baseURL);
+    await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+    return;
+  }
+
+  const evidence = await screenshot(page, `${viewportName} global banner nav shift`);
+  findings.push({
+    severity: "Medium",
+    page: "app shell",
+    title: "Global toast/banner shifts navigation or creates overflow",
+    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}.`,
+    expected: "Transient toast feedback should overlay or reserve space without pushing sticky navigation or creating nav/document scrollbars.",
+    evidence
+  });
+  await resetAuditProfile(page, baseURL);
+  await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+}
+
 async function captureProfileDrawer(page: Page, viewportName: string) {
   await page.getByRole("button", { name: /open profile/i }).click();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
@@ -1068,6 +1137,7 @@ async function runViewportAudit({
   await verifyNoDevtoolsOverlay(page, viewportName, findings);
   await verifyReducedMotionPreference(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
+  await verifyGlobalBannerDoesNotShiftNavigation(page, baseURL, viewportName, findings);
   await captureProfileDrawer(page, viewportName);
   await captureProfileDrawerSaveFlow(page, baseURL, viewportName);
   await verifyProfileDrawerKeyboardFlow(page, baseURL, viewportName, findings);
