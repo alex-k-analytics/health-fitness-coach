@@ -34,6 +34,7 @@ import type {
 } from "@/types";
 import {
   useCreateSessionMutation,
+  useDeleteSessionMutation,
   useExerciseHistoryQuery,
   useExerciseListQuery,
   useUpdateSessionMutation
@@ -102,6 +103,7 @@ export function WorkoutSessionModal({
   const historyQuery = useExerciseHistoryQuery(exerciseNames, session?.id);
   const createSession = useCreateSessionMutation();
   const updateSession = useUpdateSessionMutation();
+  const deleteSession = useDeleteSessionMutation();
   const repeatedHistory = useMemo(() => buildRepeatedHistory(repeatFrom), [repeatFrom]);
 
   useEffect(() => {
@@ -332,10 +334,39 @@ export function WorkoutSessionModal({
     handleClose();
   };
 
+  const handleDelete = () => {
+    if (!session) return;
+    const confirmed = window.confirm(
+      `Delete "${session.title}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    deleteSession.mutate(session.id, {
+      onSuccess: handleClose
+    });
+  };
+
   const handleClose = () => {
     setOpen(false);
     resetDraft(defaultIntent);
     onClose?.();
+  };
+
+  const renderDeleteButton = () => {
+    if (!isEditing) return null;
+
+    return (
+      <Button
+        type="button"
+        variant="destructive"
+        onClick={handleDelete}
+        disabled={deleteSession.isPending || updateSession.isPending}
+        className="mr-auto"
+      >
+        <Trash2 className="h-4 w-4" />
+        {deleteSession.isPending ? "Deleting..." : "Delete workout"}
+      </Button>
+    );
   };
 
   const resetDraft = (intent: EntryIntent = defaultIntent) => {
@@ -555,9 +586,10 @@ export function WorkoutSessionModal({
       {(entryIntent === "quick" || isEditing) ? renderTimeControls("plan") : null}
       {renderExercisePicker()}
       {renderExerciseEditor()}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
+        {renderDeleteButton()}
         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-        <Button type="button" onClick={entryIntent === "quick" || isEditing ? handleReview : handleStart}>
+        <Button type="button" onClick={entryIntent === "quick" || isEditing ? handleReview : handleStart} disabled={deleteSession.isPending}>
           {entryIntent === "quick" || isEditing ? <Check className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           {entryIntent === "quick" || isEditing ? "Review workout" : "Start workout"}
         </Button>
@@ -609,9 +641,10 @@ export function WorkoutSessionModal({
             </Card>
           ))}
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {renderDeleteButton()}
           <Button type="button" variant="outline" onClick={() => setStep("plan")}>Edit</Button>
-          <Button type="button" onClick={handleSave} disabled={createSession.isPending || updateSession.isPending || exercises.length === 0}>
+          <Button type="button" onClick={handleSave} disabled={createSession.isPending || updateSession.isPending || deleteSession.isPending || exercises.length === 0}>
             {createSession.isPending || updateSession.isPending ? "Saving..." : isEditing ? "Update workout" : "Save workout"}
           </Button>
         </div>

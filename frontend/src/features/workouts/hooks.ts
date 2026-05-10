@@ -122,3 +122,25 @@ export function useUpdateSessionMutation() {
     }
   });
 }
+
+export function useDeleteSessionMutation() {
+  const queryClient = useQueryClient();
+  const setGlobalNotice = useShellStore.getState().setGlobalNotice;
+  const setGlobalError = useShellStore.getState().setGlobalError;
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/workouts/sessions/${id}`, {
+        method: "DELETE"
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workoutSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["nutritionSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setGlobalNotice("Workout deleted.");
+    },
+    onError: (error) => {
+      setGlobalError(error instanceof Error ? error.message : "Unable to delete workout.");
+    }
+  });
+}

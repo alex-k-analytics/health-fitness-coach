@@ -558,9 +558,23 @@ async function captureWorkoutRescopeFlow(page: Page, baseURL: string, viewportNa
   await expect(page.getByRole("dialog", { name: /repeat workout/i })).toBeVisible();
   await expect(page.getByText(/previous: 1: 10 x 95 lb/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /copy all/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /delete workout/i })).toHaveCount(0);
   await screenshot(page, `${viewportName} workout repeat comparison`);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: /repeat workout/i })).toBeHidden();
+
+  await page.getByRole("button", { name: /edit/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /edit workout/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /delete workout/i })).toBeVisible();
+  await screenshot(page, `${viewportName} workout edit delete available`);
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toMatch(/Delete "UX audit upper plus treadmill"/);
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: /delete workout/i }).click();
+  await expect(page.getByRole("dialog", { name: /edit workout/i })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(auditWorkoutTitle).first()).toBeHidden({ timeout: 15_000 });
+  await screenshot(page, `${viewportName} workout deleted`);
 
   await page.getByRole("button", { name: /^start workout$/i }).first().click();
   await expect(page.getByRole("dialog", { name: /start workout/i })).toBeVisible();

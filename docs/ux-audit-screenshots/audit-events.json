@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-10T15:20:12.735Z",
+  "generatedAt": "2026-05-10T15:30:27.863Z",
   "findings": [],
   "events": [
     {
@@ -30,18 +30,6 @@
       "viewport": "tablet",
       "type": "http",
       "text": "404 http://localhost:5173/api/meal-plans/runs/ux-audit-sanitized-run/status",
-      "url": "http://localhost:5173/planning"
-    },
-    {
-      "viewport": "tablet",
-      "type": "console:error",
-      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
-      "url": "http://localhost:5173/planning"
-    },
-    {
-      "viewport": "tablet",
-      "type": "http",
-      "text": "404 http://localhost:5173/api/meal-plans/runs/ux-audit-sanitized-run",
       "url": "http://localhost:5173/planning"
     },
     {
