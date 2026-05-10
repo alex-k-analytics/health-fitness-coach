@@ -81,7 +81,8 @@ For quick exploratory UX checks, use the optional Playwright CLI workflow in `do
 - Profile drawer
 - Weight modal
 - Global banners/toasts
-- Toast/banner feedback should not push sticky navigation down or create nav/document scrollbars
+- Toast/banner feedback should not push sticky navigation down, overlap primary nav regions, or create nav/document scrollbars
+- Toast/banner feedback should be dismissible through an accessible control and transient for non-critical messages
 - Bottom navigation
 - Active states
 - Safe-area and bottom-nav spacing

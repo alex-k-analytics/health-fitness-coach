@@ -18,8 +18,8 @@ export const useShellStore = create<ShellStore>((set) => ({
   setSession: (session) => set({ session }),
   globalError: "",
   globalNotice: "",
-  setGlobalError: (globalError) => set({ globalError }),
-  setGlobalNotice: (globalNotice) => set({ globalNotice }),
+  setGlobalError: (globalError) => set({ globalError, globalNotice: "" }),
+  setGlobalNotice: (globalNotice) => set({ globalNotice, globalError: "" }),
   clearGlobalState: () => set({ globalError: "", globalNotice: "" }),
   profileDrawerOpen: false,
   setProfileDrawerOpen: (profileDrawerOpen) => set({ profileDrawerOpen })

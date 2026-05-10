@@ -371,16 +371,31 @@ async function measureNavigationLayoutWithBanner(page: Page) {
   return page.evaluate(() => {
     const header = document.querySelector("header");
     const bottomNav = document.querySelector('nav[aria-label="Primary navigation"]');
+    const alert = document.querySelector('[role="alert"]');
+
+    const rectsOverlap = (first: DOMRect, second: DOMRect) =>
+      first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+
+    const isVisibleRect = (rect: DOMRect) => rect.width > 0 && rect.height > 0;
     if (!header) {
       return {
         hasHeader: false,
         headerTop: null,
         bottomNavHasScrollbar: false,
-        horizontalOverflow: false
+        horizontalOverflow: false,
+        alertVisible: false,
+        alertOverlapsHeader: false,
+        alertOverlapsBottomNav: false,
+        alertTop: null,
+        alertBottom: null
       };
     }
 
-    const headerTop = Math.round(header.getBoundingClientRect().top);
+    const headerRect = header.getBoundingClientRect();
+    const bottomNavRect = bottomNav?.getBoundingClientRect() ?? null;
+    const alertRect = alert?.getBoundingClientRect() ?? null;
+    const alertVisible = alertRect ? isVisibleRect(alertRect) : false;
+    const headerTop = Math.round(headerRect.top);
     const bottomNavHasScrollbar = bottomNav
       ? bottomNav.scrollHeight > bottomNav.clientHeight + 1 || bottomNav.scrollWidth > bottomNav.clientWidth + 1
       : false;
@@ -390,7 +405,12 @@ async function measureNavigationLayoutWithBanner(page: Page) {
       hasHeader: true,
       headerTop,
       bottomNavHasScrollbar,
-      horizontalOverflow
+      horizontalOverflow,
+      alertVisible,
+      alertOverlapsHeader: alertRect && alertVisible ? rectsOverlap(alertRect, headerRect) : false,
+      alertOverlapsBottomNav: alertRect && alertVisible && bottomNavRect ? rectsOverlap(alertRect, bottomNavRect) : false,
+      alertTop: alertVisible ? Math.round(alertRect.top) : null,
+      alertBottom: alertVisible ? Math.round(alertRect.bottom) : null
     };
   });
 }
@@ -407,17 +427,26 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
   await page.getByLabel(/notes/i).fill(`UX audit toast layout check ${viewportName} ${Date.now()}`);
   await page.getByRole("button", { name: /save changes/i }).click();
   await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
-  await expect(page.getByRole("alert").filter({ hasText: /profile updated/i })).toBeVisible({ timeout: 15_000 });
+  const profileUpdatedAlert = page.getByRole("alert").filter({ hasText: /profile updated/i });
+  await expect(profileUpdatedAlert).toBeVisible({ timeout: 15_000 });
   const after = await measureNavigationLayoutWithBanner(page);
+  await screenshot(page, `${viewportName} global banner toast visible`);
+  const dismissButton = profileUpdatedAlert.getByRole("button", { name: /dismiss notification/i });
+  const hasDismissButton = await dismissButton.isVisible().catch(() => false);
 
   if (
     before.hasHeader &&
     after.hasHeader &&
     before.headerTop === after.headerTop &&
     !after.bottomNavHasScrollbar &&
-    !after.horizontalOverflow
+    !after.horizontalOverflow &&
+    after.alertVisible &&
+    !after.alertOverlapsHeader &&
+    !after.alertOverlapsBottomNav &&
+    hasDismissButton
   ) {
-    await page.getByRole("alert").filter({ hasText: /profile updated/i }).click().catch(() => undefined);
+    await dismissButton.click();
+    await expect(profileUpdatedAlert).toBeHidden({ timeout: 3_000 });
     await resetAuditProfile(page, baseURL);
     await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
     return;
@@ -428,8 +457,8 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
     severity: "Medium",
     page: "app shell",
     title: "Global toast/banner shifts navigation or creates overflow",
-    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}.`,
-    expected: "Transient toast feedback should overlay or reserve space without pushing sticky navigation or creating nav/document scrollbars.",
+    actual: `Header top before/after: ${before.headerTop}/${after.headerTop}. Bottom nav scrollbar: ${after.bottomNavHasScrollbar}. Horizontal overflow: ${after.horizontalOverflow}. Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps header: ${after.alertOverlapsHeader}. Alert overlaps bottom nav: ${after.alertOverlapsBottomNav}. Dismiss button visible: ${hasDismissButton}.`,
+    expected: "Transient toast feedback should overlay without pushing sticky navigation, overlapping primary nav regions, creating scrollbars, or hiding dismissal behind pointer-only behavior.",
     evidence
   });
   await resetAuditProfile(page, baseURL);
