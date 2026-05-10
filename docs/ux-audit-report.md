@@ -2,12 +2,12 @@
 
 Generated: 2026-05-10
 
-Update: after the workout logging rescope, the audit scope and runner were updated for mixed sessions, Repeat vs Edit, full previous set comparison, and adding cardio after strength. A fresh full `npm run ux:audit` pass completed successfully with the updated workout scenarios.
+Latest rerun: 2026-05-10T03:53:03.803Z. The audit scope and runner include the workout logging rescope scenarios for mixed sessions, Repeat vs Edit, full previous set comparison, and adding cardio after strength. A fresh full `npm run ux:audit` pass completed successfully with no structured findings.
 
 ## Automation Run
 
 - Source plan: `docs/ux-audit-plan.md`.
-- Design baseline: refreshed with `ui-ux-pro-max` for a health, fitness, wellness dashboard/mobile app.
+- Design baseline: refreshed with `ui-ux-pro-max` for a health, fitness, wellness dashboard/mobile app, with extra UX guidance for workout logging forms and set comparison.
 - Backend health check: `http://localhost:4000/health` returned `{"ok":true,"service":"health-fitness-coach-api"}`.
 - Frontend check: `http://localhost:5173` returned `200`.
 - Audit command: `npm run ux:audit` from `frontend`.
@@ -15,6 +15,7 @@ Update: after the workout logging rescope, the audit scope and runner were updat
 - Evidence directory: `docs/ux-audit-screenshots/`.
 - Structured events: `docs/ux-audit-screenshots/audit-events.json`.
 - Structured findings: none.
+- Structured event timestamp: `2026-05-10T03:53:03.803Z`.
 - Expected network events: `401 /api/auth/login` on mobile, tablet, and desktop during the wrong-password login checks.
 - Manual review checklist: `docs/ux-manual-review-checklist.md`.
 
@@ -27,6 +28,9 @@ The `ui-ux-pro-max` pass emphasized accessibility and interaction basics that ma
 - Health dashboard UI should stay functional and readable, with action priority clear on small screens.
 - Mobile and tablet layouts should avoid bottom-navigation occlusion, horizontal overflow, and hidden primary actions.
 - Numeric health inputs should remain labeled and use mobile-friendly input behavior.
+- Workout logging forms should use explicit labels rather than placeholder-only fields, especially for reps, weight, distance, and duration.
+- Mobile numeric entry should keep appropriate numeric input behavior for set rows and cardio metrics.
+- Save actions should expose loading/success/error feedback, and interactive controls should use stable hover/focus states without layout shift.
 
 The current app is aligned with this baseline in the automated pass: it uses labeled form controls, Lucide icons, visible focus styles, responsive app chrome, reduced-motion handling, and audit coverage across mobile, tablet, and desktop.
 
