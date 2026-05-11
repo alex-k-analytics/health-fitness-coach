@@ -377,7 +377,7 @@ async function measureNavigationLayoutWithBanner(page: Page) {
     const primaryAction = Array.from(document.querySelectorAll("button")).find((button) => {
       const text = button.textContent?.trim() ?? "";
       const rect = button.getBoundingClientRect();
-      return /save changes|start planning run/i.test(text) && rect.width > 0 && rect.height > 0;
+      return /save changes|start planning run|start workout/i.test(text) && rect.width > 0 && rect.height > 0;
     }) ?? null;
 
     const rectsOverlap = (first: DOMRect, second: DOMRect) =>
@@ -502,6 +502,50 @@ async function verifyGlobalBannerDoesNotShiftNavigation(page: Page, baseURL: str
   });
   await resetAuditProfile(page, baseURL);
   await page.goto(`${baseURL}/`, { waitUntil: "networkidle" });
+}
+
+async function verifyGlobalBannerDoesNotCoverWorkoutAction(page: Page, baseURL: string, viewportName: string, findings: Finding[]) {
+  await page.goto(`${baseURL}/workouts`, { waitUntil: "networkidle" });
+  const existingAlert = page.locator('[role="alert"], [role="status"]').first();
+  if (await existingAlert.isVisible().catch(() => false)) {
+    await existingAlert.getByRole("button", { name: /dismiss notification/i }).click();
+    await page.waitForTimeout(150);
+  }
+
+  await page.getByRole("button", { name: /open profile/i }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+  await page.getByLabel(/display name/i).fill(`Test User workouts toast ${viewportName}`);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("button", { name: /saving/i })).toBeHidden({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByRole("status").filter({ hasText: /profile updated/i })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole("button", { name: /^start workout$/i }).first()).toBeVisible({ timeout: 15_000 });
+  const after = await measureNavigationLayoutWithBanner(page);
+  await screenshot(page, `${viewportName} workouts toast visible near action`);
+
+  if (after.alertVisible && !after.alertOverlapsPrimaryAction && after.alertPaintsOnTop) {
+    const dismissButton = page
+      .locator('[role="alert"], [role="status"]')
+      .first()
+      .getByRole("button", { name: /dismiss notification/i });
+    if (await dismissButton.isVisible().catch(() => false)) {
+      await dismissButton.click();
+    }
+    await resetAuditProfile(page, baseURL);
+    return;
+  }
+
+  const evidence = await screenshot(page, `${viewportName} workouts toast action collision`);
+  findings.push({
+    severity: "High",
+    page: "workouts",
+    title: "Global toast covers the page action",
+    actual: `Alert visible: ${after.alertVisible}. Alert top/bottom: ${after.alertTop}/${after.alertBottom}. Alert overlaps primary action: ${after.alertOverlapsPrimaryAction}. Alert paints on top: ${after.alertPaintsOnTop}.`,
+    expected: "Toast feedback should not collide with the visible Start workout action on the workouts page.",
+    evidence
+  });
+  await resetAuditProfile(page, baseURL);
 }
 
 async function verifyGlobalFeedbackDoesNotCoverDialog(page: Page, viewportName: string, pageLabel: string, findings: Finding[]) {
@@ -1356,6 +1400,7 @@ async function runViewportAudit({
   await verifyReducedMotionPreference(page, viewportName, findings);
   await verifyHeaderActionTooltips(page, viewportName, findings);
   await verifyGlobalBannerDoesNotShiftNavigation(page, baseURL, viewportName, findings);
+  await verifyGlobalBannerDoesNotCoverWorkoutAction(page, baseURL, viewportName, findings);
   await captureProfileDrawer(page, viewportName);
   await captureProfileDrawerSaveFlow(page, baseURL, viewportName, findings);
   await verifyProfileDrawerKeyboardFlow(page, baseURL, viewportName, findings);

@@ -19,7 +19,7 @@ export function GlobalBanner() {
   if (!message) return null;
 
   return (
-    <div className="pointer-events-none fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-[calc(0.75rem+env(safe-area-inset-right))] z-50 flex w-fit max-w-[calc(100vw-1.5rem)] lg:bottom-auto lg:right-4 lg:top-[calc(3.5rem+0.75rem)] lg:w-[min(28rem,calc(100vw-2rem))]">
+    <div className="pointer-events-none fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-[calc(0.75rem+env(safe-area-inset-right))] z-50 flex w-fit max-w-[calc(100vw-1.5rem)] lg:bottom-auto lg:right-4 lg:top-[calc(3.5rem+0.75rem)] lg:max-w-[min(28rem,calc(100vw-2rem))]">
       <Alert
         variant={isError ? "destructive" : "success"}
         role={isError ? "alert" : "status"}
