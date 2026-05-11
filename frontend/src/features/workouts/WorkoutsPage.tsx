@@ -136,12 +136,12 @@ export function WorkoutsPage() {
 
 function SummaryTile({ icon: Icon, label, value }: { icon: ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
-    <div className="surface-muted p-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Icon className="h-4 w-4" />
-        <span>{label}</span>
+    <div className="surface-muted grid min-h-28 content-start p-4">
+      <div className="grid min-h-10 grid-cols-[auto_1fr] items-start gap-x-2 text-sm leading-5 text-muted-foreground">
+        <Icon className="mt-0.5 h-4 w-4" />
+        <span className="text-balance">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+      <p className="mt-2 text-2xl font-bold leading-none tracking-tight">{value}</p>
     </div>
   );
 }
